@@ -50,3 +50,7 @@ backend/data/*.db
 tmp/
 temp/
 .cache/
+
+docs/project_spec.md
+docs/current_phase.md
+docs/templates/
