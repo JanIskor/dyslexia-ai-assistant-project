@@ -25,7 +25,7 @@ export function AuthLayout({ title, description, children, footnote }: AuthLayou
         </section>
 
         <section className="w-full flex justify-center">
-          <div className="w-full max-w-lg scale-[1.08] rounded-[36px] border border-slate-200/40 bg-white/90 p-8 shadow-[0_24px_48px_rgba(148,163,184,0.25)] backdrop-blur-sm sm:p-10">
+          <div className="w-full max-w-lg scale-[1.06] rounded-[36px] border border-slate-200/40 bg-white/90 p-8 shadow-[0_24px_48px_rgba(148,163,184,0.25)] backdrop-blur-sm sm:p-10">
             <div className="mb-7 text-center">
               <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
               <p className="mt-3 text-base text-slate-600 sm:text-lg">{description}</p>
