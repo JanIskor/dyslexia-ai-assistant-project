@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { Mail } from 'lucide-react';
 import { validateEmail, AuthErrors } from '@/lib/authValidators';
 
 interface ForgotForm {
@@ -56,7 +57,7 @@ export default function ForgotPassword() {
           value={form.email}
           onChange={handleChange}
           placeholder="example@site.ru"
-          icon={<span>📧</span>}
+          icon={<Mail className="h-4 w-4 text-orange-500" />}
           error={errors.email}
           autoComplete="email"
         />

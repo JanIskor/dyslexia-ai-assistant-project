@@ -1,4 +1,6 @@
 import React from 'react';
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
 
 interface AuthLayoutProps {
   title: string;
@@ -9,36 +11,34 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ title, description, children, footnote }: AuthLayoutProps) {
   return (
-    <main className="min-h-screen bg-linear-to-br from-rose-50 via-orange-50 to-amber-50 px-4 py-8 sm:py-12">
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8">
-        {/* верхний блок вне карточки */}
-        <header className="text-center">
-          <div className="mx-auto mb-2 flex items-center justify-center gap-3">
-            <img
-              src="/image.png"
-              alt="Логотип Dyslexious"
-              className="h-10 w-10 rounded-full border border-orange-200 bg-white object-cover"
-            />
-            <span className="text-2xl font-extrabold tracking-tight text-orange-600 sm:text-3xl">Dyslexious</span>
+    <main className="relative min-h-screen bg-linear-to-br from-rose-50 via-orange-50 to-amber-50 px-4 pt-20 pb-6 sm:px-8 sm:pt-24">
+      <Header />
+
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-10">
+        <section className="w-full text-center">
+          <p className="text-3xl font-semibold text-amber-700/90 leading-snug sm:text-5xl">
+            Учиться может каждый - только дайте возможность!
+          </p>
+          <p className="mt-4 text-xl text-amber-700/40 sm:text-2xl">
+            ИИ-ассистент для школьников с дислексией
+          </p>
+        </section>
+
+        <section className="w-full flex justify-center">
+          <div className="w-full max-w-lg scale-[1.08] rounded-[36px] border border-slate-200/40 bg-white/90 p-8 shadow-[0_24px_48px_rgba(148,163,184,0.25)] backdrop-blur-sm sm:p-10">
+            <div className="mb-7 text-center">
+              <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
+              <p className="mt-3 text-base text-slate-600 sm:text-lg">{description}</p>
+            </div>
+
+            {children}
+
+            {footnote && <div className="mt-8 text-center text-base text-slate-500">{footnote}</div>}
           </div>
-          <p className="text-base font-semibold text-slate-700">Учиться может каждый — только дайте возможность!</p>
-          <p className="mt-1 text-sm text-slate-500">ИИ-ассистент для школьников с дислексией</p>
-        </header>
-
-        {/* карточка с формой */}
-        <div className="w-full max-w-md rounded-[30px] border border-slate-200/50 bg-white/90 p-6 shadow-[0_20px_40px_rgba(148,163,184,0.25)] backdrop-blur-sm sm:p-8">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-            <p className="mt-2 text-sm text-slate-500">{description}</p>
-          </div>
-
-          {children}
-
-          {footnote && <div className="mt-6 text-center text-sm text-slate-500">{footnote}</div>}
-
-          <div className="mt-6 text-center text-xs text-slate-400">© {new Date().getFullYear()} AI-дислексия</div>
-        </div>
+        </section>
       </div>
+
+      <Footer />
     </main>
   );
 }

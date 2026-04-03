@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
+import { Mail, Lock } from 'lucide-react';
 import {
   validateEmail,
   validatePassword,
@@ -67,7 +68,7 @@ export default function RegisterPage() {
           value={form.email}
           onChange={handleChange}
           placeholder="example@site.ru"
-          icon={<span>📧</span>}
+          icon={<Mail className="h-4 w-4 text-orange-500" />}
           error={errors.email}
           autoComplete="email"
         />
@@ -79,7 +80,7 @@ export default function RegisterPage() {
           value={form.password}
           onChange={handleChange}
           placeholder="Пароль"
-          icon={<span>🔒</span>}
+          icon={<Lock className="h-4 w-4 text-orange-500" />}
           error={errors.password}
           autoComplete="new-password"
         />
@@ -91,7 +92,7 @@ export default function RegisterPage() {
           value={form.confirmPassword}
           onChange={handleChange}
           placeholder="Подтверждение пароля"
-          icon={<span>🔒</span>}
+          icon={<Lock className="h-4 w-4 text-orange-500" />}
           error={errors.confirmPassword}
           autoComplete="new-password"
         />

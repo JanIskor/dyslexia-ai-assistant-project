@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
 import { validateEmail, validatePassword, AuthErrors } from '@/lib/authValidators';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginForm {
   email: string;
@@ -64,7 +65,7 @@ export default function LoginPage() {
           value={form.email}
           onChange={handleChange}
           placeholder="example@site.ru"
-          icon={<span>📧</span>}
+          icon={<Mail className="h-4 w-4 text-orange-500" />}
           error={errors.email}
           autoComplete="email"
         />
@@ -76,16 +77,17 @@ export default function LoginPage() {
           value={form.password}
           onChange={handleChange}
           placeholder="Введите пароль"
-          icon={<span>🔒</span>}
+          icon={<Lock className="h-4 w-4 text-orange-500" />}
           error={errors.password}
           autoComplete="current-password"
         >
           <button
             type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 hover:text-slate-700"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
             onClick={() => setForm((prev) => ({ ...prev, showPassword: !prev.showPassword }))}
+            aria-label={form.showPassword ? 'Скрыть пароль' : 'Показать пароль'}
           >
-            {form.showPassword ? 'Скрыть' : 'Показать'}
+            {form.showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </AuthField>
 
@@ -100,7 +102,7 @@ export default function LoginPage() {
             />
             <span>Запомнить меня</span>
           </label>
-          <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700">
+          <Link href="/forgot-password" className="text-orange-500 hover:text-orange-600">
             Забыли пароль?
           </Link>
         </div>
