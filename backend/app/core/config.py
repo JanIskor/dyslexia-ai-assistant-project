@@ -1,15 +1,12 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "AI Dyslexia Backend"
-    debug: bool = True
-    version: str = "0.1.0"
-    host: str = "127.0.0.1"
-    port: int = 8000
+    DATABASE_URL: str = "sqlite:///./app.db"
+    SECRET_KEY: str = "change-me"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
