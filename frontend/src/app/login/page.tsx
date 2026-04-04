@@ -1,10 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
 import { validateEmail, validatePassword, AuthErrors } from '@/lib/authValidators';
+import { getCurrentUser, loginUser } from '@/lib/authApi';
+import { getRoleRedirectPath } from '@/lib/authRedirect';
+import { saveAccessToken } from '@/lib/authStorage';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginForm {
@@ -17,9 +21,20 @@ interface LoginForm {
 const initialForm: LoginForm = { email: '', password: '', remember: false, showPassword: false };
 
 export default function LoginPage() {
+  const router = useRouter();
   const [form, setForm] = useState<LoginForm>(initialForm);
   const [errors, setErrors] = useState<AuthErrors>({});
   const [status, setStatus] = useState<string>('');
+  const [statusType, setStatusType] = useState<'error' | 'success'>('error');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('registered') === '1') {
+      setStatusType('success');
+      setStatus('Регистрация прошла успешно. Теперь войдите в систему.');
+    }
+  }, []);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = event.target;
@@ -35,13 +50,38 @@ export default function LoginPage() {
     return !result.email && !result.password;
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) {
+      setStatusType('error');
       setStatus('Обнаружены ошибки. Исправьте, пожалуйста.');
       return;
     }
-    setStatus('Форма корректна (имитация отправки). TODO: подключить backend.');
+
+    setIsSubmitting(true);
+    setStatus('');
+
+    try {
+      const { access_token } = await loginUser({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      saveAccessToken(access_token, form.remember);
+
+      const currentUser = await getCurrentUser(access_token);
+
+      setStatusType('success');
+      setStatus('Вход выполнен успешно. Перенаправляем...');
+      router.push(getRoleRedirectPath(currentUser.role));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Не удалось выполнить вход. Попробуйте ещё раз.';
+      setStatusType('error');
+      setStatus(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -109,13 +149,20 @@ export default function LoginPage() {
 
         <button
           type="submit"
+          disabled={isSubmitting}
           className="w-full rounded-xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-4 py-2 text-white font-semibold shadow-md transition hover:brightness-95"
         >
-          Войти
+          {isSubmitting ? 'Входим...' : 'Войти'}
         </button>
 
         {status && (
-          <p className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">
+          <p
+            className={`rounded-lg border p-2 text-sm ${
+              statusType === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
             {status}
           </p>
         )}

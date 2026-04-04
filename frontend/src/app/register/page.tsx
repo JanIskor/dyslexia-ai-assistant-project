@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { AuthField } from '@/components/auth/AuthField';
 import { Mail, Lock } from 'lucide-react';
+import { registerUser } from '@/lib/authApi';
 import {
   validateEmail,
   validatePassword,
@@ -20,9 +22,12 @@ interface RegisterForm {
 const initialForm: RegisterForm = { email: '', password: '', confirmPassword: '' };
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [form, setForm] = useState<RegisterForm>(initialForm);
   const [errors, setErrors] = useState<AuthErrors>({});
   const [status, setStatus] = useState<string>('');
+  const [statusType, setStatusType] = useState<'error' | 'success'>('error');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
@@ -38,13 +43,40 @@ export default function RegisterPage() {
     return !result.email && !result.password && !result.confirmPassword;
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) {
+      setStatusType('error');
       setStatus('Исправьте ошибки в форме');
       return;
     }
-    setStatus('Регистрация готова. Далее будет интеграция с backend.');
+
+    setIsSubmitting(true);
+    setStatus('');
+
+    try {
+      await registerUser({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      setStatusType('success');
+      setStatus('Регистрация прошла успешно. Перенаправляем на страницу входа...');
+      setForm(initialForm);
+
+      window.setTimeout(() => {
+        router.push('/login?registered=1');
+      }, 1200);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Не удалось завершить регистрацию. Попробуйте ещё раз.';
+      setStatusType('error');
+      setStatus(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -67,7 +99,7 @@ export default function RegisterPage() {
           type="email"
           value={form.email}
           onChange={handleChange}
-          placeholder="example@site.ru"
+          placeholder="ivan.petrov@mail.ru"
           icon={<Mail className="h-4 w-4 text-orange-500" />}
           error={errors.email}
           autoComplete="email"
@@ -99,13 +131,20 @@ export default function RegisterPage() {
 
         <button
           type="submit"
+          disabled={isSubmitting}
           className="w-full rounded-xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-4 py-2 text-white font-semibold shadow-md transition hover:brightness-95"
         >
-          Зарегистрироваться
+          {isSubmitting ? 'Регистрируем...' : 'Зарегистрироваться'}
         </button>
 
         {status && (
-          <p className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">
+          <p
+            className={`rounded-lg border p-2 text-sm ${
+              statusType === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
             {status}
           </p>
         )}

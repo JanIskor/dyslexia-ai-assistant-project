@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Frontend Foundation
+## Текущая фаза: Auth Integration
 
-На этом этапе реализуется фронтенд-приложение на основе современного стека.
+На этом этапе frontend auth UI соединён с backend auth API в минимальный рабочий MVP flow.
 
 ### Tech Stack
 ```
@@ -15,10 +15,42 @@ Frontend (Next.js 16 + App Router)
     [Tailwind CSS for styling]
     [TypeScript for type safety]
     [ESLint + Prettier for code quality]
+    [Auth API client + token storage]
     ↓
 [Browser]
 
-Backend (планируется FastAPI на следующем шаге)
+Backend (FastAPI + SQLAlchemy)
+    ↓
+    [SQLite database]
+    [JWT authentication]
+    [Pydantic validation]
+    [CORS for local frontend]
+    ↓
+[uvicorn server]
+```
+
+## Структура backend
+
+### App (app/)
+```
+app/
+├── main.py         # FastAPI приложение
+├── core/           # Конфигурация и зависимости
+│   ├── config.py
+│   ├── security.py
+│   └── dependencies.py
+├── db/             # База данных
+│   ├── base.py
+│   └── session.py
+├── models/         # SQLAlchemy модели
+│   └── user.py
+├── schemas/        # Pydantic схемы
+│   └── auth.py
+├── services/       # Бизнес-логика
+│   └── auth_service.py
+└── api/v1/         # API endpoints
+    ├── health.py
+    └── auth.py
 ```
 
 ## Структура приложения
@@ -46,9 +78,11 @@ components/
 Вспомогательные функции и константы
 ```
 lib/
-├── utils.ts        # Общие помощники
-├── constants.ts    # Константы приложения
-└── [API клиент - когда будет backend]
+├── authApi.ts      # Запросы register/login/me
+├── authRedirect.ts # Redirect по роли
+├── authStorage.ts  # Хранение access token
+├── authValidators.ts
+└── [другие helpers]
 ```
 
 ### Hooks (src/hooks/)
@@ -85,20 +119,24 @@ types/
    - Реализуется функциональность адаптации текстов
 ```
 
-## Data Flow (планируется на будущих шагах)
+## Data Flow auth integration
 
 ```
 User Browser
     ↓
-React Components (в src/components/)
+React auth pages (`/register`, `/login`)
     ↓
-Custom Hooks (в src/hooks/)
+`authApi.ts`
     ↓
-API Client (будет в src/lib/ когда готов backend)
+FastAPI auth endpoints
     ↓
-Backend API (FastAPI - следующий шаг)
+`/register` → создаёт пользователя
+`/login` → возвращает access token
+`/me` → возвращает текущего пользователя по Bearer token
     ↓
-Database
+Browser storage (`localStorage` или `sessionStorage`)
+    ↓
+Redirect по роли (`/student` или `/teacher`)
 ```
 
 ## Масштабируемость
@@ -110,10 +148,22 @@ Database
 - **Hooks** отделены в src/hooks для переиспользования
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Интеграция с Backend (планируется)
+## Auth Integration
 
-На следующих шагах:
-1. Backend реализуется на FastAPI
-2. Создается API клиент в `src/lib/api.ts`
-3. Типы запросов/ответов добавляются в `src/types/api.ts`
-4. Hooks для работы с API добавляются в `src/hooks`
+- `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
+- `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
+- После логина frontend делает `GET /api/v1/auth/me` с `Authorization: Bearer <token>`.
+- Токен сохраняется минимальным MVP-способом:
+  - `localStorage` при включённом «Запомнить меня»;
+  - `sessionStorage` в остальных случаях.
+- Redirect по роли реализован без middleware и глобального auth context:
+  - `student` → `/student`
+  - `teacher` → `/teacher`
+- На backend включён CORS для локального frontend.
+
+## Что ещё не реализовано
+
+- refresh tokens;
+- централизованный auth state;
+- protected routes через middleware;
+- автоматическая проверка токена при открытии приложения.
