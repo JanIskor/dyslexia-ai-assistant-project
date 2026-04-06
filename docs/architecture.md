@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Auth Integration
+## Текущая фаза: Student Dashboard UI
 
-На этом этапе frontend auth UI соединён с backend auth API в минимальный рабочий MVP flow.
+На текущем этапе frontend auth flow уже работает end-to-end, а поверх него реализован student dashboard UI на маршруте `/student`.
 
 ### Tech Stack
 ```
@@ -60,18 +60,24 @@ app/
 app/
 ├── layout.tsx      # Root layout с метаданными и стилями
 ├── page.tsx        # Главная страница (/)
+├── login/page.tsx
+├── register/page.tsx
+├── teacher/page.tsx
+├── student/page.tsx # Student dashboard entrypoint
 ├── globals.css     # Глобальные стили (Tailwind)
-└── [в будущем - другие маршруты]
+└── [другие маршруты]
 ```
 
 ### Компоненты (src/components/)
 Место для переиспользуемых React компонентов
 ```
 components/
-├── Button.tsx
-├── Input.tsx
-├── Header.tsx
-└── [другие компоненты]
+├── auth/
+├── layout/
+│   ├── Header.tsx
+│   └── Footer.tsx
+└── student/
+    └── StudentDashboard.tsx
 ```
 
 ### Утилиты (src/lib/)
@@ -85,41 +91,7 @@ lib/
 └── [другие helpers]
 ```
 
-### Hooks (src/hooks/)
-Пользовательские React hooks
-```
-hooks/
-├── useAuth.ts      # [в будущем]
-└── [другие hooks]
-```
-
-### Типы (src/types/)
-TypeScript типы и интерфейсы
-```
-types/
-├── index.ts        # Основные типы
-└── api.ts          # [типы для API - когда будет backend]
-```
-
-## Жизненный цикл приложения
-
-```
-1. Пользователь открывает приложение
-   ↓
-2. Next.js загружает layout.tsx (язык, шрифты, стили)
-   ↓
-3. Next.js загружает page.tsx (главная страница)
-   ↓
-4. На экране отображается минималистичная главная страница
-   ↓
-5. На будущих шагах:
-   - Добавляются интерактивные компоненты
-   - Подключается API backend
-   - Реализуется авторизация
-   - Реализуется функциональность адаптации текстов
-```
-
-## Data Flow auth integration
+## Data Flow auth + student dashboard
 
 ```
 User Browser
@@ -137,6 +109,13 @@ FastAPI auth endpoints
 Browser storage (`localStorage` или `sessionStorage`)
     ↓
 Redirect по роли (`/student` или `/teacher`)
+    ↓
+`/student` выполняет `getAccessToken()` и `GET /api/v1/auth/me`
+    ↓
+Role check:
+- `student` → dashboard UI
+- `teacher` → redirect на `/teacher`
+- нет токена / токен невалиден → redirect на `/login`
 ```
 
 ## Масштабируемость
@@ -144,11 +123,9 @@ Redirect по роли (`/student` или `/teacher`)
 Текущая структура подготовлена к расширению:
 - **Компоненты** легко добавлять в src/components
 - **Утилиты** организованы в src/lib
-- **Типы** централизованы в src/types
-- **Hooks** отделены в src/hooks для переиспользования
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Auth Integration
+## Student Dashboard UI
 
 - `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
 - `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
@@ -159,6 +136,14 @@ Redirect по роли (`/student` или `/teacher`)
 - Redirect по роли реализован без middleware и глобального auth context:
   - `student` → `/student`
   - `teacher` → `/teacher`
+- `frontend/src/app/student/page.tsx` рендерит `StudentDashboard`.
+- `StudentDashboard` хранит активную вкладку в локальном состоянии:
+  - `profile`
+  - `materials`
+  - `tests`
+- Внутри `/student` не используется nested routing.
+- Верхняя панель student dashboard построена на общем `Header.tsx` через `variant="dashboard"`.
+- `Footer.tsx` остаётся общим и рендерится вне карточки dashboard, поэтому естественно остаётся внизу страницы.
 - На backend включён CORS для локального frontend.
 
 ## Что ещё не реализовано
@@ -166,4 +151,7 @@ Redirect по роли (`/student` или `/teacher`)
 - refresh tokens;
 - централизованный auth state;
 - protected routes через middleware;
-- автоматическая проверка токена при открытии приложения.
+- полноценные данные профиля с backend;
+- реальные учебные материалы;
+- реальные тесты;
+- student dashboard actions beyond logout.
