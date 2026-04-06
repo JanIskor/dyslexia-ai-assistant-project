@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Mail, UserRound } from 'lucide-react';
@@ -12,13 +13,20 @@ import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 type StudentDashboardSection = 'profile' | 'materials' | 'tests';
 
 interface StudentProfileCardData {
+  // In the next phase this avatar URL should come from MinIO for the current student.
+  avatarUrl: string | null;
+  // In the next phase these profile values should come from the student record in the DB.
   fullName: string;
   quote: string;
   birthDate: string;
   gender: string;
   classLabel: string;
-  studyYear: string;
   startDate: string;
+}
+
+interface StudentProfileField {
+  label: string;
+  value: string;
 }
 
 const STUDENT_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> = [
@@ -28,21 +36,28 @@ const STUDENT_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> 
 ];
 
 const PROFILE_CARD_DATA: StudentProfileCardData = {
+  avatarUrl: null,
   fullName: 'Иванов Андрей Викторович',
   quote:
     '«Маленький человек может сделать гораздо больше, чем он об этом предполагает»',
   birthDate: '23 января 2010 года',
   gender: 'Мужской',
   classLabel: '4А класс',
-  studyYear: '4а класс',
   startDate: '3 сентября 2017 года',
 };
+
+const PROFILE_FIELDS: StudentProfileField[] = [
+  { label: 'Дата рождения:', value: '23 января 2010 года' },
+  { label: 'Пол:', value: 'Мужской' },
+  { label: 'Класс обучения:', value: '4А класс' },
+  { label: 'Дата поступления:', value: '3 сентября 2017 года' },
+];
 
 const UNREAD_MESSAGES_COUNT = 3;
 
 function StudentNotificationBadge() {
   return (
-    <div className="relative">
+    <div className="relative" aria-label="Новые сообщения от преподавателя">
       <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-orange-100 bg-white/90 text-orange-300 shadow-[0_10px_25px_rgba(221,156,130,0.15)]">
         <Mail className="h-6 w-6 stroke-[1.7]" />
       </div>
@@ -55,31 +70,50 @@ function StudentNotificationBadge() {
 
 function StudentProfileCard() {
   return (
-    <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-      <div className="mx-auto flex max-w-md flex-col items-center text-center">
+    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
         <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
-            <UserRound className="h-14 w-14 text-orange-300" />
-          </div>
+          {PROFILE_CARD_DATA.avatarUrl ? (
+            // Placeholder structure for future MinIO-backed student avatar.
+            <Image
+              src={PROFILE_CARD_DATA.avatarUrl}
+              alt={`Аватар ученика ${PROFILE_CARD_DATA.fullName}`}
+              width={96}
+              height={96}
+              unoptimized
+              className="h-24 w-24 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
+              <UserRound className="h-14 w-14 text-orange-300" />
+            </div>
+          )}
         </div>
 
-        <h2 className="mt-7 max-w-xs text-4xl font-medium leading-tight text-stone-700">
+        <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
           {PROFILE_CARD_DATA.fullName}
         </h2>
 
-        <p className="mt-4 max-w-sm text-2xl leading-relaxed text-stone-500">
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-[1.7rem] lg:leading-relaxed">
           {PROFILE_CARD_DATA.quote}
         </p>
 
-        <div className="mt-7 w-full space-y-4 text-center text-[1.75rem] text-stone-500">
-          <p>{PROFILE_CARD_DATA.birthDate}</p>
-          <p>{PROFILE_CARD_DATA.gender}</p>
-          <div className="mx-auto flex max-w-xs items-center justify-center gap-4 border-y border-orange-100 py-3">
-            <span>{PROFILE_CARD_DATA.classLabel}</span>
-            <span className="text-orange-200">|</span>
-            <span>{PROFILE_CARD_DATA.studyYear}</span>
-          </div>
-          <p>{PROFILE_CARD_DATA.startDate}</p>
+        <div className="mt-6 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
+          <dl className="divide-y divide-orange-100/80">
+            {PROFILE_FIELDS.map((field) => (
+              <div
+                key={field.label}
+                className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:gap-4"
+              >
+                <dt className="text-sm font-medium text-stone-500 sm:text-base lg:text-xl">
+                  {field.label}
+                </dt>
+                <dd className="text-sm text-stone-700 sm:text-base sm:text-right lg:text-xl">
+                  {field.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </div>
     </section>
@@ -90,8 +124,8 @@ function StudentSectionContent({ section }: { section: StudentDashboardSection }
   if (section === 'materials') {
     return (
       <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-3xl font-medium text-stone-700">Мои учебные материалы</h2>
-        <p className="mt-6 text-xl leading-relaxed text-stone-500">
+        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Мои учебные материалы</h2>
+        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
           Здесь будут отображаться учебные материалы
         </p>
       </section>
@@ -101,8 +135,8 @@ function StudentSectionContent({ section }: { section: StudentDashboardSection }
   if (section === 'tests') {
     return (
       <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-3xl font-medium text-stone-700">Мои тесты</h2>
-        <p className="mt-6 text-xl leading-relaxed text-stone-500">
+        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Мои тесты</h2>
+        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
           Здесь будут отображаться тесты
         </p>
       </section>
@@ -111,7 +145,7 @@ function StudentSectionContent({ section }: { section: StudentDashboardSection }
 
   return (
     <>
-      <h1 className="text-4xl font-medium tracking-tight text-stone-700 sm:text-[2.7rem]">
+      <h1 className="text-2xl font-medium tracking-tight text-stone-700 sm:text-3xl lg:text-[2.1rem]">
         Образовательный профиль
       </h1>
       <div className="mt-6">
@@ -187,8 +221,8 @@ export function StudentDashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,#fff7f2_0%,#fffaf8_30%,#fdf3ee_100%)] text-stone-700">
-      <main className="mx-auto flex w-full max-w-7xl flex-1 px-3 py-3 sm:px-5 sm:py-5">
-        <div className="w-full rounded-[34px] border border-orange-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(255,245,240,0.8))] p-3 shadow-[0_20px_80px_rgba(221,156,130,0.14)] backdrop-blur sm:p-5">
+      <main className="mx-auto flex w-full max-w-[1500px] flex-1 px-2 py-2 sm:px-4 sm:py-4 lg:px-6">
+        <div className="w-full p-1 sm:p-2">
           <Header
             variant="dashboard"
             title="Мой профиль"
@@ -219,7 +253,7 @@ export function StudentDashboard() {
                         <button
                           type="button"
                           onClick={() => setActiveSection(item.id)}
-                          className={`flex w-full items-center gap-2 rounded-r-2xl rounded-l-none px-6 py-4 text-left text-2xl leading-tight transition ${
+                          className={`flex w-full items-center gap-2 rounded-r-2xl rounded-l-none px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
                               : 'text-stone-500 hover:bg-white/60'
@@ -243,7 +277,7 @@ export function StudentDashboard() {
               </nav>
             </aside>
 
-            <section className="rounded-[28px] border border-orange-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,247,242,0.4))] px-5 py-6 sm:px-7 sm:py-8">
+            <section className="rounded-[28px] border border-orange-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,247,242,0.4))] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
               <StudentSectionContent section={activeSection} />
             </section>
           </div>
