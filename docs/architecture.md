@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Student Dashboard UI
+## Текущая фаза: Teacher Dashboard UI
 
-На текущем этапе frontend auth flow уже работает end-to-end, а поверх него реализован student dashboard UI на маршруте `/student`.
+На текущем этапе frontend auth flow уже работает end-to-end, а поверх него реализованы student и teacher dashboard UI на маршрутах `/student` и `/teacher`.
 
 ### Tech Stack
 ```
@@ -76,8 +76,10 @@ components/
 ├── layout/
 │   ├── Header.tsx
 │   └── Footer.tsx
-└── student/
-    └── StudentDashboard.tsx
+├── student/
+│   └── StudentDashboard.tsx
+└── teacher/
+    └── TeacherDashboard.tsx
 ```
 
 ### Утилиты (src/lib/)
@@ -91,7 +93,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow auth + student dashboard
+## Data Flow auth + dashboards
 
 ```
 User Browser
@@ -110,7 +112,7 @@ Browser storage (`localStorage` или `sessionStorage`)
     ↓
 Redirect по роли (`/student` или `/teacher`)
     ↓
-`/student` выполняет `getAccessToken()` и `GET /api/v1/auth/me`
+`/student` или `/teacher` выполняет `getAccessToken()` и `GET /api/v1/auth/me`
     ↓
 Role check:
 - `student` → dashboard UI
@@ -125,7 +127,7 @@ Role check:
 - **Утилиты** организованы в src/lib
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Student Dashboard UI
+## Dashboard UI
 
 - `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
 - `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
@@ -137,13 +139,21 @@ Role check:
   - `student` → `/student`
   - `teacher` → `/teacher`
 - `frontend/src/app/student/page.tsx` рендерит `StudentDashboard`.
+- `frontend/src/app/teacher/page.tsx` рендерит `TeacherDashboard`.
 - `StudentDashboard` хранит активную вкладку в локальном состоянии:
   - `profile`
   - `materials`
   - `tests`
+- `TeacherDashboard` хранит активную вкладку в локальном состоянии:
+  - `profile`
+  - `students`
+  - `assistant`
 - Внутри `/student` не используется nested routing.
+- Внутри `/teacher` не используется nested routing.
 - Верхняя панель student dashboard построена на общем `Header.tsx` через `variant="dashboard"`.
+- Верхняя панель teacher dashboard использует тот же общий `Header.tsx` и тот же визуальный паттерн.
 - `Footer.tsx` остаётся общим и рендерится вне карточки dashboard, поэтому естественно остаётся внизу страницы.
+- Для локальной проверки teacher flow добавлен utility `backend/scripts/create_teacher_user.py`, который создаёт или обновляет пользователя с ролью `teacher` напрямую в локальной SQLite БД.
 - На backend включён CORS для локального frontend.
 
 ## Что ещё не реализовано
@@ -154,4 +164,6 @@ Role check:
 - полноценные данные профиля с backend;
 - реальные учебные материалы;
 - реальные тесты;
-- student dashboard actions beyond logout.
+- реальный список учеников;
+- реальный интерфейс ИИ-ассистента;
+- dashboard actions beyond logout.
