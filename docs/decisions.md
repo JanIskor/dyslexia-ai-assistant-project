@@ -37,7 +37,8 @@
 ### Выбран стек
 - **FastAPI** - современный Python фреймворк для API
 - **SQLAlchemy** - ORM для работы с базой данных
-- **SQLite** - локальная база данных для MVP
+- **PostgreSQL** - основная база данных проекта
+- **Alembic** - миграции схемы
 - **Pydantic** - валидация данных и схемы
 - **passlib** - хеширование паролей
 - **python-jose** - работа с JWT токенами
@@ -55,10 +56,10 @@
 - Поддержка миграций через Alembic
 - Широко используется в Python экосистеме
 
-#### SQLite
-- Не требует отдельного сервера
-- Легко для разработки и тестирования
-- Подходит для MVP
+#### PostgreSQL
+- Подходит для реальной relational schema со связями teacher ↔ student
+- Даёт предсказуемую persistence layer для следующих шагов
+- Хорошо сочетается с Alembic и product-level migration flow
 
 #### Pydantic
 - Валидация данных с понятными ошибками
@@ -173,7 +174,7 @@ backend/
 - Причина: это позволяет не переписывать auth flow и не вводить лишнюю архитектурную сложность.
 
 ### Для локальной проверки teacher flow добавлен только utility, а не публичная teacher-регистрация
-- Создан `backend/scripts/create_teacher_user.py`, который создаёт или обновляет локального teacher-пользователя в SQLite.
+- Создан `backend/scripts/create_teacher_user.py`, который создаёт или обновляет локального teacher-пользователя в основной БД проекта.
 - Endpoint `/register` не менялся и по-прежнему создаёт только `student`.
 - Причина: teacher должен быть проверяем локально через login, но не должен появляться через публичную регистрацию.
 
@@ -181,3 +182,37 @@ backend/
 - Профиль преподавателя отображает захардкоженные данные по макету.
 - Разделы списка учеников и ИИ-ассистента реализованы как placeholders.
 - Причина: на шаге 3.1.2 задача ограничена UI и локальной проверкой teacher flow без внедрения реальных product-данных.
+
+## Решения шага 3.2.1: PostgreSQL migration + profile schema
+
+### PostgreSQL стал единственной основной persistence layer
+- Значение `DATABASE_URL` переведено на PostgreSQL по умолчанию.
+- SQLite больше не используется как основная рабочая БД backend.
+- Причина: следующая продуктовая схема и связи teacher ↔ student должны жить в одной реальной relational database.
+
+### Управление схемой переведено на Alembic
+- Автоматическое `Base.metadata.create_all(...)` убрано из `app.main`.
+- Схема БД создаётся и обновляется через Alembic migration history.
+- Причина: для PostgreSQL и дальнейшего развития схемы нужен контролируемый migration flow вместо неявного auto-create.
+
+### Product-level profile schema сведена к четырём таблицам без лишнего расширения
+- Добавлены только:
+  - `users`
+  - `student_profiles`
+  - `teacher_profiles`
+  - `teacher_students`
+- Причина: это минимальный foundation для следующего этапа без premature abstraction.
+
+### UUID используется как primary key во всех таблицах
+- Все PK и профильные FK завязаны на UUID.
+- Причина: это даёт единый формат идентификаторов и хорошо сочетается с PostgreSQL и будущими интеграциями.
+
+### Роль хранится как string, но ограничивается backend/database validation
+- Поле `users.role` оставлено строковым.
+- Для него добавлен `CHECK` constraint на значения `student` и `teacher`.
+- Причина: это соответствует ТЗ и не требует вводить отдельный enum layer на текущем шаге.
+
+### Локальный seed сделан простым utility, а не framework
+- Добавлен `scripts/seed_profile_data.py`.
+- Script создаёт или обновляет одного teacher, одного student, их профили и связь teacher ↔ student.
+- Причина: этого достаточно для локальной проверки PostgreSQL schema и auth persistence без overengineering.

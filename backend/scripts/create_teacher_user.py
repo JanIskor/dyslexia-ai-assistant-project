@@ -1,14 +1,12 @@
 import argparse
 import uuid
 
+from app.db.session import SessionLocal
 from app.models.user import User
-from app.db.base import Base
-from app.db.session import SessionLocal, engine
 from app.services.auth_service import get_password_hash, normalize_email
 
 
 def create_teacher(email: str, password: str) -> None:
-    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
@@ -23,13 +21,14 @@ def create_teacher(email: str, password: str) -> None:
             return
 
         teacher_user = User(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             email=normalized_email,
             password_hash=get_password_hash(password),
             role="teacher",
         )
         db.add(teacher_user)
         db.commit()
+        db.refresh(teacher_user)
         print(f"Created local teacher user: {normalized_email}")
     finally:
         db.close()

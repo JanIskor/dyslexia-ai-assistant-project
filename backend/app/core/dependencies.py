@@ -24,6 +24,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     token_data = verify_token(token, credentials_exception)
     user = db.query(User).filter(User.id == token_data.user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
     return user

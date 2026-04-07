@@ -1,5 +1,3 @@
-import uuid
-
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -25,10 +23,9 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 def create_user(db: Session, user: RegisterRequest) -> UserResponse:
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        id=str(uuid.uuid4()),
         email=normalize_email(user.email),
         password_hash=hashed_password,
-        role="student"
+        role="student",
     )
     db.add(db_user)
     db.commit()

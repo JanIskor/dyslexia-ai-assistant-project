@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import UUID
+
 from jose import JWTError, jwt
+
 from app.core.config import settings
 from app.schemas.auth import TokenData
 
@@ -19,11 +22,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def verify_token(token: str, credentials_exception):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        user_id: str = payload.get("sub")
+        user_id_raw: str = payload.get("sub")
         role: str = payload.get("role")
-        if user_id is None:
+        if user_id_raw is None:
             raise credentials_exception
-        token_data = TokenData(user_id=user_id, role=role)
+        token_data = TokenData(user_id=UUID(user_id_raw), role=role)
     except JWTError:
+        raise credentials_exception
+    except ValueError:
         raise credentials_exception
     return token_data

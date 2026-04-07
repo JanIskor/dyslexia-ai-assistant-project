@@ -33,5 +33,5 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    user_id: Optional[str] = None
+    user_id: Optional[UUID] = None
     role: Optional[str] = None

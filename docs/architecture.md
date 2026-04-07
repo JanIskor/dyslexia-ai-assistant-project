@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Dashboard UI
+## Текущая фаза: PostgreSQL Migration + Profile Schema
 
-На текущем этапе frontend auth flow уже работает end-to-end, а поверх него реализованы student и teacher dashboard UI на маршрутах `/student` и `/teacher`.
+На текущем этапе frontend auth flow и базовые dashboard UI уже реализованы, а backend persistence переведён на PostgreSQL с Alembic и product-level profile schema.
 
 ### Tech Stack
 ```
@@ -21,7 +21,8 @@ Frontend (Next.js 16 + App Router)
 
 Backend (FastAPI + SQLAlchemy)
     ↓
-    [SQLite database]
+    [PostgreSQL database]
+    [Alembic migrations]
     [JWT authentication]
     [Pydantic validation]
     [CORS for local frontend]
@@ -43,11 +44,17 @@ app/
 │   ├── base.py
 │   └── session.py
 ├── models/         # SQLAlchemy модели
-│   └── user.py
+│   ├── user.py
+│   ├── student_profile.py
+│   ├── teacher_profile.py
+│   └── teacher_student.py
 ├── schemas/        # Pydantic схемы
 │   └── auth.py
 ├── services/       # Бизнес-логика
 │   └── auth_service.py
+├── scripts/        # Локальные utility/seed scripts
+│   ├── create_teacher_user.py
+│   └── seed_profile_data.py
 └── api/v1/         # API endpoints
     ├── health.py
     └── auth.py
@@ -93,7 +100,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow auth + dashboards
+## Data Flow auth + persistence
 
 ```
 User Browser
@@ -107,6 +114,10 @@ FastAPI auth endpoints
 `/register` → создаёт пользователя
 `/login` → возвращает access token
 `/me` → возвращает текущего пользователя по Bearer token
+    ↓
+SQLAlchemy ORM
+    ↓
+PostgreSQL
     ↓
 Browser storage (`localStorage` или `sessionStorage`)
     ↓
@@ -127,33 +138,22 @@ Role check:
 - **Утилиты** организованы в src/lib
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Dashboard UI
+## Persistence Layer
 
 - `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
 - `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
 - После логина frontend делает `GET /api/v1/auth/me` с `Authorization: Bearer <token>`.
-- Токен сохраняется минимальным MVP-способом:
-  - `localStorage` при включённом «Запомнить меня»;
-  - `sessionStorage` в остальных случаях.
-- Redirect по роли реализован без middleware и глобального auth context:
-  - `student` → `/student`
-  - `teacher` → `/teacher`
-- `frontend/src/app/student/page.tsx` рендерит `StudentDashboard`.
-- `frontend/src/app/teacher/page.tsx` рендерит `TeacherDashboard`.
-- `StudentDashboard` хранит активную вкладку в локальном состоянии:
-  - `profile`
-  - `materials`
-  - `tests`
-- `TeacherDashboard` хранит активную вкладку в локальном состоянии:
-  - `profile`
-  - `students`
-  - `assistant`
-- Внутри `/student` не используется nested routing.
-- Внутри `/teacher` не используется nested routing.
-- Верхняя панель student dashboard построена на общем `Header.tsx` через `variant="dashboard"`.
-- Верхняя панель teacher dashboard использует тот же общий `Header.tsx` и тот же визуальный паттерн.
-- `Footer.tsx` остаётся общим и рендерится вне карточки dashboard, поэтому естественно остаётся внизу страницы.
-- Для локальной проверки teacher flow добавлен utility `backend/scripts/create_teacher_user.py`, который создаёт или обновляет пользователя с ролью `teacher` напрямую в локальной SQLite БД.
+- Auth persistence теперь использует PostgreSQL вместо SQLite.
+- Alembic управляет версионированием схемы БД.
+- Первая миграция создаёт:
+  - `users`
+  - `student_profiles`
+  - `teacher_profiles`
+  - `teacher_students`
+- `student_profiles.user_id` и `teacher_profiles.user_id` задают one-to-one профиль к пользователю.
+- `teacher_students` хранит teacher ↔ student linkage через два FK на `users.id`.
+- Для локальной проверки добавлен seed `backend/scripts/seed_profile_data.py`.
+- На backend сохранён существующий auth API contract.
 - На backend включён CORS для локального frontend.
 
 ## Что ещё не реализовано
@@ -161,9 +161,8 @@ Role check:
 - refresh tokens;
 - централизованный auth state;
 - protected routes через middleware;
-- полноценные данные профиля с backend;
-- реальные учебные материалы;
-- реальные тесты;
-- реальный список учеников;
-- реальный интерфейс ИИ-ассистента;
-- dashboard actions beyond logout.
+- profile read/write endpoints;
+- frontend integration новых profile-данных;
+- MinIO avatar storage;
+- materials/tests persistence;
+- assistant persistence.

@@ -3,11 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import health, auth
 from app.core.config import settings
-from app.db.base import Base
-from app.db.session import engine
-
-# Create tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="AI Dyslexia Backend",
