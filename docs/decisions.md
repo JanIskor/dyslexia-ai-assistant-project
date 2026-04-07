@@ -216,3 +216,22 @@ backend/
 - Добавлен `scripts/seed_profile_data.py`.
 - Script создаёт или обновляет одного teacher, одного student, их профили и связь teacher ↔ student.
 - Причина: этого достаточно для локальной проверки PostgreSQL schema и auth persistence без overengineering.
+
+## Решения шага 3.2.2: Teacher Students API
+
+### Teacher-only доступ вынесен в dependency
+- Добавлен `get_current_teacher` поверх существующего `get_current_user`.
+- Teacher endpoint без teacher-роли получает `403`.
+- Причина: это минимально достаточный и переиспользуемый способ ограничить teacher area без новой auth architecture.
+
+### Teacher видит только своих учеников через `teacher_students`
+- Оба endpoint делают выборку только через связь `teacher_students.teacher_user_id -> current_teacher.id`.
+- Причина: это отражает предметную модель и предотвращает доступ к чужим student records на уровне query logic.
+
+### Для карточки чужого ученика возвращается `404`, а не `403`
+- Если teacher запрашивает student profile, который не связан с ним через `teacher_students`, API отвечает `404 Student not found`.
+- Причина: endpoint не раскрывает наличие чужого ученика вне teacher scope.
+
+### Response schemas сведены к минимально нужным полям
+- Для списка и детальной карточки созданы отдельные Pydantic schema.
+- Причина: endpoint не возвращает лишние user/system поля и следует ТЗ текущего шага.

@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: PostgreSQL Migration + Profile Schema
+## Текущая фаза: Teacher Students API
 
-На текущем этапе frontend auth flow и базовые dashboard UI уже реализованы, а backend persistence переведён на PostgreSQL с Alembic и product-level profile schema.
+На текущем этапе frontend auth flow, dashboard UI и PostgreSQL schema layer уже реализованы, а backend расширен teacher-only API для доступа преподавателя к своим ученикам.
 
 ### Tech Stack
 ```
@@ -49,15 +49,18 @@ app/
 │   ├── teacher_profile.py
 │   └── teacher_student.py
 ├── schemas/        # Pydantic схемы
-│   └── auth.py
+│   ├── auth.py
+│   └── teacher_students.py
 ├── services/       # Бизнес-логика
-│   └── auth_service.py
+│   ├── auth_service.py
+│   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
 │   ├── create_teacher_user.py
 │   └── seed_profile_data.py
 └── api/v1/         # API endpoints
     ├── health.py
-    └── auth.py
+    ├── auth.py
+    └── teacher.py
 ```
 
 ## Структура приложения
@@ -100,7 +103,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow auth + persistence
+## Data Flow teacher students API
 
 ```
 User Browser
@@ -114,6 +117,8 @@ FastAPI auth endpoints
 `/register` → создаёт пользователя
 `/login` → возвращает access token
 `/me` → возвращает текущего пользователя по Bearer token
+`/teacher/students` → список учеников текущего teacher
+`/teacher/students/{student_id}` → карточка конкретного ученика текущего teacher
     ↓
 SQLAlchemy ORM
     ↓
@@ -138,7 +143,7 @@ Role check:
 - **Утилиты** организованы в src/lib
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Persistence Layer
+## Teacher Students API
 
 - `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
 - `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
@@ -155,14 +160,32 @@ Role check:
 - Для локальной проверки добавлен seed `backend/scripts/seed_profile_data.py`.
 - На backend сохранён существующий auth API contract.
 - На backend включён CORS для локального frontend.
+- `app/core/dependencies.py` содержит teacher-only guard `get_current_teacher`.
+- `app/services/teacher_students_service.py` инкапсулирует выборку учеников teacher.
+- `GET /api/v1/teacher/students` возвращает:
+  - `id`
+  - `full_name`
+  - `grade_label`
+  - `avatar_url`
+- `GET /api/v1/teacher/students/{student_id}` возвращает:
+  - `id`
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `grade_label`
+  - `enrollment_date`
+  - `quote`
+  - `avatar_url`
+- Teacher получает только своих учеников за счёт join по `teacher_students.teacher_user_id`.
 
 ## Что ещё не реализовано
 
 - refresh tokens;
 - централизованный auth state;
 - protected routes через middleware;
-- profile read/write endpoints;
+- profile write endpoints;
 - frontend integration новых profile-данных;
 - MinIO avatar storage;
 - materials/tests persistence;
-- assistant persistence.
+- assistant persistence;
+- search/pagination для teacher students list.
