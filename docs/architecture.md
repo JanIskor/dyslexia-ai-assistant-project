@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Frontend Integration Teacher Students
+## Текущая фаза: Teacher Students Search And Sort
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer и teacher-only API уже реализованы, а teacher dashboard подключён к реальным данным учеников без новых маршрутов.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API и teacher students frontend integration уже реализованы, а список учеников teacher dashboard расширен поиском по фамилии и сортировкой по фамилии/классу.
 
 ### Tech Stack
 ```
@@ -141,11 +141,17 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 Выбор sidebar-пункта `Список учеников`
     ↓
 `teacherStudentsApi.ts` делает `GET /api/v1/teacher/students` с Bearer token
+и query params:
+- `search`
+- `sort_by`
+- `sort_order`
     ↓
 В правой панели отображается:
 - loading state списка
 - error state списка
 - empty state списка
+- search input по фамилии
+- меню сортировки
 - grid карточек учеников
     ↓
 Клик по карточке
@@ -172,6 +178,15 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - Раздел `Список учеников` в `TeacherDashboard.tsx` не создаёт отдельный маршрут и работает внутри `/teacher`.
 - Для teacher students frontend добавлен минимальный API client `frontend/src/lib/teacherStudentsApi.ts`.
 - Список учеников запрашивается только после открытия teacher-секции `students`.
+- Список учеников может быть перезапрошен с query params:
+  - `search`
+  - `sort_by`
+  - `sort_order`
+- Поиск ограничен только первым словом `full_name`, потому что в предметной модели этот фрагмент соответствует фамилии.
+- Сортировка `full_name` использует обычный порядок строки ФИО, что даёт порядок по фамилии.
+- Сортировка `grade_label` использует натуральный порядок:
+  - сначала номер класса
+  - затем букву класса
 - Detail view ученика хранится в локальном state teacher dashboard и не использует nested routing.
 - Карточки учеников строятся из реальных backend-полей:
   - `avatar_url`
@@ -190,6 +205,8 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - loading
   - error
   - empty
+- Для пустого результата поиска frontend показывает отдельный empty state:
+  - `По вашему запросу ученики не найдены`
 - Для detail реализованы состояния:
   - loading
   - error
@@ -213,6 +230,10 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - `full_name`
   - `grade_label`
   - `avatar_url`
+- `GET /api/v1/teacher/students` дополнительно поддерживает:
+  - `search`
+  - `sort_by`
+  - `sort_order`
 - `GET /api/v1/teacher/students/{student_id}` возвращает:
   - `id`
   - `full_name`
@@ -234,5 +255,5 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - MinIO avatar storage;
 - materials/tests persistence;
 - assistant persistence;
-- search/filter UI для teacher students list;
 - pagination для teacher students list.
+- выбор конкретных классов или множественные фильтры для teacher students list.

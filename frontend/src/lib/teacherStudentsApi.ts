@@ -20,6 +20,15 @@ interface ApiErrorBody {
   detail?: string;
 }
 
+export type TeacherStudentsSortBy = 'full_name' | 'grade_label';
+export type TeacherStudentsSortOrder = 'asc' | 'desc';
+
+export interface TeacherStudentsListParams {
+  search?: string;
+  sort_by?: TeacherStudentsSortBy;
+  sort_order?: TeacherStudentsSortOrder;
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
 
@@ -73,9 +82,32 @@ async function request<T>(path: string, token: string, fallbackMessage: string):
   return parseJson<T>(response);
 }
 
-export const getTeacherStudents = async (token: string): Promise<TeacherStudentListItem[]> =>
+const buildTeacherStudentsQuery = (params: TeacherStudentsListParams): string => {
+  const searchParams = new URLSearchParams();
+
+  const trimmedSearch = params.search?.trim();
+  if (trimmedSearch) {
+    searchParams.set('search', trimmedSearch);
+  }
+
+  if (params.sort_by) {
+    searchParams.set('sort_by', params.sort_by);
+  }
+
+  if (params.sort_order) {
+    searchParams.set('sort_order', params.sort_order);
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+};
+
+export const getTeacherStudents = async (
+  token: string,
+  params: TeacherStudentsListParams = {},
+): Promise<TeacherStudentListItem[]> =>
   request<TeacherStudentListItem[]>(
-    '/api/v1/teacher/students',
+    `/api/v1/teacher/students${buildTeacherStudentsQuery(params)}`,
     token,
     'Не удалось загрузить учеников',
   );

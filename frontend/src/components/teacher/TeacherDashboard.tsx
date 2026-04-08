@@ -2,8 +2,9 @@
 
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut, Mail, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, Mail, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
@@ -14,6 +15,9 @@ import {
   getTeacherStudents,
   type TeacherStudentDetail,
   type TeacherStudentListItem,
+  type TeacherStudentsListParams,
+  type TeacherStudentsSortBy,
+  type TeacherStudentsSortOrder,
 } from '@/lib/teacherStudentsApi';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'assistant';
@@ -76,6 +80,46 @@ const STUDENT_PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
   month: 'long',
   year: 'numeric',
 });
+
+type TeacherStudentsSortOptionId =
+  | 'full_name_asc'
+  | 'full_name_desc'
+  | 'grade_label_asc'
+  | 'grade_label_desc';
+
+interface TeacherStudentsSortOption {
+  id: TeacherStudentsSortOptionId;
+  label: string;
+  sortBy: TeacherStudentsSortBy;
+  sortOrder: TeacherStudentsSortOrder;
+}
+
+const TEACHER_STUDENTS_SORT_OPTIONS: TeacherStudentsSortOption[] = [
+  {
+    id: 'full_name_asc',
+    label: 'Фамилия А–Я',
+    sortBy: 'full_name',
+    sortOrder: 'asc',
+  },
+  {
+    id: 'full_name_desc',
+    label: 'Фамилия Я–А',
+    sortBy: 'full_name',
+    sortOrder: 'desc',
+  },
+  {
+    id: 'grade_label_asc',
+    label: 'Класс ↑',
+    sortBy: 'grade_label',
+    sortOrder: 'asc',
+  },
+  {
+    id: 'grade_label_desc',
+    label: 'Класс ↓',
+    sortBy: 'grade_label',
+    sortOrder: 'desc',
+  },
+];
 
 function TeacherNotificationBadge() {
   return (
@@ -275,6 +319,79 @@ function StudentsListState({ message }: { message: string }) {
   );
 }
 
+function TeacherStudentsToolbar({
+  searchValue,
+  onSearchChange,
+  selectedSortOption,
+  isSortMenuOpen,
+  onToggleSortMenu,
+  onSelectSortOption,
+}: {
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  selectedSortOption: TeacherStudentsSortOption;
+  isSortMenuOpen: boolean;
+  onToggleSortMenu: () => void;
+  onSelectSortOption: (option: TeacherStudentsSortOption) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <label className="relative block flex-1">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+        <input
+          type="text"
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Поиск по фамилии..."
+          className="h-14 w-full rounded-[24px] border border-orange-100/80 bg-white/92 pl-12 pr-4 text-base text-stone-700 shadow-[0_12px_30px_rgba(221,156,130,0.08)] outline-none transition placeholder:text-stone-400 focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+          aria-label="Поиск по фамилии"
+        />
+      </label>
+
+      <div className="relative self-end sm:self-auto">
+        <button
+          type="button"
+          onClick={onToggleSortMenu}
+          className="flex h-14 w-14 items-center justify-center rounded-[20px] border border-orange-100/80 bg-white/92 text-orange-400 shadow-[0_12px_30px_rgba(221,156,130,0.08)] transition hover:bg-orange-50"
+          aria-haspopup="menu"
+          aria-expanded={isSortMenuOpen}
+          aria-label={`Сортировка: ${selectedSortOption.label}`}
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+        </button>
+
+        {isSortMenuOpen ? (
+          <div
+            className="absolute right-0 top-[calc(100%+0.75rem)] z-20 min-w-[13rem] rounded-[22px] border border-orange-100/80 bg-white/96 p-2 shadow-[0_20px_45px_rgba(221,156,130,0.16)]"
+            role="menu"
+            aria-label="Меню сортировки учеников"
+          >
+            {TEACHER_STUDENTS_SORT_OPTIONS.map((option) => {
+              const isActive = option.id === selectedSortOption.id;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onSelectSortOption(option)}
+                  className={`flex w-full rounded-2xl px-4 py-3 text-left text-sm transition sm:text-base ${
+                    isActive
+                      ? 'bg-orange-50 font-medium text-orange-500'
+                      : 'text-stone-600 hover:bg-orange-50/80'
+                  }`}
+                  role="menuitem"
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function TeacherStudentsSection({
   accessToken,
   viewState,
@@ -293,6 +410,30 @@ function TeacherStudentsSection({
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
   const [isStudentDetailLoading, setIsStudentDetailLoading] = useState(false);
   const loadedStudentIdsRef = useRef<Set<string>>(new Set());
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedSortOption, setSelectedSortOption] = useState<TeacherStudentsSortOption>(
+    TEACHER_STUDENTS_SORT_OPTIONS[0],
+  );
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (sortMenuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setIsSortMenuOpen(false);
+    };
+
+    if (isSortMenuOpen) {
+      window.addEventListener('mousedown', handleOutsideClick);
+    }
+
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isSortMenuOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -302,7 +443,12 @@ function TeacherStudentsSection({
       setStudentsError(null);
 
       try {
-        const response = await getTeacherStudents(accessToken);
+        const queryParams: TeacherStudentsListParams = {
+          search: searchValue,
+          sort_by: selectedSortOption.sortBy,
+          sort_order: selectedSortOption.sortOrder,
+        };
+        const response = await getTeacherStudents(accessToken, queryParams);
 
         if (!isMounted) {
           return;
@@ -330,7 +476,7 @@ function TeacherStudentsSection({
     return () => {
       isMounted = false;
     };
-  }, [accessToken]);
+  }, [accessToken, searchValue, selectedSortOption]);
 
   useEffect(() => {
     if (viewState.mode !== 'detail') {
@@ -401,26 +547,49 @@ function TeacherStudentsSection({
     return <StudentDetailProfile student={selectedStudent} onBack={onBackToList} />;
   }
 
+  let listContent: ReactNode;
+
   if (isStudentsLoading) {
-    return <StudentsListState message="Загрузка списка учеников..." />;
-  }
-
-  if (studentsError) {
-    return <StudentsListState message={studentsError} />;
-  }
-
-  if (students.length === 0) {
-    return <StudentsListState message="У преподавателя пока нет учеников" />;
+    listContent = <StudentsListState message="Загрузка списка учеников..." />;
+  } else if (studentsError) {
+    listContent = <StudentsListState message={studentsError} />;
+  } else if (students.length === 0) {
+    listContent = (
+      <StudentsListState
+        message={
+          searchValue.trim()
+            ? 'По вашему запросу ученики не найдены'
+            : 'У преподавателя пока нет учеников'
+        }
+      />
+    );
+  } else {
+    listContent = (
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {students.map((student) => (
+          <StudentCard key={student.id} student={student} onOpen={onOpenStudent} />
+        ))}
+      </div>
+    );
   }
 
   return (
     <section>
       <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Список учеников</h2>
-      <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {students.map((student) => (
-          <StudentCard key={student.id} student={student} onOpen={onOpenStudent} />
-        ))}
+      <div className="mt-6" ref={sortMenuRef}>
+        <TeacherStudentsToolbar
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          selectedSortOption={selectedSortOption}
+          isSortMenuOpen={isSortMenuOpen}
+          onToggleSortMenu={() => setIsSortMenuOpen((currentValue) => !currentValue)}
+          onSelectSortOption={(option) => {
+            setSelectedSortOption(option);
+            setIsSortMenuOpen(false);
+          }}
+        />
       </div>
+      <div className="mt-6">{listContent}</div>
     </section>
   );
 }
