@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Students Search And Sort
+## Текущая фаза: Teacher Students Pagination
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API и teacher students frontend integration уже реализованы, а список учеников teacher dashboard расширен поиском по фамилии и сортировкой по фамилии/классу.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API, teacher students frontend integration, поиск и сортировка уже реализованы, а список учеников teacher dashboard расширен пагинацией.
 
 ### Tech Stack
 ```
@@ -145,6 +145,8 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - `search`
 - `sort_by`
 - `sort_order`
+- `page`
+- `page_size`
     ↓
 В правой панели отображается:
 - loading state списка
@@ -153,6 +155,7 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - search input по фамилии
 - меню сортировки
 - grid карточек учеников
+- pagination UI
     ↓
 Клик по карточке
     ↓
@@ -182,6 +185,17 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - `search`
   - `sort_by`
   - `sort_order`
+  - `page`
+  - `page_size`
+- Backend возвращает paginated response:
+  - `items`
+  - `total`
+  - `page`
+  - `page_size`
+  - `pages`
+- На teacher dashboard одна страница ограничена 9 карточками:
+  - 3 карточки в строке
+  - 3 ряда
 - Поиск ограничен только первым словом `full_name`, потому что в предметной модели этот фрагмент соответствует фамилии.
 - Сортировка `full_name` использует обычный порядок строки ФИО, что даёт порядок по фамилии.
 - Сортировка `grade_label` использует натуральный порядок:
@@ -234,6 +248,14 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - `search`
   - `sort_by`
   - `sort_order`
+  - `page`
+  - `page_size`
+- `GET /api/v1/teacher/students` возвращает paginated object:
+  - `items`
+  - `total`
+  - `page`
+  - `page_size`
+  - `pages`
 - `GET /api/v1/teacher/students/{student_id}` возвращает:
   - `id`
   - `full_name`
@@ -255,5 +277,5 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - MinIO avatar storage;
 - materials/tests persistence;
 - assistant persistence;
-- pagination для teacher students list.
 - выбор конкретных классов или множественные фильтры для teacher students list.
+- cursor/infinite pagination для teacher students list.

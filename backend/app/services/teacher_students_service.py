@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
-from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentListItem
+from app.schemas.teacher_students import (
+    TeacherStudentDetail,
+    TeacherStudentListItem,
+    TeacherStudentsListResponse,
+)
 
 
 TeacherStudentsSortBy = Literal["full_name", "grade_label"]
@@ -58,7 +62,9 @@ def list_teacher_students(
     search: str | None = None,
     sort_by: TeacherStudentsSortBy = "full_name",
     sort_order: TeacherStudentsSortOrder = "asc",
-) -> list[TeacherStudentListItem]:
+    page: int = 1,
+    page_size: int = 9,
+) -> TeacherStudentsListResponse:
     query = (
         db.query(StudentProfile)
         .join(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
@@ -73,17 +79,26 @@ def list_teacher_students(
     else:
         query = query.order_by(_build_full_name_sort_expression(sort_order))
 
-    profiles = query.all()
+    total = query.count()
+    pages = max(1, (total + page_size - 1) // page_size)
+    offset = (page - 1) * page_size
+    profiles = query.offset(offset).limit(page_size).all()
 
-    return [
-        TeacherStudentListItem(
-            id=profile.user_id,
-            full_name=profile.full_name,
-            grade_label=profile.grade_label,
-            avatar_url=profile.avatar_url,
-        )
-        for profile in profiles
-    ]
+    return TeacherStudentsListResponse(
+        items=[
+            TeacherStudentListItem(
+                id=profile.user_id,
+                full_name=profile.full_name,
+                grade_label=profile.grade_label,
+                avatar_url=profile.avatar_url,
+            )
+            for profile in profiles
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 def get_teacher_student(

@@ -7,17 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_teacher, get_db
 from app.models.user import User
-from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentListItem
+from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
 
 
-@router.get("/students", response_model=list[TeacherStudentListItem])
+@router.get("/students", response_model=TeacherStudentsListResponse)
 def read_teacher_students(
     search: str | None = Query(default=None),
     sort_by: Literal["full_name", "grade_label"] = Query(default="full_name"),
     sort_order: Literal["asc", "desc"] = Query(default="asc"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=9, ge=1),
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
@@ -27,6 +29,8 @@ def read_teacher_students(
         search=search,
         sort_by=sort_by,
         sort_order=sort_order,
+        page=page,
+        page_size=page_size,
     )
 
 

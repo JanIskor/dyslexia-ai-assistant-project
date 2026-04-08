@@ -27,6 +27,16 @@ export interface TeacherStudentsListParams {
   search?: string;
   sort_by?: TeacherStudentsSortBy;
   sort_order?: TeacherStudentsSortOrder;
+  page?: number;
+  page_size?: number;
+}
+
+export interface TeacherStudentsListResponse {
+  items: TeacherStudentListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
 }
 
 const API_BASE_URL =
@@ -98,6 +108,14 @@ const buildTeacherStudentsQuery = (params: TeacherStudentsListParams): string =>
     searchParams.set('sort_order', params.sort_order);
   }
 
+  if (typeof params.page === 'number') {
+    searchParams.set('page', String(params.page));
+  }
+
+  if (typeof params.page_size === 'number') {
+    searchParams.set('page_size', String(params.page_size));
+  }
+
   const queryString = searchParams.toString();
   return queryString ? `?${queryString}` : '';
 };
@@ -105,8 +123,8 @@ const buildTeacherStudentsQuery = (params: TeacherStudentsListParams): string =>
 export const getTeacherStudents = async (
   token: string,
   params: TeacherStudentsListParams = {},
-): Promise<TeacherStudentListItem[]> =>
-  request<TeacherStudentListItem[]>(
+): Promise<TeacherStudentsListResponse> =>
+  request<TeacherStudentsListResponse>(
     `/api/v1/teacher/students${buildTeacherStudentsQuery(params)}`,
     token,
     'Не удалось загрузить учеников',

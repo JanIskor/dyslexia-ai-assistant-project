@@ -20,3 +20,11 @@ class TeacherStudentDetail(BaseModel):
     enrollment_date: date
     quote: str | None = None
     avatar_url: str | None = None
+
+
+class TeacherStudentsListResponse(BaseModel):
+    items: list[TeacherStudentListItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int

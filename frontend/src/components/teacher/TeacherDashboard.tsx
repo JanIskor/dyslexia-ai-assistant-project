@@ -16,6 +16,7 @@ import {
   type TeacherStudentDetail,
   type TeacherStudentListItem,
   type TeacherStudentsListParams,
+  type TeacherStudentsListResponse,
   type TeacherStudentsSortBy,
   type TeacherStudentsSortOrder,
 } from '@/lib/teacherStudentsApi';
@@ -74,6 +75,7 @@ const TEACHER_PROFILE_FIELDS: TeacherProfileField[] = [
 ];
 
 const UNREAD_MESSAGES_COUNT = 3;
+const TEACHER_STUDENTS_PAGE_SIZE = 9;
 
 const STUDENT_PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
@@ -392,6 +394,45 @@ function TeacherStudentsToolbar({
   );
 }
 
+function TeacherStudentsPagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Пагинация списка учеников">
+      {Array.from({ length: totalPages }, (_, index) => {
+        const pageNumber = index + 1;
+        const isActive = pageNumber === currentPage;
+
+        return (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onPageChange(pageNumber)}
+            className={`flex h-11 min-w-11 items-center justify-center rounded-2xl px-4 text-sm font-medium transition sm:text-base ${
+              isActive
+                ? 'bg-orange-400 text-white shadow-[0_12px_30px_rgba(251,146,60,0.28)]'
+                : 'border border-orange-100/80 bg-white/92 text-stone-600 shadow-[0_10px_24px_rgba(221,156,130,0.08)] hover:bg-orange-50'
+            }`}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            {pageNumber}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function TeacherStudentsSection({
   accessToken,
   viewState,
@@ -406,6 +447,9 @@ function TeacherStudentsSection({
   const [students, setStudents] = useState<TeacherStudentListItem[]>([]);
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [isStudentsLoading, setIsStudentsLoading] = useState(true);
+  const [studentsListResponse, setStudentsListResponse] = useState<TeacherStudentsListResponse | null>(
+    null,
+  );
   const [selectedStudent, setSelectedStudent] = useState<TeacherStudentDetail | null>(null);
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
   const [isStudentDetailLoading, setIsStudentDetailLoading] = useState(false);
@@ -415,7 +459,12 @@ function TeacherStudentsSection({
     TEACHER_STUDENTS_SORT_OPTIONS[0],
   );
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchValue, selectedSortOption]);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -447,6 +496,8 @@ function TeacherStudentsSection({
           search: searchValue,
           sort_by: selectedSortOption.sortBy,
           sort_order: selectedSortOption.sortOrder,
+          page: currentPage,
+          page_size: TEACHER_STUDENTS_PAGE_SIZE,
         };
         const response = await getTeacherStudents(accessToken, queryParams);
 
@@ -454,13 +505,15 @@ function TeacherStudentsSection({
           return;
         }
 
-        setStudents(response);
+        setStudents(response.items);
+        setStudentsListResponse(response);
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
         setStudents([]);
+        setStudentsListResponse(null);
         setStudentsError(
           error instanceof Error ? error.message : 'Не удалось загрузить учеников',
         );
@@ -476,7 +529,7 @@ function TeacherStudentsSection({
     return () => {
       isMounted = false;
     };
-  }, [accessToken, searchValue, selectedSortOption]);
+  }, [accessToken, currentPage, searchValue, selectedSortOption]);
 
   useEffect(() => {
     if (viewState.mode !== 'detail') {
@@ -590,6 +643,11 @@ function TeacherStudentsSection({
         />
       </div>
       <div className="mt-6">{listContent}</div>
+      <TeacherStudentsPagination
+        currentPage={studentsListResponse?.page ?? currentPage}
+        totalPages={studentsListResponse?.pages ?? 0}
+        onPageChange={setCurrentPage}
+      />
     </section>
   );
 }
