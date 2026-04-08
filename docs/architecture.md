@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Students Pagination
+## Текущая фаза: Admin Role Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API, teacher students frontend integration, поиск и сортировка уже реализованы, а список учеников teacher dashboard расширен пагинацией.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API и teacher students frontend integration уже реализованы. Поверх этого добавлен foundation для третьей системной роли `admin` без внедрения бизнес-логики заявок.
 
 ### Tech Stack
 ```
@@ -56,8 +56,10 @@ app/
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
 │   ├── create_teacher_user.py
+│   ├── create_admin_user.py
 │   └── seed_profile_data.py
 └── api/v1/         # API endpoints
+    ├── admin.py
     ├── health.py
     ├── auth.py
     └── teacher.py
@@ -72,6 +74,7 @@ app/
 ├── page.tsx        # Главная страница (/)
 ├── login/page.tsx
 ├── register/page.tsx
+├── admin/page.tsx
 ├── teacher/page.tsx
 ├── student/page.tsx # Student dashboard entrypoint
 ├── globals.css     # Глобальные стили (Tailwind)
@@ -88,6 +91,8 @@ components/
 │   └── Footer.tsx
 ├── student/
 │   └── StudentDashboard.tsx
+├── admin/
+│   └── AdminDashboard.tsx
 └── teacher/
     └── TeacherDashboard.tsx
 ```
@@ -127,13 +132,14 @@ PostgreSQL
     ↓
 Browser storage (`localStorage` или `sessionStorage`)
     ↓
-Redirect по роли (`/student` или `/teacher`)
+Redirect по роли (`/student`, `/teacher` или `/admin`)
     ↓
-`/student` или `/teacher` выполняет `getAccessToken()` и `GET /api/v1/auth/me`
+`/student`, `/teacher` или `/admin` выполняет `getAccessToken()` и `GET /api/v1/auth/me`
     ↓
 Role check:
 - `student` → dashboard UI
 - `teacher` → redirect на `/teacher`
+- `admin` → redirect на `/admin`
 - нет токена / токен невалиден → redirect на `/login`
     ↓
 Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
@@ -237,8 +243,9 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - Для локальной проверки добавлен seed `backend/scripts/seed_profile_data.py`.
 - На backend сохранён существующий auth API contract.
 - На backend включён CORS для локального frontend.
-- `app/core/dependencies.py` содержит teacher-only guard `get_current_teacher`.
+- `app/core/dependencies.py` содержит teacher-only guard `get_current_teacher` и admin-only guard `get_current_admin`.
 - `app/services/teacher_students_service.py` инкапсулирует выборку учеников teacher.
+- `GET /api/v1/admin/access-check` даёт минимальную backend-проверку admin-only доступа без добавления бизнес-логики.
 - `GET /api/v1/teacher/students` возвращает:
   - `id`
   - `full_name`
@@ -277,5 +284,9 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - MinIO avatar storage;
 - materials/tests persistence;
 - assistant persistence;
+- student applications workflow;
+- moderation actions for admin;
+- teacher assignment flow;
+- admin profile management;
 - выбор конкретных классов или множественные фильтры для teacher students list.
 - cursor/infinite pagination для teacher students list.

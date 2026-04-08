@@ -356,3 +356,41 @@ backend/
 - Teacher остаётся на `/teacher`.
 - Detail view ученика и кнопка `Назад` продолжают работать в той же правой панели.
 - Причина: текущий шаг ограничен именно pagination списка, без переработки маршрутизации.
+
+## Решения шага 3.2.4.1: Admin Role Foundation
+
+### Роль `admin` добавлена в существующую role model, без отдельного enum layer
+- Поле `users.role` осталось строковым.
+- Database/model constraint расширен до значений `student`, `teacher`, `admin`.
+- JWT, `/auth/login`, `/auth/me` и `get_current_user` не переписывались, потому что уже работают с ролью как со строкой.
+- Причина: это минимальное изменение, которое расширяет текущую auth-модель без новой архитектуры.
+
+### Публичная регистрация не расширялась на admin
+- `POST /api/v1/auth/register` по-прежнему всегда создаёт только `student`.
+- Для dev-проверки добавлен отдельный utility `backend/scripts/create_admin_user.py`.
+- Причина: admin не должен появляться через публичный flow.
+
+### Admin-only доступ вынесен в отдельную dependency
+- Добавлен `get_current_admin` поверх существующего `get_current_user`.
+- Для реальной backend-проверки добавлен минимальный endpoint `GET /api/v1/admin/access-check`.
+- Причина: это foundation для следующих admin API без внедрения бизнес-логики заявок уже сейчас.
+
+### Redirect by role остался централизованным
+- Frontend продолжает определять целевой dashboard после логина через `GET /api/v1/auth/me`.
+- Общий helper `getRoleRedirectPath` теперь поддерживает:
+  - `student` → `/student`
+  - `teacher` → `/teacher`
+  - `admin` → `/admin`
+- Причина: один источник истины для role-based redirect сохраняет уже работающий auth flow.
+
+### Маршрут `/admin` защищён тем же локальным auth-паттерном, что и остальные dashboard
+- `AdminDashboard` использует существующие `getAccessToken()`, `getCurrentUser()` и `clearAccessToken()`.
+- Без токена происходит redirect на `/login`.
+- Пользователь с ролью `student` или `teacher` получает redirect на свой dashboard, а не доступ в admin area.
+- Причина: это консистентно со student/teacher dashboard и не требует middleware или глобального auth store.
+
+### Admin dashboard ограничен skeleton UI
+- Добавлен только один маршрут `/admin` и локальный sidebar state.
+- Правая часть показывает placeholder для `Заявки учеников`.
+- Отдельный admin profile, moderation flow, notifications logic и CRUD намеренно не реализовывались.
+- Причина: шаг ограничен foundation роли администратора внутри уже существующего продукта.
