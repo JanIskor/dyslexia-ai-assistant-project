@@ -15,7 +15,7 @@ TeacherStudentsSortOrder = Literal["asc", "desc"]
 
 def _build_surname_search_filter(search: str):
     surname_expression = func.split_part(StudentProfile.full_name, " ", 1)
-    return surname_expression.ilike(f"%{search.strip()}%")
+    return surname_expression.ilike(f"{search.strip()}%")
 
 
 def _build_grade_sort_expressions(sort_order: TeacherStudentsSortOrder):
