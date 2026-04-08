@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Students API
+## Текущая фаза: Frontend Integration Teacher Students
 
-На текущем этапе frontend auth flow, dashboard UI и PostgreSQL schema layer уже реализованы, а backend расширен teacher-only API для доступа преподавателя к своим ученикам.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer и teacher-only API уже реализованы, а teacher dashboard подключён к реальным данным учеников без новых маршрутов.
 
 ### Tech Stack
 ```
@@ -99,11 +99,12 @@ lib/
 ├── authApi.ts      # Запросы register/login/me
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
+├── teacherStudentsApi.ts # Запросы teacher students list/detail
 ├── authValidators.ts
 └── [другие helpers]
 ```
 
-## Data Flow teacher students API
+## Data Flow teacher students frontend
 
 ```
 User Browser
@@ -134,6 +135,26 @@ Role check:
 - `student` → dashboard UI
 - `teacher` → redirect на `/teacher`
 - нет токена / токен невалиден → redirect на `/login`
+    ↓
+Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
+    ↓
+Выбор sidebar-пункта `Список учеников`
+    ↓
+`teacherStudentsApi.ts` делает `GET /api/v1/teacher/students` с Bearer token
+    ↓
+В правой панели отображается:
+- loading state списка
+- error state списка
+- empty state списка
+- grid карточек учеников
+    ↓
+Клик по карточке
+    ↓
+`teacherStudentsApi.ts` делает `GET /api/v1/teacher/students/{student_id}`
+    ↓
+В той же правой панели отображается student-like profile view
+    ↓
+Кнопка `Назад` возвращает локальный view state к grid списка
 ```
 
 ## Масштабируемость
@@ -143,11 +164,36 @@ Role check:
 - **Утилиты** организованы в src/lib
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
 
-## Teacher Students API
+## Teacher Students Frontend
 
 - `frontend/src/app/register/page.tsx` отправляет JSON на `POST /api/v1/auth/register`.
 - `frontend/src/app/login/page.tsx` отправляет JSON на `POST /api/v1/auth/login`.
 - После логина frontend делает `GET /api/v1/auth/me` с `Authorization: Bearer <token>`.
+- Раздел `Список учеников` в `TeacherDashboard.tsx` не создаёт отдельный маршрут и работает внутри `/teacher`.
+- Для teacher students frontend добавлен минимальный API client `frontend/src/lib/teacherStudentsApi.ts`.
+- Список учеников запрашивается только после открытия teacher-секции `students`.
+- Detail view ученика хранится в локальном state teacher dashboard и не использует nested routing.
+- Карточки учеников строятся из реальных backend-полей:
+  - `avatar_url`
+  - `full_name`
+  - `grade_label`
+- Detail view показывает:
+  - `avatar_url`
+  - `full_name`
+  - `quote`
+  - `birth_date`
+  - `gender`
+  - `grade_label`
+  - `enrollment_date`
+- Если `avatar_url` отсутствует, frontend отображает placeholder avatar.
+- Для списка реализованы состояния:
+  - loading
+  - error
+  - empty
+- Для detail реализованы состояния:
+  - loading
+  - error
+- Ошибки `401/403` на students endpoints не ломают layout: teacher dashboard остаётся на экране и показывает error state.
 - Auth persistence теперь использует PostgreSQL вместо SQLite.
 - Alembic управляет версионированием схемы БД.
 - Первая миграция создаёт:
@@ -188,4 +234,5 @@ Role check:
 - MinIO avatar storage;
 - materials/tests persistence;
 - assistant persistence;
-- search/pagination для teacher students list.
+- search/filter UI для teacher students list;
+- pagination для teacher students list.

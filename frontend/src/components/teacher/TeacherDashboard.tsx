@@ -1,14 +1,20 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Mail, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, Mail, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
+import {
+  getTeacherStudentDetail,
+  getTeacherStudents,
+  type TeacherStudentDetail,
+  type TeacherStudentListItem,
+} from '@/lib/teacherStudentsApi';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'assistant';
 
@@ -27,6 +33,15 @@ interface TeacherProfileField {
   label: string;
   value: string;
 }
+
+type TeacherStudentsViewState =
+  | {
+      mode: 'list';
+    }
+  | {
+      mode: 'detail';
+      studentId: string;
+    };
 
 const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> = [
   { id: 'profile', label: 'Мой профиль' },
@@ -56,6 +71,12 @@ const TEACHER_PROFILE_FIELDS: TeacherProfileField[] = [
 
 const UNREAD_MESSAGES_COUNT = 3;
 
+const STUDENT_PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
 function TeacherNotificationBadge() {
   return (
     <div className="relative" aria-label="Новые результаты тестов от учеников">
@@ -69,26 +90,50 @@ function TeacherNotificationBadge() {
   );
 }
 
+function AvatarPlaceholder({ size = 'md' }: { size?: 'md' | 'lg' }) {
+  const containerClassName = size === 'lg' ? 'h-24 w-24' : 'h-20 w-20';
+  const iconClassName = size === 'lg' ? 'h-14 w-14' : 'h-11 w-11';
+
+  return (
+    <div className={`flex ${containerClassName} items-center justify-center rounded-full bg-white/70`}>
+      <UserRound className={`${iconClassName} text-orange-300`} />
+    </div>
+  );
+}
+
+function ProfileAvatar({
+  avatarUrl,
+  fullName,
+}: {
+  avatarUrl: string | null;
+  fullName: string;
+}) {
+  return (
+    <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
+      {avatarUrl ? (
+        <Image
+          src={avatarUrl}
+          alt={`Аватар ${fullName}`}
+          width={96}
+          height={96}
+          unoptimized
+          className="h-24 w-24 rounded-full object-cover"
+        />
+      ) : (
+        <AvatarPlaceholder size="lg" />
+      )}
+    </div>
+  );
+}
+
 function TeacherProfileCard() {
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
-        <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-          {TEACHER_PROFILE_CARD_DATA.avatarUrl ? (
-            <Image
-              src={TEACHER_PROFILE_CARD_DATA.avatarUrl}
-              alt={`Аватар преподавателя ${TEACHER_PROFILE_CARD_DATA.fullName}`}
-              width={96}
-              height={96}
-              unoptimized
-              className="h-24 w-24 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
-              <UserRound className="h-14 w-14 text-orange-300" />
-            </div>
-          )}
-        </div>
+        <ProfileAvatar
+          avatarUrl={TEACHER_PROFILE_CARD_DATA.avatarUrl}
+          fullName={TEACHER_PROFILE_CARD_DATA.fullName}
+        />
 
         <h2 className="mt-6 max-w-2xl text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
           {TEACHER_PROFILE_CARD_DATA.fullName}
@@ -116,15 +161,291 @@ function TeacherProfileCard() {
   );
 }
 
-function TeacherSectionContent({ section }: { section: TeacherDashboardSection }) {
+function formatProfileDate(value: string): string {
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  return STUDENT_PROFILE_DATE_FORMATTER.format(parsedDate);
+}
+
+function StudentCard({
+  student,
+  onOpen,
+}: {
+  student: TeacherStudentListItem;
+  onOpen: (studentId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(student.id)}
+      className="flex min-h-[18rem] w-full flex-col items-center rounded-[28px] border border-orange-100/80 bg-white/92 px-6 py-8 text-center shadow-[0_18px_40px_rgba(221,156,130,0.10)] transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_22px_45px_rgba(221,156,130,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+    >
+      <div className="flex h-28 w-28 items-center justify-center rounded-[28px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
+        {student.avatar_url ? (
+          <Image
+            src={student.avatar_url}
+            alt={`Аватар ученика ${student.full_name}`}
+            width={88}
+            height={88}
+            unoptimized
+            className="h-[5.5rem] w-[5.5rem] rounded-full object-cover"
+          />
+        ) : (
+          <AvatarPlaceholder />
+        )}
+      </div>
+
+      <h3 className="mt-6 text-xl font-medium leading-snug text-stone-700 sm:text-2xl">
+        {student.full_name}
+      </h3>
+      <p className="mt-3 text-base text-stone-500 sm:text-lg">{student.grade_label}</p>
+    </button>
+  );
+}
+
+function StudentDetailProfile({
+  student,
+  onBack,
+}: {
+  student: TeacherStudentDetail;
+  onBack: () => void;
+}) {
+  const detailFields: TeacherProfileField[] = [
+    { label: 'Дата рождения:', value: formatProfileDate(student.birth_date) },
+    { label: 'Пол:', value: student.gender },
+    { label: 'Класс обучения:', value: student.grade_label },
+    { label: 'Дата поступления:', value: formatProfileDate(student.enrollment_date) },
+  ];
+
+  return (
+    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад
+      </button>
+
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col items-center text-center">
+        <ProfileAvatar avatarUrl={student.avatar_url} fullName={student.full_name} />
+
+        <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
+          {student.full_name}
+        </h2>
+
+        {student.quote ? (
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-[1.7rem] lg:leading-relaxed">
+            {student.quote}
+          </p>
+        ) : null}
+
+        <div className="mt-6 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
+          <dl className="divide-y divide-orange-100/80">
+            {detailFields.map((field) => (
+              <div
+                key={field.label}
+                className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:gap-4"
+              >
+                <dt className="text-sm font-medium text-stone-500 sm:text-base lg:text-xl">
+                  {field.label}
+                </dt>
+                <dd className="text-sm text-stone-700 sm:text-base sm:text-right lg:text-xl">
+                  {field.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StudentsListState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[18rem] items-center justify-center rounded-[28px] border border-orange-100/80 bg-white/90 px-6 py-10 text-center text-base text-stone-500 shadow-[0_18px_40px_rgba(221,156,130,0.10)] sm:text-lg">
+      {message}
+    </div>
+  );
+}
+
+function TeacherStudentsSection({
+  accessToken,
+  viewState,
+  onOpenStudent,
+  onBackToList,
+}: {
+  accessToken: string;
+  viewState: TeacherStudentsViewState;
+  onOpenStudent: (studentId: string) => void;
+  onBackToList: () => void;
+}) {
+  const [students, setStudents] = useState<TeacherStudentListItem[]>([]);
+  const [studentsError, setStudentsError] = useState<string | null>(null);
+  const [isStudentsLoading, setIsStudentsLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<TeacherStudentDetail | null>(null);
+  const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
+  const [isStudentDetailLoading, setIsStudentDetailLoading] = useState(false);
+  const loadedStudentIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadStudents = async () => {
+      setIsStudentsLoading(true);
+      setStudentsError(null);
+
+      try {
+        const response = await getTeacherStudents(accessToken);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setStudents(response);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStudents([]);
+        setStudentsError(
+          error instanceof Error ? error.message : 'Не удалось загрузить учеников',
+        );
+      } finally {
+        if (isMounted) {
+          setIsStudentsLoading(false);
+        }
+      }
+    };
+
+    void loadStudents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (viewState.mode !== 'detail') {
+      setSelectedStudent(null);
+      setStudentDetailError(null);
+      setIsStudentDetailLoading(false);
+      return;
+    }
+
+    if (
+      selectedStudent?.id === viewState.studentId &&
+      loadedStudentIdsRef.current.has(viewState.studentId)
+    ) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadStudentDetail = async () => {
+      setIsStudentDetailLoading(true);
+      setStudentDetailError(null);
+      setSelectedStudent(null);
+
+      try {
+        const response = await getTeacherStudentDetail(accessToken, viewState.studentId);
+
+        if (!isMounted) {
+          return;
+        }
+
+        loadedStudentIdsRef.current.add(response.id);
+        setSelectedStudent(response);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStudentDetailError(
+          error instanceof Error ? error.message : 'Не удалось загрузить профиль ученика',
+        );
+      } finally {
+        if (isMounted) {
+          setIsStudentDetailLoading(false);
+        }
+      }
+    };
+
+    void loadStudentDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken, selectedStudent?.id, viewState]);
+
+  if (viewState.mode === 'detail') {
+    if (isStudentDetailLoading) {
+      return <StudentsListState message="Загрузка профиля ученика..." />;
+    }
+
+    if (studentDetailError) {
+      return <StudentsListState message={studentDetailError} />;
+    }
+
+    if (!selectedStudent) {
+      return <StudentsListState message="Не удалось загрузить профиль ученика" />;
+    }
+
+    return <StudentDetailProfile student={selectedStudent} onBack={onBackToList} />;
+  }
+
+  if (isStudentsLoading) {
+    return <StudentsListState message="Загрузка списка учеников..." />;
+  }
+
+  if (studentsError) {
+    return <StudentsListState message={studentsError} />;
+  }
+
+  if (students.length === 0) {
+    return <StudentsListState message="У преподавателя пока нет учеников" />;
+  }
+
+  return (
+    <section>
+      <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Список учеников</h2>
+      <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {students.map((student) => (
+          <StudentCard key={student.id} student={student} onOpen={onOpenStudent} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TeacherSectionContent({
+  section,
+  accessToken,
+  studentsViewState,
+  onOpenStudent,
+  onBackToStudentsList,
+}: {
+  section: TeacherDashboardSection;
+  accessToken: string;
+  studentsViewState: TeacherStudentsViewState;
+  onOpenStudent: (studentId: string) => void;
+  onBackToStudentsList: () => void;
+}) {
   if (section === 'students') {
     return (
-      <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Список учеников</h2>
-        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-          Здесь будет отображаться список учеников
-        </p>
-      </section>
+      <TeacherStudentsSection
+        accessToken={accessToken}
+        viewState={studentsViewState}
+        onOpenStudent={onOpenStudent}
+        onBackToList={onBackToStudentsList}
+      />
     );
   }
 
@@ -141,8 +462,8 @@ function TeacherSectionContent({ section }: { section: TeacherDashboardSection }
 
   return (
     <>
-      <h1 className="text-2xl font-medium tracking-tight text-stone-700 sm:text-3xl lg:text-[2.1rem]">
-        Образовательный профиль
+      <h1 className="text-2xl font-medium tracking-tight text-stone-700 sm:text-3xl lg:text-[2rem]">
+        Профиль преподавателя
       </h1>
       <div className="mt-6">
         <TeacherProfileCard />
@@ -169,6 +490,10 @@ export function TeacherDashboard() {
   const [activeSection, setActiveSection] = useState<TeacherDashboardSection>('profile');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [studentsViewState, setStudentsViewState] = useState<TeacherStudentsViewState>({
+    mode: 'list',
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -191,6 +516,7 @@ export function TeacherDashboard() {
 
         if (isMounted) {
           setCurrentUser(user);
+          setAccessToken(token);
           setIsCheckingAuth(false);
         }
       } catch {
@@ -211,7 +537,27 @@ export function TeacherDashboard() {
     router.replace('/login');
   };
 
-  if (isCheckingAuth || !currentUser) {
+  const handleSectionChange = (section: TeacherDashboardSection) => {
+    setActiveSection(section);
+
+    if (section !== 'students') {
+      setStudentsViewState({ mode: 'list' });
+    }
+  };
+
+  const handleOpenStudent = (studentId: string) => {
+    setStudentsViewState({
+      mode: 'detail',
+      studentId,
+    });
+  };
+
+  const headerTitle =
+    activeSection === 'students' && studentsViewState.mode === 'detail'
+      ? 'Профиль ученика'
+      : TEACHER_MENU_ITEMS.find((item) => item.id === activeSection)?.label ?? 'Мой профиль';
+
+  if (isCheckingAuth || !currentUser || !accessToken) {
     return <DashboardSkeleton />;
   }
 
@@ -221,7 +567,7 @@ export function TeacherDashboard() {
         <div className="w-full p-1 sm:p-2">
           <Header
             variant="dashboard"
-            title="Мой профиль"
+            title={headerTitle}
             rightContent={
               <div className="flex items-center gap-3">
                 <TeacherNotificationBadge />
@@ -248,7 +594,7 @@ export function TeacherDashboard() {
                       <li key={item.id}>
                         <button
                           type="button"
-                          onClick={() => setActiveSection(item.id)}
+                          onClick={() => handleSectionChange(item.id)}
                           className={`flex w-full items-center gap-2 rounded-r-2xl rounded-l-none px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
@@ -274,7 +620,13 @@ export function TeacherDashboard() {
             </aside>
 
             <section className="rounded-[28px] border border-orange-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,247,242,0.4))] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
-              <TeacherSectionContent section={activeSection} />
+              <TeacherSectionContent
+                section={activeSection}
+                accessToken={accessToken}
+                studentsViewState={studentsViewState}
+                onOpenStudent={handleOpenStudent}
+                onBackToStudentsList={() => setStudentsViewState({ mode: 'list' })}
+              />
             </section>
           </div>
         </div>

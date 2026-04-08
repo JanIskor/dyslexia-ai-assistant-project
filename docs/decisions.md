@@ -235,3 +235,43 @@ backend/
 ### Response schemas сведены к минимально нужным полям
 - Для списка и детальной карточки созданы отдельные Pydantic schema.
 - Причина: endpoint не возвращает лишние user/system поля и следует ТЗ текущего шага.
+
+## Решения шага 3.2.3.1: Frontend Integration Teacher Students
+
+### Teacher students integration встроена в существующий `/teacher`, без новых маршрутов
+- Раздел `Список учеников` реализован внутри уже существующего `TeacherDashboard`.
+- Переключение между grid списка и profile view ученика сделано через локальный React state.
+- Причина: это соответствует ТЗ шага и сохраняет teacher dashboard как единый экран.
+
+### Для teacher students добавлен минимальный API client без новой frontend-архитектуры
+- Добавлен `frontend/src/lib/teacherStudentsApi.ts` с двумя GET-запросами:
+  - `/api/v1/teacher/students`
+  - `/api/v1/teacher/students/{student_id}`
+- Запросы используют существующий Bearer token из `authStorage`.
+- Причина: это достаточно для текущего шага и не требует глобального data layer.
+
+### Auth flow не дублируется и не переписывается
+- Teacher dashboard по-прежнему использует существующий `getAccessToken()` и `getCurrentUser()` для auth-check.
+- Students API вызывается только после успешной teacher-проверки.
+- Причина: это сохраняет уже работающий auth flow и исключает расхождение логики.
+
+### Ошибки students API отображаются как локальные UI states
+- Для списка реализованы `loading`, `error`, `empty`.
+- Для detail реализованы `loading` и `error`.
+- При `401/403` layout teacher dashboard остаётся целым, а пользователь видит error state вместо падения страницы.
+- Причина: шаг требует мягкую обработку ошибок без переизобретения auth-механики.
+
+### Detail view использует student-like profile composition
+- Карточка выбранного ученика повторяет композицию student profile view:
+  - avatar
+  - full name
+  - quote
+  - birth date
+  - gender
+  - grade label
+  - enrollment date
+- Причина: это соответствует референсу и позволяет переиспользовать уже принятый визуальный паттерн без новой дизайн-системы.
+
+### Поиск и фильтрация намеренно не добавлялись
+- В верхней части списка учеников не добавлялись input и filter controls.
+- Причина: они относятся к следующему шагу 3.2.3.2 и сознательно не смешивались с интеграцией реальных данных.
