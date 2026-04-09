@@ -394,3 +394,68 @@ backend/
 - Правая часть показывает placeholder для `Заявки учеников`.
 - Отдельный admin profile, moderation flow, notifications logic и CRUD намеренно не реализовывались.
 - Причина: шаг ограничен foundation роли администратора внутри уже существующего продукта.
+
+## Решения шага 3.2.4.2: Student Profile Moderation Foundation
+
+### Student area поддерживает два режима без новых маршрутов
+- Маршрут `/student` сохранён как единая точка входа.
+- Режим `onboarding` используется для student без назначенного преподавателя.
+- Режим `regular` используется для student, у которого уже есть связь в `teacher_students`.
+- Причина: это даёт предсказуемое поведение без отдельной сложной router-архитектуры.
+
+### Режим student определяется через уже существующую teacher-student связь
+- `GET /api/v1/student/profile` возвращает `student_mode`.
+- `student_mode = regular`, если у student есть запись в `teacher_students`.
+- Иначе возвращается `student_mode = onboarding`.
+- Причина: это переиспользует уже существующую предметную модель и не требует новых сущностей.
+
+### Moderation flow по-прежнему опирается только на два статуса
+- В `student_profiles` добавлены:
+  - `profile_status`
+  - `submitted_at`
+- На текущем шаге используются только значения:
+  - `draft`
+  - `submitted`
+- Причина: этого достаточно для foundation без преждевременного внедрения moderation state machine.
+
+### Draft-profile создаётся автоматически при первом обращении student
+- Публичная регистрация по-прежнему создаёт только `User` с ролью `student`.
+- `GET /api/v1/student/profile` создаёт пустой draft-profile, если запись ещё не существует.
+- Причина: новый student должен сразу попадать в onboarding flow без отдельного seed или скрытого init endpoint.
+
+### Student редактирует только ограниченный набор полей
+- `PATCH /api/v1/student/profile` поддерживает только:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `quote`
+- `grade_label` и `enrollment_date` остаются read-only и не принимаются API.
+- Причина: эти поля относятся к дальнейшему внутреннему workflow, а не к self-service onboarding student.
+
+### Submit отделён от простого сохранения draft
+- Draft сохраняется через `PATCH /api/v1/student/profile`.
+- Отправка на модерацию делается отдельным `POST /api/v1/student/profile/submit`.
+- Submit возможен только если заполнены:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+- Причина: это явно разделяет редактирование черновика и финальную отправку.
+
+### После submit профиль становится read-only и на backend, и на frontend
+- Backend запрещает `PATCH` для профиля со статусом `submitted`.
+- Frontend в статусе `submitted` скрывает submit-кнопку и делает moderation-form read-only.
+- Причина: read-only поведение не должно зависеть только от клиентского UI.
+
+### Regular student получает обычный dashboard и отдельную вкладку редактирования
+- В `regular` mode sidebar содержит:
+  - `Мой профиль`
+  - `Учебные материалы`
+  - `Мои тесты`
+  - `Редактирование профиля`
+- Вкладка `Редактирование профиля` использует тот же editable screen, что и onboarding.
+- Причина: активный student не должен терять доступ к обычному dashboard, но должен иметь путь для отправки profile changes на модерацию.
+
+### Onboarding student по-прежнему ограничен moderation-flow
+- В `onboarding` mode sidebar содержит только `Мой профиль`.
+- До появления teacher assignment student не получает полноценный обычный dashboard.
+- Причина: это следует продуктовой логике текущего шага.

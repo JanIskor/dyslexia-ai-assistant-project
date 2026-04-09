@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Admin Role Foundation
+## Текущая фаза: Student Profile Moderation Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, teacher-only API и teacher students frontend integration уже реализованы. Поверх этого добавлен foundation для третьей системной роли `admin` без внедрения бизнес-логики заявок.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation и teacher students integration уже реализованы. Поверх этого student area поддерживает два режима: `onboarding` для новых учеников и `regular` для учеников с назначенным преподавателем.
 
 ### Tech Stack
 ```
@@ -50,9 +50,11 @@ app/
 │   └── teacher_student.py
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
+│   ├── student_profile.py
 │   └── teacher_students.py
 ├── services/       # Бизнес-логика
 │   ├── auth_service.py
+│   ├── student_profile_service.py
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
 │   ├── create_teacher_user.py
@@ -62,6 +64,7 @@ app/
     ├── admin.py
     ├── health.py
     ├── auth.py
+    ├── student.py
     └── teacher.py
 ```
 
@@ -104,12 +107,13 @@ lib/
 ├── authApi.ts      # Запросы register/login/me
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
+├── studentProfileApi.ts # Запросы student self-profile
 ├── teacherStudentsApi.ts # Запросы teacher students list/detail
 ├── authValidators.ts
 └── [другие helpers]
 ```
 
-## Data Flow teacher students frontend
+## Data Flow student profile moderation
 
 ```
 User Browser
@@ -123,6 +127,9 @@ FastAPI auth endpoints
 `/register` → создаёт пользователя
 `/login` → возвращает access token
 `/me` → возвращает текущего пользователя по Bearer token
+`/student/profile` → self-profile текущего student + его режим
+`/student/profile` (PATCH) → сохранение draft-формы
+`/student/profile/submit` → перевод draft в `submitted`
 `/teacher/students` → список учеников текущего teacher
 `/teacher/students/{student_id}` → карточка конкретного ученика текущего teacher
     ↓
@@ -141,6 +148,40 @@ Role check:
 - `teacher` → redirect на `/teacher`
 - `admin` → redirect на `/admin`
 - нет токена / токен невалиден → redirect на `/login`
+    ↓
+Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)
+    ↓
+`studentProfileApi.ts` делает `GET /api/v1/student/profile`
+    ↓
+Backend создаёт draft-profile автоматически, если у student его ещё нет
+    ↓
+Backend определяет `student_mode` по наличию связи в `teacher_students`
+    ↓
+Если `student_mode = onboarding`:
+- доступны поля `full_name`, `birth_date`, `gender`, `quote`
+- доступна кнопка `Отправить на модерацию`
+- sidebar содержит только `Мой профиль`
+    ↓
+`PATCH /api/v1/student/profile` сохраняет только editable поля
+    ↓
+`POST /api/v1/student/profile/submit` проверяет обязательные поля:
+- `full_name`
+- `birth_date`
+- `gender`
+    ↓
+При успехе профиль получает:
+- `profile_status = submitted`
+- `submitted_at = now()`
+    ↓
+Если `student_mode = regular`:
+- student остаётся на обычном `/student` dashboard
+- sidebar содержит:
+  - `Мой профиль`
+  - `Учебные материалы`
+  - `Мои тесты`
+  - `Редактирование профиля`
+- вкладка `Редактирование профиля` использует тот же editable screen
+- при `profile_status = submitted` edit-screen становится read-only
     ↓
 Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
     ↓
@@ -178,6 +219,35 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - **Компоненты** легко добавлять в src/components
 - **Утилиты** организованы в src/lib
 - **Path alias** (`@/*`) позволяет чистые импорты независимо от глубины папок
+
+## Student Profile Moderation Foundation
+
+- `GET /api/v1/student/profile` возвращает только профиль текущего student.
+- Если `student_profile` ещё не существует, backend создаёт draft-запись автоматически.
+- `GET /api/v1/student/profile` дополнительно возвращает `student_mode`:
+  - `onboarding`
+  - `regular`
+- `student_mode` определяется по наличию назначения преподавателя через `teacher_students`.
+- `PATCH /api/v1/student/profile` позволяет student менять только:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `quote`
+- `PATCH /api/v1/student/profile` не принимает `grade_label` и `enrollment_date`.
+- `POST /api/v1/student/profile/submit` доступен только для draft-profile.
+- После submit backend проставляет:
+  - `profile_status = submitted`
+  - `submitted_at`
+- После submit backend запрещает дальнейшее редактирование student profile.
+- `student_profiles` теперь содержит:
+  - `profile_status`
+  - `submitted_at`
+- Moderation UI остаётся внутри существующего маршрута `/student`.
+- В `onboarding` mode sidebar содержит только `Мой профиль`.
+- В `regular` mode sidebar содержит также `Учебные материалы`, `Мои тесты`, `Редактирование профиля`.
+- `Редактирование профиля` использует тот же editable screen, что и onboarding flow.
+- Grade и дата поступления могут отображаться, но остаются read-only.
+- Avatar upload и MinIO integration на этом шаге не реализуются.
 
 ## Teacher Students Frontend
 
@@ -288,5 +358,9 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - moderation actions for admin;
 - teacher assignment flow;
 - admin profile management;
+- avatar upload for student onboarding;
+- отдельная история версий student profile changes;
+- approve/reject cycle для profile moderation;
+- назначение класса и даты поступления student через продуктовый workflow;
 - выбор конкретных классов или множественные фильтры для teacher students list.
 - cursor/infinite pagination для teacher students list.

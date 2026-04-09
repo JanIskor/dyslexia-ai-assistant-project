@@ -83,6 +83,8 @@ def ensure_student_profile(db: Session, student_user: User) -> None:
         profile.enrollment_date = date(2017, 9, 3)
         profile.quote = "Маленький человек может сделать гораздо больше, чем он об этом предполагает"
         profile.avatar_url = None
+        profile.profile_status = "draft"
+        profile.submitted_at = None
         db.commit()
         return
 
@@ -97,6 +99,8 @@ def ensure_student_profile(db: Session, student_user: User) -> None:
             enrollment_date=date(2017, 9, 3),
             quote="Маленький человек может сделать гораздо больше, чем он об этом предполагает",
             avatar_url=None,
+            profile_status="draft",
+            submitted_at=None,
         )
     )
     db.commit()
