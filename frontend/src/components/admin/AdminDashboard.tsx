@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, LogOut, Shield, Users, UserSquare2 } from 'lucide-react';
+import { FileText, LogOut, Mail, Users, UserSquare2 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
@@ -11,8 +11,8 @@ import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 
 type AdminDashboardSection = 'student-applications' | 'teachers' | 'students';
 
-const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string; icon: typeof Shield }> = [
-  { id: 'student-applications', label: 'Заявки учеников', icon: Shield },
+const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string; icon: typeof FileText }> = [
+  { id: 'student-applications', label: 'Заявки учеников', icon: FileText },
   { id: 'teachers', label: 'Преподаватели', icon: Users },
   { id: 'students', label: 'Ученики', icon: UserSquare2 },
 ];
@@ -21,7 +21,7 @@ function AdminNotificationBadge() {
   return (
     <div className="relative" aria-label="Уведомления администратора">
       <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-orange-100 bg-white/90 text-orange-300 shadow-[0_10px_25px_rgba(221,156,130,0.15)]">
-        <Bell className="h-6 w-6 stroke-[1.7]" />
+        <Mail className="h-6 w-6 stroke-[1.7]" />
       </div>
     </div>
   );
@@ -139,7 +139,7 @@ export function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => setActiveSection(item.id)}
-                          className={`flex w-full items-center gap-3 rounded-r-2xl rounded-l-none px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
+                          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
                               : 'text-stone-500 hover:bg-white/60'

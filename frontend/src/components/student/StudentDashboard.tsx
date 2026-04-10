@@ -75,18 +75,21 @@ function StudentNotificationBadge() {
 function ModerationBanner({
   profileStatus,
   studentMode,
+  regularSubmittedNotice,
 }: {
   profileStatus: StudentProfile['profile_status'];
   studentMode: StudentMode;
+  regularSubmittedNotice: boolean;
 }) {
-  const isSubmitted = profileStatus === 'submitted';
+  const isSubmitted =
+    studentMode === 'regular' ? regularSubmittedNotice : profileStatus === 'submitted';
   const draftMessage =
     studentMode === 'regular'
       ? 'Проверьте данные профиля, при необходимости обновите их и отправьте изменения на модерацию администратору.'
       : 'Заполните профиль и отправьте его на модерацию администратору.';
   const submittedMessage =
     studentMode === 'regular'
-      ? 'Изменения профиля на модерации у администратора. Пока редактирование недоступно.'
+      ? 'Изменения отправлены на модерацию. Они будут применены после проверки администратором.'
       : 'Профиль на модерации у администратора. Ожидайте назначения преподавателя.';
 
   return (
@@ -138,7 +141,7 @@ function StudentProfileEditCard({
   statusMessage: string | null;
   statusType: 'error' | 'success';
 }) {
-  const isReadOnly = profile.profile_status === 'submitted';
+  const isReadOnly = profile.student_mode === 'onboarding' && profile.profile_status === 'submitted';
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
@@ -217,7 +220,7 @@ function StudentProfileEditCard({
                 value={form.gender}
                 onChange={(event) => onChange('gender', event.target.value)}
                 disabled={isReadOnly}
-                className={`w-full rounded-2xl border px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
+                className={`w-full rounded-2xl border px-4 py-3 pr-12 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
                   isReadOnly
                     ? 'border-orange-100 bg-stone-50 text-stone-500'
                     : 'border-orange-200 bg-white focus:border-orange-300'
@@ -316,6 +319,7 @@ function StudentSectionContent({
   onSubmit,
   isSaving,
   isSubmitting,
+  regularSubmittedNotice,
   statusMessage,
   statusType,
 }: {
@@ -327,6 +331,7 @@ function StudentSectionContent({
   onSubmit: () => void;
   isSaving: boolean;
   isSubmitting: boolean;
+  regularSubmittedNotice: boolean;
   statusMessage: string | null;
   statusType: 'error' | 'success';
 }) {
@@ -405,6 +410,7 @@ function StudentSectionContent({
         <ModerationBanner
           profileStatus={profile.profile_status}
           studentMode={profile.student_mode}
+          regularSubmittedNotice={regularSubmittedNotice}
         />
       </div>
       <div className="mt-6">
@@ -451,6 +457,7 @@ export function StudentDashboard() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [regularSubmittedNotice, setRegularSubmittedNotice] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'error' | 'success'>('success');
 
@@ -501,6 +508,9 @@ export function StudentDashboard() {
   };
 
   const handleFormChange = (field: keyof StudentProfileFormState, value: string) => {
+    if (profile?.student_mode === 'regular') {
+      setRegularSubmittedNotice(false);
+    }
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -516,6 +526,12 @@ export function StudentDashboard() {
     setStatusMessage(null);
 
     try {
+      if (profile.student_mode === 'regular') {
+        setStatusType('success');
+        setStatusMessage('Изменения сохранены в форме. Отправьте их на модерацию, когда будете готовы.');
+        return;
+      }
+
       const updatedProfile = await updateStudentProfile(token, {
         full_name: form.fullName,
         birth_date: form.birthDate || null,
@@ -548,6 +564,13 @@ export function StudentDashboard() {
     setStatusMessage(null);
 
     try {
+      if (profile.student_mode === 'regular') {
+        setRegularSubmittedNotice(true);
+        setStatusType('success');
+        setStatusMessage('Форма остаётся доступной для редактирования.');
+        return;
+      }
+
       const savedProfile = await updateStudentProfile(token, {
         full_name: form.fullName,
         birth_date: form.birthDate || null,
@@ -619,21 +642,13 @@ export function StudentDashboard() {
                         <button
                           type="button"
                           onClick={() => setActiveSection(item.id)}
-                          className={`flex w-full items-center gap-2 rounded-r-2xl rounded-l-none px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
+                          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
                               : 'text-stone-500 hover:bg-white/60'
                           }`}
                           aria-current={isActive ? 'page' : undefined}
                         >
-                          <span
-                            className={`text-xl transition ${
-                              isActive ? 'text-orange-400' : 'text-transparent'
-                            }`}
-                            aria-hidden="true"
-                          >
-                            ›
-                          </span>
                           <span>{item.label}</span>
                         </button>
                       </li>
@@ -653,6 +668,7 @@ export function StudentDashboard() {
                 onSubmit={handleSubmitProfile}
                 isSaving={isSaving}
                 isSubmitting={isSubmitting}
+                regularSubmittedNotice={regularSubmittedNotice}
                 statusMessage={statusMessage}
                 statusType={statusType}
               />

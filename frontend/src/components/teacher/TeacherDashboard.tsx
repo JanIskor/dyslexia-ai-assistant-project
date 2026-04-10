@@ -822,21 +822,13 @@ export function TeacherDashboard() {
                         <button
                           type="button"
                           onClick={() => handleSectionChange(item.id)}
-                          className={`flex w-full items-center gap-2 rounded-r-2xl rounded-l-none px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
+                          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
                               : 'text-stone-500 hover:bg-white/60'
                           }`}
                           aria-current={isActive ? 'page' : undefined}
                         >
-                          <span
-                            className={`text-xl transition ${
-                              isActive ? 'text-orange-400' : 'text-transparent'
-                            }`}
-                            aria-hidden="true"
-                          >
-                            ›
-                          </span>
                           <span className={item.id !== 'profile' ? 'max-w-44' : ''}>{item.label}</span>
                         </button>
                       </li>
