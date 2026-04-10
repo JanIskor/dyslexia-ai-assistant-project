@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, LogOut, Mail, Users, UserSquare2 } from 'lucide-react';
+import { FileText, LogOut, Mail, UserSquare2, Users } from 'lucide-react';
+import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
+import { getAdminApplications, type AdminApplication } from '@/lib/adminApplicationsApi';
 
 type AdminDashboardSection = 'student-applications' | 'teachers' | 'students';
 
@@ -40,8 +42,61 @@ function DashboardSkeleton() {
   );
 }
 
-function AdminSectionContent({ section }: { section: AdminDashboardSection }) {
+function ApplicationsPanel({ token }: { token: string }) {
+  const [searchValue, setSearchValue] = useState('');
+  const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        if (isMounted) {
+          setIsLoading(true);
+          setErrorMessage(null);
+        }
+
+        const response = await getAdminApplications(token, searchValue);
+
+        if (isMounted) {
+          setApplications(response.items);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список заявок.');
+          setApplications([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchValue, token]);
+
+  return (
+    <AdminApplicationsListPanel
+      searchValue={searchValue}
+      onSearchChange={setSearchValue}
+      applications={applications}
+      isLoading={isLoading}
+      errorMessage={errorMessage}
+    />
+  );
+}
+
+function AdminSectionContent({ section, token }: { section: AdminDashboardSection; token: string }) {
   const title = section === 'student-applications' ? 'Заявки учеников' : section === 'teachers' ? 'Преподаватели' : 'Ученики';
+
+  if (section === 'student-applications') {
+    return <ApplicationsPanel token={token} />;
+  }
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.10)]">
@@ -156,7 +211,7 @@ export function AdminDashboard() {
             </aside>
 
             <div className="min-w-0">
-              <AdminSectionContent section={activeSection} />
+              <AdminSectionContent section={activeSection} token={getAccessToken() ?? ''} />
             </div>
           </div>
         </div>

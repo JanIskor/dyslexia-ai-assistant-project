@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Student Profile Moderation Foundation
+## Текущая фаза: Admin Applications List Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation и teacher students integration уже реализованы. Поверх этого student area поддерживает два режима: `onboarding` для новых учеников и `regular` для учеников с назначенным преподавателем.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration и student profile moderation foundation уже реализованы. Поверх этого `/admin` переходит от skeleton UI к реальным данным в разделе списка заявок учеников.
 
 ### Tech Stack
 ```
@@ -50,9 +50,11 @@ app/
 │   └── teacher_student.py
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
+│   ├── admin_applications.py
 │   ├── student_profile.py
 │   └── teacher_students.py
 ├── services/       # Бизнес-логика
+│   ├── admin_applications_service.py
 │   ├── auth_service.py
 │   ├── student_profile_service.py
 │   └── teacher_students_service.py
@@ -104,6 +106,7 @@ components/
 Вспомогательные функции и константы
 ```
 lib/
+├── adminApplicationsApi.ts # Запросы admin applications list
 ├── authApi.ts      # Запросы register/login/me
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
@@ -113,7 +116,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow student profile moderation
+## Data Flow admin applications list foundation
 
 ```
 User Browser
@@ -127,6 +130,7 @@ FastAPI auth endpoints
 `/register` → создаёт пользователя
 `/login` → возвращает access token
 `/me` → возвращает текущего пользователя по Bearer token
+`/admin/applications` → список student applications для admin
 `/student/profile` → self-profile текущего student + его режим
 `/student/profile` (PATCH) → сохранение draft-формы
 `/student/profile/submit` → перевод draft в `submitted`
@@ -148,6 +152,46 @@ Role check:
 - `teacher` → redirect на `/teacher`
 - `admin` → redirect на `/admin`
 - нет токена / токен невалиден → redirect на `/login`
+    ↓
+Admin dashboard (`frontend/src/components/admin/AdminDashboard.tsx`)
+    ↓
+Выбор sidebar-пункта `Заявки учеников`
+    ↓
+`adminApplicationsApi.ts` делает `GET /api/v1/admin/applications`
+с Bearer token и необязательным query param:
+- `search`
+    ↓
+Backend использует `get_current_admin`
+    ↓
+Только `admin` получает доступ к данным
+    ↓
+Backend делает выборку из `student_profiles` c join на `users`
+и ограничением `users.role = student`
+    ↓
+Поиск работает по `student_profiles.full_name` через case-insensitive substring search
+    ↓
+Backend возвращает:
+- `id`
+- `full_name`
+- `status`
+    ↓
+Статус вычисляется mapping-слоем:
+- `draft` → `Новая`
+- `submitted` → `На рассмотрении`
+- `rejected` → `Отклонена` (зарезервировано для следующего расширения)
+    ↓
+В правой панели `/admin` отображается:
+- search input
+- filter button без полной логики фильтрации
+- loading state
+- error state
+- empty state
+- список заявок
+    ↓
+В каждой строке:
+- слева `full_name`
+- справа status badge
+- status badge выровнен по правому краю строки
     ↓
 Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)
     ↓
@@ -316,6 +360,7 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - `app/core/dependencies.py` содержит teacher-only guard `get_current_teacher` и admin-only guard `get_current_admin`.
 - `app/services/teacher_students_service.py` инкапсулирует выборку учеников teacher.
 - `GET /api/v1/admin/access-check` даёт минимальную backend-проверку admin-only доступа без добавления бизнес-логики.
+- `GET /api/v1/admin/applications` даёт foundation списка student applications с поиском по ФИО.
 - `GET /api/v1/teacher/students` возвращает:
   - `id`
   - `full_name`
