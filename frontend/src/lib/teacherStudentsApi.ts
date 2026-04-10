@@ -1,3 +1,5 @@
+import { buildApiUrl } from '@/lib/apiBaseUrl';
+
 export interface TeacherStudentListItem {
   id: string;
   full_name: string;
@@ -39,11 +41,6 @@ export interface TeacherStudentsListResponse {
   pages: number;
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
-
-const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
-
 const getTeacherStudentsErrorMessage = (
   status: number,
   fallbackMessage: string,
@@ -69,7 +66,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 async function request<T>(path: string, token: string, fallbackMessage: string): Promise<T> {
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,

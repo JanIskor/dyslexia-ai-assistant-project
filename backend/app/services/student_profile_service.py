@@ -8,6 +8,10 @@ from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
 
 
+EDITABLE_PROFILE_STATUSES = {"draft", "needs_completion"}
+SUBMITTABLE_PROFILE_STATUSES = {"draft", "needs_completion"}
+
+
 def _normalize_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -48,10 +52,10 @@ def update_student_profile(
     profile: StudentProfile,
     updates: dict,
 ) -> StudentProfile:
-    if profile.profile_status != "draft":
+    if profile.profile_status not in EDITABLE_PROFILE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Submitted profile is read-only",
+            detail="Profile is read-only during moderation",
         )
 
     if "full_name" in updates:
@@ -69,7 +73,7 @@ def update_student_profile(
 
 
 def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentProfile:
-    if profile.profile_status != "draft":
+    if profile.profile_status not in SUBMITTABLE_PROFILE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Profile already submitted",

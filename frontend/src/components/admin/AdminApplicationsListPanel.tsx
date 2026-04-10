@@ -6,7 +6,8 @@ import type { AdminApplication, AdminApplicationStatusFilterOption } from '@/lib
 const APPLICATION_STATUS_STYLES: Record<string, string> = {
   Новая: 'bg-[#ffe4cc] text-[#db8b42]',
   'На рассмотрении': 'bg-[#ece8ef] text-[#6e6670]',
-  Отклонена: 'bg-[#f9ddd8] text-[#d46d63]',
+  'На доработке': 'bg-[#f9ddd8] text-[#d46d63]',
+  Подтверждена: 'bg-[#dff3e4] text-[#4f8c5f]',
 };
 
 interface AdminApplicationsListPanelProps {
@@ -19,6 +20,7 @@ interface AdminApplicationsListPanelProps {
   onToggleFilterOpen: () => void;
   statusOptions: AdminApplicationStatusFilterOption[];
   applications: AdminApplication[];
+  onSelectApplication: (applicationId: string) => void;
   isLoading: boolean;
   errorMessage: string | null;
 }
@@ -33,6 +35,7 @@ export function AdminApplicationsListPanel({
   onToggleFilterOpen,
   statusOptions,
   applications,
+  onSelectApplication,
   isLoading,
   errorMessage,
 }: AdminApplicationsListPanelProps) {
@@ -136,16 +139,24 @@ export function AdminApplicationsListPanel({
             {applications.map((application) => (
               <li
                 key={application.id}
-                className="flex items-center gap-4 rounded-[22px] border border-orange-50/90 bg-white/88 px-4 py-4 shadow-[0_8px_24px_rgba(221,156,130,0.05)] sm:px-5"
+                className="rounded-[22px] border border-orange-50/90 bg-white/88 shadow-[0_8px_24px_rgba(221,156,130,0.05)]"
               >
-                <span className="min-w-0 flex-1 text-base text-stone-700 sm:text-[1.05rem]">{application.full_name}</span>
-                <span
-                  className={`ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:min-w-[168px] sm:text-base ${
-                    APPLICATION_STATUS_STYLES[application.status] ?? APPLICATION_STATUS_STYLES['На рассмотрении']
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => onSelectApplication(application.id)}
+                  className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-orange-50/60 sm:px-5"
                 >
-                  {application.status}
-                </span>
+                  <span className="min-w-0 flex-1 text-base text-stone-700 sm:text-[1.05rem]">
+                    {application.full_name}
+                  </span>
+                  <span
+                    className={`ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:min-w-[168px] sm:text-base ${
+                      APPLICATION_STATUS_STYLES[application.status] ?? APPLICATION_STATUS_STYLES['На рассмотрении']
+                    }`}
+                  >
+                    {application.status}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>

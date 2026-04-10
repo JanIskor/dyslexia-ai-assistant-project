@@ -1,5 +1,7 @@
 export type UserRole = 'student' | 'teacher' | 'admin';
 
+import { buildApiUrl } from '@/lib/apiBaseUrl';
+
 export interface RegisterPayload {
   email: string;
   password: string;
@@ -30,11 +32,6 @@ interface ApiFieldError {
 interface ApiErrorBody {
   detail?: string | ApiFieldError[];
 }
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
-
-const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
 
 const getValidationErrorMessage = (errors: ApiFieldError[]): string => {
   const hasEmailError = errors.some((error) => error.loc?.includes('email'));
@@ -78,7 +75,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',

@@ -508,3 +508,49 @@ backend/
   - `Преподаватели`
   - `Ученики`
 - Причина: это ближе к референсу и делает левую колонку визуально спокойнее.
+
+## Решения шага 3.2.4.4: Admin Application Detail / Review Foundation
+
+### Детальная карточка заявки открывается внутри того же `/admin`, без нового route
+- Клик по строке заявки переключает правую часть dashboard из списка в detail card.
+- Возврат реализован кнопкой `Назад`, которая сбрасывает локальный selected application state.
+- Причина: это сохраняет простой admin layout и не требует nested routing.
+
+### Student data остаются read-only для admin
+- В detail card admin только просматривает:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `quote`
+  - `avatar_url`
+  - `status`
+- Причина: шаг ограничен review foundation и не должен превращаться в прямое редактирование student profile.
+
+### Admin редактирует только два поля предметной модели
+- `PATCH /api/v1/admin/applications/{application_id}` принимает только:
+  - `grade_label`
+  - `enrollment_date`
+- Причина: именно эти поля по ТЗ относятся к admin review, а остальные student fields заполняет сам ученик.
+
+### Review flow держится на четырёх рабочих статусах
+- Для review flow используются:
+  - `submitted`
+  - `in_review`
+  - `needs_completion`
+  - `approved`
+- `draft` остаётся внутренним состоянием student до отправки на модерацию.
+- Причина: этого достаточно для базового review cycle без premature assignment logic.
+
+### Открытие detail переводит `submitted` в `in_review`
+- `GET /api/v1/admin/applications/{application_id}` при первом открытии меняет статус `submitted` на `in_review`.
+- Причина: открытие detail означает начало review и позволяет списку отражать, что заявка уже взята в работу.
+
+### Request changes и approve реализованы как отдельные action endpoints
+- `POST /api/v1/admin/applications/{application_id}/request-changes` переводит заявку в `needs_completion`.
+- `POST /api/v1/admin/applications/{application_id}/approve` переводит заявку в `approved`.
+- Причина: отдельные action endpoints проще и чище, чем перегружать один PATCH несколькими типами переходов.
+
+### Student снова может редактировать профиль после `needs_completion`
+- Student-side backend разрешает `PATCH` и повторный submit для статуса `needs_completion`.
+- Frontend student profile перестаёт быть read-only в этом статусе.
+- Причина: иначе action `Отправить на доработку` был бы продуктово бесполезным.

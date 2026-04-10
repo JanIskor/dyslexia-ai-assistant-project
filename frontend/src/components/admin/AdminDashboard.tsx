@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Mail } from 'lucide-react';
+import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -11,8 +12,13 @@ import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
   getAdminApplicationFilters,
+  getAdminApplicationDetail,
   getAdminApplications,
+  updateAdminApplication,
+  requestAdminApplicationChanges,
+  approveAdminApplication,
   type AdminApplication,
+  type AdminApplicationDetail,
   type AdminApplicationStatusFilterOption,
 } from '@/lib/adminApplicationsApi';
 
@@ -52,9 +58,18 @@ function ApplicationsPanel({ token }: { token: string }) {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState<AdminApplicationStatusFilterOption[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [selectedApplication, setSelectedApplication] = useState<AdminApplicationDetail | null>(null);
+  const [gradeLabel, setGradeLabel] = useState('');
+  const [enrollmentDate, setEnrollmentDate] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isActing, setIsActing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [detailMessage, setDetailMessage] = useState<string | null>(null);
+  const [detailMessageType, setDetailMessageType] = useState<'error' | 'success'>('success');
 
   useEffect(() => {
     let isMounted = true;
@@ -83,12 +98,16 @@ function ApplicationsPanel({ token }: { token: string }) {
   useEffect(() => {
     let isMounted = true;
     const timeoutId = window.setTimeout(async () => {
-      try {
-        if (isMounted) {
-          setIsLoading(true);
-          setErrorMessage(null);
-        }
+      if (!isMounted) {
+        return;
+      }
 
+      if (isMounted) {
+        setIsLoading(true);
+        setErrorMessage(null);
+      }
+
+      try {
         const response = await getAdminApplications(token, searchValue, selectedStatuses);
 
         if (isMounted) {
@@ -112,6 +131,48 @@ function ApplicationsPanel({ token }: { token: string }) {
     };
   }, [searchValue, selectedStatuses, token]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDetail = async () => {
+      if (!selectedApplicationId) {
+        setSelectedApplication(null);
+        setDetailMessage(null);
+        return;
+      }
+
+      try {
+        if (isMounted) {
+          setIsLoadingDetail(true);
+          setDetailMessage(null);
+        }
+
+        const applicationDetail = await getAdminApplicationDetail(token, selectedApplicationId);
+
+        if (isMounted) {
+          setSelectedApplication(applicationDetail);
+          setGradeLabel(applicationDetail.grade_label ?? '');
+          setEnrollmentDate(applicationDetail.enrollment_date ?? '');
+        }
+      } catch (error) {
+        if (isMounted) {
+          setDetailMessageType('error');
+          setDetailMessage(error instanceof Error ? error.message : 'Не удалось загрузить заявку.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDetail(false);
+        }
+      }
+    };
+
+    void loadDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedApplicationId, token]);
+
   const handleToggleStatus = (status: string) => {
     setSelectedStatuses((currentStatuses) =>
       currentStatuses.includes(status)
@@ -119,6 +180,117 @@ function ApplicationsPanel({ token }: { token: string }) {
         : [...currentStatuses, status]
     );
   };
+
+  const handleSave = async () => {
+    if (!selectedApplication) {
+      return;
+    }
+
+    setIsSaving(true);
+    setDetailMessage(null);
+
+    try {
+      const updatedApplication = await updateAdminApplication(token, selectedApplication.id, {
+        grade_label: gradeLabel || null,
+        enrollment_date: enrollmentDate || null,
+      });
+      setSelectedApplication(updatedApplication);
+      setGradeLabel(updatedApplication.grade_label ?? '');
+      setEnrollmentDate(updatedApplication.enrollment_date ?? '');
+      setDetailMessageType('success');
+      setDetailMessage('Поля администратора сохранены.');
+      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      setApplications(refreshedApplications.items);
+    } catch (error) {
+      setDetailMessageType('error');
+      setDetailMessage(error instanceof Error ? error.message : 'Не удалось сохранить заявку.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRequestChanges = async () => {
+    if (!selectedApplication) {
+      return;
+    }
+
+    setIsActing(true);
+    setDetailMessage(null);
+
+    try {
+      const updatedApplication = await requestAdminApplicationChanges(token, selectedApplication.id);
+      setSelectedApplication(updatedApplication);
+      setDetailMessageType('success');
+      setDetailMessage('Заявка отправлена на доработку.');
+      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      setApplications(refreshedApplications.items);
+    } catch (error) {
+      setDetailMessageType('error');
+      setDetailMessage(error instanceof Error ? error.message : 'Не удалось отправить заявку на доработку.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedApplication) {
+      return;
+    }
+
+    setIsActing(true);
+    setDetailMessage(null);
+
+    try {
+      const updatedApplication = await approveAdminApplication(token, selectedApplication.id);
+      setSelectedApplication(updatedApplication);
+      setDetailMessageType('success');
+      setDetailMessage('Заявка подтверждена.');
+      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      setApplications(refreshedApplications.items);
+    } catch (error) {
+      setDetailMessageType('error');
+      setDetailMessage(error instanceof Error ? error.message : 'Не удалось подтвердить заявку.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  if (selectedApplicationId) {
+    if (isLoadingDetail || !selectedApplication) {
+      return (
+        <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.10)]">
+          <button
+            type="button"
+            onClick={() => setSelectedApplicationId(null)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_8px_24px_rgba(221,156,130,0.08)] transition hover:bg-orange-50"
+          >
+            Назад
+          </button>
+          <p className="mt-6 text-base text-stone-500 sm:text-lg">
+            {detailMessage ?? 'Загружаем заявку...'}
+          </p>
+        </section>
+      );
+    }
+
+    return (
+      <AdminApplicationDetailPanel
+        application={selectedApplication}
+        gradeLabel={gradeLabel}
+        enrollmentDate={enrollmentDate}
+        onGradeLabelChange={setGradeLabel}
+        onEnrollmentDateChange={setEnrollmentDate}
+        onBack={() => setSelectedApplicationId(null)}
+        onSave={handleSave}
+        onRequestChanges={handleRequestChanges}
+        onApprove={handleApprove}
+        isSaving={isSaving}
+        isActing={isActing}
+        statusMessage={detailMessage}
+        statusType={detailMessageType}
+      />
+    );
+  }
 
   return (
     <AdminApplicationsListPanel
@@ -131,6 +303,7 @@ function ApplicationsPanel({ token }: { token: string }) {
       onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
       statusOptions={statusOptions}
       applications={applications}
+      onSelectApplication={setSelectedApplicationId}
       isLoading={isLoading}
       errorMessage={errorMessage}
     />

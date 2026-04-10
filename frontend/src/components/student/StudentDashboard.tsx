@@ -82,25 +82,43 @@ function ModerationBanner({
   regularSubmittedNotice: boolean;
 }) {
   const isSubmitted =
-    studentMode === 'regular' ? regularSubmittedNotice : profileStatus === 'submitted';
+    studentMode === 'regular'
+      ? regularSubmittedNotice
+      : profileStatus === 'submitted' || profileStatus === 'in_review';
+  const needsCompletion = profileStatus === 'needs_completion';
+  const isApproved = profileStatus === 'approved';
   const draftMessage =
     studentMode === 'regular'
       ? 'Проверьте данные профиля, при необходимости обновите их и отправьте изменения на модерацию администратору.'
       : 'Заполните профиль и отправьте его на модерацию администратору.';
+  const needsCompletionMessage =
+    'Администратор отправил профиль на доработку. Обновите данные и снова отправьте заявку на модерацию.';
   const submittedMessage =
     studentMode === 'regular'
       ? 'Изменения отправлены на модерацию. Они будут применены после проверки администратором.'
       : 'Профиль на модерации у администратора. Ожидайте назначения преподавателя.';
+  const approvedMessage =
+    'Профиль подтверждён администратором. Дополнительные шаги будут доступны на следующих этапах.';
 
   return (
     <div
       className={`rounded-[24px] border px-5 py-4 text-base leading-relaxed shadow-[0_10px_30px_rgba(221,156,130,0.08)] sm:px-6 sm:text-lg ${
-        isSubmitted
+        isApproved
+          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
+          : needsCompletion
+            ? 'border-rose-200 bg-rose-50/90 text-rose-700'
+            : isSubmitted
           ? 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
           : 'border-orange-200 bg-orange-50/95 text-stone-600'
       }`}
     >
-      {isSubmitted ? submittedMessage : draftMessage}
+      {isApproved
+        ? approvedMessage
+        : needsCompletion
+          ? needsCompletionMessage
+          : isSubmitted
+            ? submittedMessage
+            : draftMessage}
     </div>
   );
 }
@@ -141,7 +159,9 @@ function StudentProfileEditCard({
   statusMessage: string | null;
   statusType: 'error' | 'success';
 }) {
-  const isReadOnly = profile.student_mode === 'onboarding' && profile.profile_status === 'submitted';
+  const isReadOnly =
+    profile.student_mode === 'onboarding' &&
+    ['submitted', 'in_review', 'approved'].includes(profile.profile_status);
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">

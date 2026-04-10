@@ -9,7 +9,10 @@ from app.db.base import Base
 class StudentProfile(Base):
     __tablename__ = "student_profiles"
     __table_args__ = (
-        CheckConstraint("profile_status IN ('draft', 'submitted')", name="ck_student_profiles_status"),
+        CheckConstraint(
+            "profile_status IN ('draft', 'submitted', 'in_review', 'needs_completion', 'approved')",
+            name="ck_student_profiles_status",
+        ),
     )
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)

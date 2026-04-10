@@ -1,4 +1,6 @@
-export type StudentProfileStatus = 'draft' | 'submitted';
+import { buildApiUrl } from '@/lib/apiBaseUrl';
+
+export type StudentProfileStatus = 'draft' | 'submitted' | 'in_review' | 'needs_completion' | 'approved';
 export type StudentMode = 'onboarding' | 'regular';
 
 export interface StudentProfile {
@@ -32,11 +34,6 @@ interface ApiErrorBody {
   detail?: string | ApiFieldError[];
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
-
-const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
-
 const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
   const detail = body?.detail;
 
@@ -44,8 +41,8 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Заполните ФИО, дату рождения и пол перед отправкой на модерацию.';
   }
 
-  if (detail === 'Submitted profile is read-only') {
-    return 'Профиль уже отправлен и больше не доступен для редактирования.';
+  if (detail === 'Profile is read-only during moderation') {
+    return 'Профиль сейчас находится на модерации и временно недоступен для редактирования.';
   }
 
   if (detail === 'Profile already submitted') {
@@ -68,7 +65,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 async function request<T>(path: string, token: string, init: RequestInit): Promise<T> {
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',

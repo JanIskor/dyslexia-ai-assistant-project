@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Admin Applications List Foundation
+## Текущая фаза: Admin Application Detail / Review Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration и student profile moderation foundation уже реализованы. Поверх этого `/admin` переходит от skeleton UI к реальным данным в разделе списка заявок учеников.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation и admin applications list foundation уже реализованы. Поверх этого `/admin` получает foundation просмотра и базовой модерации конкретной заявки ученика.
 
 ### Tech Stack
 ```
@@ -97,6 +97,8 @@ components/
 ├── student/
 │   └── StudentDashboard.tsx
 ├── admin/
+│   ├── AdminApplicationDetailPanel.tsx
+│   ├── AdminApplicationsListPanel.tsx
 │   └── AdminDashboard.tsx
 └── teacher/
     └── TeacherDashboard.tsx
@@ -116,7 +118,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow admin applications list foundation
+## Data Flow admin application detail / review foundation
 
 ```
 User Browser
@@ -178,9 +180,10 @@ Backend возвращает:
 - `status`
     ↓
 Статус вычисляется mapping-слоем:
-- `draft` → `Новая`
-- `submitted` → `На рассмотрении`
-- `rejected` → `Отклонена` (зарезервировано для следующего расширения)
+- `submitted` → `Новая`
+- `in_review` → `На рассмотрении`
+- `needs_completion` → `На доработке`
+- `approved` → `Подтверждена`
     ↓
 В правой панели `/admin` отображается:
 - search input
@@ -195,6 +198,33 @@ Backend возвращает:
 - справа status badge
 - status badge выровнен по правому краю строки
 - между строками есть небольшой визуальный отступ
+    ↓
+Клик по строке заявки
+    ↓
+`adminApplicationsApi.ts` делает `GET /api/v1/admin/applications/{application_id}`
+    ↓
+Если статус был `submitted`, backend переводит его в `in_review`
+    ↓
+В той же правой панели отображается detail card заявки
+    ↓
+Read-only student data:
+- `full_name`
+- `birth_date`
+- `gender`
+- `quote`
+- `avatar_url`
+- `status`
+    ↓
+Editable admin fields:
+- `grade_label`
+- `enrollment_date`
+    ↓
+Admin actions:
+- `PATCH /api/v1/admin/applications/{application_id}`
+- `POST /api/v1/admin/applications/{application_id}/request-changes`
+- `POST /api/v1/admin/applications/{application_id}/approve`
+    ↓
+Кнопка `Назад` возвращает локальный view state к списку заявок
     ↓
 Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)
     ↓
@@ -367,6 +397,12 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - с prefix search по фамилии
   - с фильтрацией по статусу
 - `GET /api/v1/admin/applications/filters` возвращает доступные статусы для UI-фильтра.
+- `GET /api/v1/admin/applications/{application_id}` возвращает detail заявки и переводит `submitted` в `in_review` при открытии.
+- `PATCH /api/v1/admin/applications/{application_id}` даёт admin изменить только:
+  - `grade_label`
+  - `enrollment_date`
+- `POST /api/v1/admin/applications/{application_id}/request-changes` переводит заявку в `needs_completion`.
+- `POST /api/v1/admin/applications/{application_id}/approve` переводит заявку в `approved`.
 - `GET /api/v1/teacher/students` возвращает:
   - `id`
   - `full_name`
