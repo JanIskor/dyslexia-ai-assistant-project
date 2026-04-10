@@ -2,21 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, LogOut, Mail, UserSquare2, Users } from 'lucide-react';
+import { LogOut, Mail } from 'lucide-react';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
-import { getAdminApplications, type AdminApplication } from '@/lib/adminApplicationsApi';
+import {
+  getAdminApplicationFilters,
+  getAdminApplications,
+  type AdminApplication,
+  type AdminApplicationStatusFilterOption,
+} from '@/lib/adminApplicationsApi';
 
 type AdminDashboardSection = 'student-applications' | 'teachers' | 'students';
 
-const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string; icon: typeof FileText }> = [
-  { id: 'student-applications', label: 'Заявки учеников', icon: FileText },
-  { id: 'teachers', label: 'Преподаватели', icon: Users },
-  { id: 'students', label: 'Ученики', icon: UserSquare2 },
+const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
+  { id: 'student-applications', label: 'Заявки учеников' },
+  { id: 'teachers', label: 'Преподаватели' },
+  { id: 'students', label: 'Ученики' },
 ];
 
 function AdminNotificationBadge() {
@@ -44,9 +49,36 @@ function DashboardSkeleton() {
 
 function ApplicationsPanel({ token }: { token: string }) {
   const [searchValue, setSearchValue] = useState('');
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [statusOptions, setStatusOptions] = useState<AdminApplicationStatusFilterOption[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFilterOptions = async () => {
+      try {
+        const response = await getAdminApplicationFilters(token);
+
+        if (isMounted) {
+          setStatusOptions(response.statuses);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список заявок.');
+        }
+      }
+    };
+
+    void loadFilterOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,7 +89,7 @@ function ApplicationsPanel({ token }: { token: string }) {
           setErrorMessage(null);
         }
 
-        const response = await getAdminApplications(token, searchValue);
+        const response = await getAdminApplications(token, searchValue, selectedStatuses);
 
         if (isMounted) {
           setApplications(response.items);
@@ -78,12 +110,26 @@ function ApplicationsPanel({ token }: { token: string }) {
       isMounted = false;
       window.clearTimeout(timeoutId);
     };
-  }, [searchValue, token]);
+  }, [searchValue, selectedStatuses, token]);
+
+  const handleToggleStatus = (status: string) => {
+    setSelectedStatuses((currentStatuses) =>
+      currentStatuses.includes(status)
+        ? currentStatuses.filter((currentStatus) => currentStatus !== status)
+        : [...currentStatuses, status]
+    );
+  };
 
   return (
     <AdminApplicationsListPanel
       searchValue={searchValue}
       onSearchChange={setSearchValue}
+      selectedStatuses={selectedStatuses}
+      onToggleStatus={handleToggleStatus}
+      onClearStatuses={() => setSelectedStatuses([])}
+      isFilterOpen={isFilterOpen}
+      onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
+      statusOptions={statusOptions}
       applications={applications}
       isLoading={isLoading}
       errorMessage={errorMessage}
@@ -187,7 +233,6 @@ export function AdminDashboard() {
                 <ul className="space-y-1">
                   {ADMIN_MENU_ITEMS.map((item) => {
                     const isActive = item.id === activeSection;
-                    const Icon = item.icon;
 
                     return (
                       <li key={item.id}>
@@ -200,7 +245,6 @@ export function AdminDashboard() {
                               : 'text-stone-500 hover:bg-white/60'
                           }`}
                         >
-                          <Icon className="h-5 w-5 shrink-0" />
                           <span>{item.label}</span>
                         </button>
                       </li>

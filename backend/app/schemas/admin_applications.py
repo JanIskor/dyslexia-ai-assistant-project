@@ -11,3 +11,12 @@ class AdminApplicationListItem(BaseModel):
 
 class AdminApplicationsListResponse(BaseModel):
     items: list[AdminApplicationListItem]
+
+
+class AdminApplicationStatusFilterOption(BaseModel):
+    value: str
+    label: str
+
+
+class AdminApplicationsFiltersResponse(BaseModel):
+    statuses: list[AdminApplicationStatusFilterOption]

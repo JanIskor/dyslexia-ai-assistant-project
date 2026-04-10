@@ -158,8 +158,9 @@ Admin dashboard (`frontend/src/components/admin/AdminDashboard.tsx`)
 Выбор sidebar-пункта `Заявки учеников`
     ↓
 `adminApplicationsApi.ts` делает `GET /api/v1/admin/applications`
-с Bearer token и необязательным query param:
+s Bearer token и необязательными query params:
 - `search`
+- `status`
     ↓
 Backend использует `get_current_admin`
     ↓
@@ -168,7 +169,8 @@ Backend использует `get_current_admin`
 Backend делает выборку из `student_profiles` c join на `users`
 и ограничением `users.role = student`
     ↓
-Поиск работает по `student_profiles.full_name` через case-insensitive substring search
+Поиск работает только по первому слову `student_profiles.full_name`
+через case-insensitive prefix search
     ↓
 Backend возвращает:
 - `id`
@@ -182,7 +184,7 @@ Backend возвращает:
     ↓
 В правой панели `/admin` отображается:
 - search input
-- filter button без полной логики фильтрации
+- compact filter dropdown по статусам
 - loading state
 - error state
 - empty state
@@ -192,6 +194,7 @@ Backend возвращает:
 - слева `full_name`
 - справа status badge
 - status badge выровнен по правому краю строки
+- между строками есть небольшой визуальный отступ
     ↓
 Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)
     ↓
@@ -360,7 +363,10 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - `app/core/dependencies.py` содержит teacher-only guard `get_current_teacher` и admin-only guard `get_current_admin`.
 - `app/services/teacher_students_service.py` инкапсулирует выборку учеников teacher.
 - `GET /api/v1/admin/access-check` даёт минимальную backend-проверку admin-only доступа без добавления бизнес-логики.
-- `GET /api/v1/admin/applications` даёт foundation списка student applications с поиском по ФИО.
+- `GET /api/v1/admin/applications` даёт foundation списка student applications:
+  - с prefix search по фамилии
+  - с фильтрацией по статусу
+- `GET /api/v1/admin/applications/filters` возвращает доступные статусы для UI-фильтра.
 - `GET /api/v1/teacher/students` возвращает:
   - `id`
   - `full_name`

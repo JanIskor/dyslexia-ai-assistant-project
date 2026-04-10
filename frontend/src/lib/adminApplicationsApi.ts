@@ -4,8 +4,17 @@ export interface AdminApplication {
   status: string;
 }
 
+export interface AdminApplicationStatusFilterOption {
+  value: string;
+  label: string;
+}
+
 export interface AdminApplicationsResponse {
   items: AdminApplication[];
+}
+
+export interface AdminApplicationFiltersResponse {
+  statuses: AdminApplicationStatusFilterOption[];
 }
 
 interface ApiErrorBody {
@@ -42,12 +51,17 @@ async function parseJson<T>(response: Response): Promise<T> {
 export const getAdminApplications = async (
   token: string,
   search: string,
+  statuses: string[],
 ): Promise<AdminApplicationsResponse> => {
   const params = new URLSearchParams();
 
   if (search.trim()) {
     params.set('search', search.trim());
   }
+
+  statuses.forEach((status) => {
+    params.append('status', status);
+  });
 
   const path = params.toString()
     ? `/api/v1/admin/applications?${params.toString()}`
@@ -74,4 +88,30 @@ export const getAdminApplications = async (
   }
 
   return parseJson<AdminApplicationsResponse>(response);
+};
+
+export const getAdminApplicationFilters = async (
+  token: string,
+): Promise<AdminApplicationFiltersResponse> => {
+  const response = await fetch(buildUrl('/api/v1/admin/applications/filters'), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  return parseJson<AdminApplicationFiltersResponse>(response);
 };
