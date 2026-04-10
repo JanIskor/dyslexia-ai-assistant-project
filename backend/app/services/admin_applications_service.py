@@ -176,8 +176,15 @@ def request_admin_application_changes(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be sent for revision")
 
     profile.profile_status = "needs_completion"
-    db.commit()
-    db.refresh(profile)
+    try:
+        db.commit()
+        db.refresh(profile)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Application status transition is not supported by the current database schema",
+        ) from exc
     return _build_admin_application_detail(profile)
 
 
@@ -192,6 +199,13 @@ def approve_admin_application(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be approved")
 
     profile.profile_status = "approved"
-    db.commit()
-    db.refresh(profile)
+    try:
+        db.commit()
+        db.refresh(profile)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Application status transition is not supported by the current database schema",
+        ) from exc
     return _build_admin_application_detail(profile)

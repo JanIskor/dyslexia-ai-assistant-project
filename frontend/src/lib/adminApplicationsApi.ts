@@ -63,6 +63,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Эту заявку сейчас нельзя подтвердить.';
   }
 
+  if (detail === 'Application status transition is not supported by the current database schema') {
+    return 'Статусы заявок в базе данных не обновлены для review flow. Примените последние миграции backend.';
+  }
+
   if (status >= 500) {
     return 'Ошибка сервера. Попробуйте ещё раз позже.';
   }
