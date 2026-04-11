@@ -179,6 +179,17 @@ def _get_student_profile_for_assignment_or_404(db: Session, application_id: UUID
     return profile
 
 
+def _is_student_profile_status_constraint_error(exc: IntegrityError) -> bool:
+    orig = getattr(exc, "orig", None)
+    diag = getattr(orig, "diag", None)
+    constraint_name = getattr(diag, "constraint_name", None)
+
+    if constraint_name == "ck_student_profiles_status":
+        return True
+
+    return "ck_student_profiles_status" in str(orig)
+
+
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
     profile = _get_admin_application_or_404(db, application_id)
 
@@ -319,9 +330,12 @@ def assign_teacher_to_application(
         db.refresh(profile)
     except IntegrityError as exc:
         db.rollback()
+        detail = "Student already assigned"
+        if _is_student_profile_status_constraint_error(exc):
+            detail = "Application status transition is not supported by the current database schema"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Student already assigned",
+            detail=detail,
         ) from exc
 
     return _build_admin_application_detail(profile)
