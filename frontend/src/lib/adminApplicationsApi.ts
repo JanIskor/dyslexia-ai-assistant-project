@@ -23,6 +23,15 @@ export interface AdminApplicationStatusFilterOption {
   label: string;
 }
 
+export interface AdminTeacherAssignmentOption {
+  teacher_user_id: string;
+  full_name: string;
+  subject_name: string;
+  student_count: number;
+  capacity: number;
+  is_available: boolean;
+}
+
 export interface AdminApplicationsResponse {
   items: AdminApplication[];
 }
@@ -31,9 +40,17 @@ export interface AdminApplicationFiltersResponse {
   statuses: AdminApplicationStatusFilterOption[];
 }
 
+export interface AdminTeacherAssignmentOptionsResponse {
+  items: AdminTeacherAssignmentOption[];
+}
+
 export interface AdminApplicationUpdatePayload {
   grade_label?: string | null;
   enrollment_date?: string | null;
+}
+
+export interface AdminAssignTeacherPayload {
+  teacher_user_id: string;
 }
 
 interface ApiErrorBody {
@@ -55,12 +72,40 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Заявка не найдена.';
   }
 
+  if (detail === 'Invalid application id') {
+    return 'Некорректный идентификатор заявки.';
+  }
+
+  if (detail === 'Student profile not found') {
+    return 'Профиль ученика не найден.';
+  }
+
   if (detail === 'Application cannot be sent for revision') {
     return 'Эту заявку сейчас нельзя отправить на доработку.';
   }
 
   if (detail === 'Application cannot be approved') {
     return 'Эту заявку сейчас нельзя подтвердить.';
+  }
+
+  if (detail === 'Application cannot be assigned') {
+    return 'Эту заявку сейчас нельзя отправить преподавателю.';
+  }
+
+  if (detail === 'Teacher not found') {
+    return 'Преподаватель не найден.';
+  }
+
+  if (detail === 'Teacher is at full capacity') {
+    return 'У выбранного преподавателя уже 15 из 15 учеников.';
+  }
+
+  if (detail === 'Student already assigned') {
+    return 'Ученик уже назначен преподавателю.';
+  }
+
+  if (detail === 'Student is already assigned to this teacher') {
+    return 'Этот ученик уже назначен выбранному преподавателю.';
   }
 
   if (detail === 'Application status transition is not supported by the current database schema') {
@@ -144,6 +189,32 @@ export const getAdminApplicationFilters = async (
   }
 
   return parseJson<AdminApplicationFiltersResponse>(response);
+};
+
+export const getAdminTeacherAssignmentOptions = async (
+  token: string,
+): Promise<AdminTeacherAssignmentOptionsResponse> => {
+  const response = await fetch(buildApiUrl('/api/v1/admin/teachers/assignment-options'), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  return parseJson<AdminTeacherAssignmentOptionsResponse>(response);
 };
 
 export const getAdminApplicationDetail = async (
@@ -241,6 +312,35 @@ export const approveAdminApplication = async (
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  return parseJson<AdminApplicationDetail>(response);
+};
+
+export const assignTeacherToApplication = async (
+  token: string,
+  applicationId: string,
+  payload: AdminAssignTeacherPayload,
+): Promise<AdminApplicationDetail> => {
+  const response = await fetch(buildApiUrl(`/api/v1/admin/applications/${applicationId}/assign-teacher`), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

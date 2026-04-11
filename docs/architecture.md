@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Admin Application Detail / Review Foundation
+## Текущая фаза: Teacher Assignment Modal Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation и admin applications list foundation уже реализованы. Поверх этого `/admin` получает foundation просмотра и базовой модерации конкретной заявки ученика.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation и admin application detail / review foundation уже реализованы. Поверх этого `/admin` получает foundation назначения преподавателя через modal внутри уже существующего review flow.
 
 ### Tech Stack
 ```
@@ -99,7 +99,8 @@ components/
 ├── admin/
 │   ├── AdminApplicationDetailPanel.tsx
 │   ├── AdminApplicationsListPanel.tsx
-│   └── AdminDashboard.tsx
+│   ├── AdminDashboard.tsx
+│   └── TeacherAssignmentModal.tsx
 └── teacher/
     └── TeacherDashboard.tsx
 ```
@@ -108,7 +109,7 @@ components/
 Вспомогательные функции и константы
 ```
 lib/
-├── adminApplicationsApi.ts # Запросы admin applications list
+├── adminApplicationsApi.ts # Запросы admin applications list/detail/assignment
 ├── authApi.ts      # Запросы register/login/me
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
@@ -118,7 +119,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow admin application detail / review foundation
+## Data Flow teacher assignment modal foundation
 
 ```
 User Browser
@@ -222,9 +223,49 @@ Editable admin fields:
 Admin actions:
 - `PATCH /api/v1/admin/applications/{application_id}`
 - `POST /api/v1/admin/applications/{application_id}/request-changes`
-- `POST /api/v1/admin/applications/{application_id}/approve`
+- `GET /api/v1/admin/teachers/assignment-options`
+- `POST /api/v1/admin/applications/{application_id}/assign-teacher`
     ↓
-Кнопка `Назад` возвращает локальный view state к списку заявок
+Кнопка `Подтвердить заявку`
+    ↓
+Frontend не делает direct approve
+    ↓
+Открывается `TeacherAssignmentModal`
+    ↓
+`adminApplicationsApi.ts` делает `GET /api/v1/admin/teachers/assignment-options`
+    ↓
+Backend делает выборку из `teacher_profiles`
+с outer join на `teacher_students`
+    ↓
+Для каждого преподавателя считаются:
+- `teacher_user_id`
+- `full_name`
+- `subject_name`
+- `student_count`
+- `capacity = 15`
+- `is_available = student_count < 15`
+    ↓
+В modal отображаются:
+- ФИО преподавателя
+- предмет
+- занятость `current/15`
+    ↓
+Если преподаватель имеет `15/15`,
+строка недоступна для выбора
+    ↓
+После выбора frontend делает
+`POST /api/v1/admin/applications/{application_id}/assign-teacher`
+с `teacher_user_id`
+    ↓
+Backend:
+- проверяет существование teacher
+- повторно проверяет текущую загрузку
+- создаёт связь в `teacher_students`
+- переводит заявку в `approved`
+    ↓
+Frontend закрывает modal и обновляет detail/list states
+    ↓
+Кнопка `Назад` по-прежнему возвращает локальный view state к списку заявок
     ↓
 Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)
     ↓

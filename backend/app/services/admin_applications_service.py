@@ -2,16 +2,22 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.models.student_profile import StudentProfile
+from app.models.teacher_profile import TeacherProfile
+from app.models.teacher_student import TeacherStudent
 from app.models.user import User
 from app.schemas.admin_applications import (
+    AdminAssignTeacherRequest,
     AdminApplicationDetailResponse,
     AdminApplicationListItem,
     AdminApplicationsFiltersResponse,
     AdminApplicationStatusFilterOption,
     AdminApplicationsListResponse,
     AdminApplicationUpdateRequest,
+    AdminTeacherAssignmentOption,
+    AdminTeacherAssignmentOptionsResponse,
 )
 
 
@@ -33,6 +39,7 @@ APPLICATION_STATUS_TO_PROFILE_STATUSES = {
 
 VISIBLE_APPLICATION_STATUSES = ("submitted", "in_review", "needs_completion", "approved")
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
+TEACHER_ASSIGNMENT_CAPACITY = 15
 
 
 def map_application_status(profile_status: str) -> str:
@@ -44,6 +51,37 @@ def get_admin_application_status_filters() -> AdminApplicationsFiltersResponse:
         statuses=[
             AdminApplicationStatusFilterOption(value=status_label, label=status_label)
             for status_label in APPLICATION_STATUS_TO_PROFILE_STATUSES
+        ]
+    )
+
+
+def list_admin_teacher_assignment_options(db: Session) -> AdminTeacherAssignmentOptionsResponse:
+    teacher_rows = (
+        db.query(
+            TeacherProfile.user_id.label("teacher_user_id"),
+            TeacherProfile.full_name,
+            TeacherProfile.subject_name,
+            func.count(TeacherStudent.id).label("student_count"),
+        )
+        .join(User, User.id == TeacherProfile.user_id)
+        .outerjoin(TeacherStudent, TeacherStudent.teacher_user_id == TeacherProfile.user_id)
+        .filter(User.role == "teacher")
+        .group_by(TeacherProfile.user_id, TeacherProfile.full_name, TeacherProfile.subject_name)
+        .order_by(TeacherProfile.full_name.asc())
+        .all()
+    )
+
+    return AdminTeacherAssignmentOptionsResponse(
+        items=[
+            AdminTeacherAssignmentOption(
+                teacher_user_id=row.teacher_user_id,
+                full_name=row.full_name,
+                subject_name=row.subject_name,
+                student_count=row.student_count,
+                capacity=TEACHER_ASSIGNMENT_CAPACITY,
+                is_available=row.student_count < TEACHER_ASSIGNMENT_CAPACITY,
+            )
+            for row in teacher_rows
         ]
     )
 
@@ -132,6 +170,15 @@ def _get_admin_application_or_404(db: Session, application_id) -> StudentProfile
     return profile
 
 
+def _get_student_profile_for_assignment_or_404(db: Session, application_id: UUID) -> StudentProfile:
+    profile = db.query(StudentProfile).filter(StudentProfile.id == application_id).first()
+
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
+
+    return profile
+
+
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
     profile = _get_admin_application_or_404(db, application_id)
 
@@ -208,4 +255,73 @@ def approve_admin_application(
             status_code=status.HTTP_409_CONFLICT,
             detail="Application status transition is not supported by the current database schema",
         ) from exc
+    return _build_admin_application_detail(profile)
+
+
+def assign_teacher_to_application(
+    db: Session,
+    *,
+    application_id: UUID,
+    payload: AdminAssignTeacherRequest,
+) -> AdminApplicationDetailResponse:
+    profile = _get_student_profile_for_assignment_or_404(db, application_id)
+
+    teacher_profile = (
+        db.query(TeacherProfile)
+        .join(User, User.id == TeacherProfile.user_id)
+        .filter(
+            TeacherProfile.user_id == payload.teacher_user_id,
+            User.role == "teacher",
+        )
+        .first()
+    )
+
+    if teacher_profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+    existing_assignment = (
+        db.query(TeacherStudent)
+        .filter(TeacherStudent.student_user_id == profile.user_id)
+        .first()
+    )
+    if existing_assignment is not None:
+        if existing_assignment.teacher_user_id == payload.teacher_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Student is already assigned to this teacher",
+            )
+
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student already assigned")
+
+    if profile.profile_status not in REVIEWABLE_APPLICATION_STATUSES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be assigned")
+
+    student_count = (
+        db.query(func.count(TeacherStudent.id))
+        .filter(TeacherStudent.teacher_user_id == payload.teacher_user_id)
+        .scalar()
+        or 0
+    )
+
+    if student_count >= TEACHER_ASSIGNMENT_CAPACITY:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teacher is at full capacity")
+
+    db.add(
+        TeacherStudent(
+            teacher_user_id=payload.teacher_user_id,
+            student_user_id=profile.user_id,
+        )
+    )
+    profile.profile_status = "approved"
+
+    try:
+        db.commit()
+        db.refresh(profile)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Student already assigned",
+        ) from exc
+
     return _build_admin_application_detail(profile)

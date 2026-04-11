@@ -554,3 +554,45 @@ backend/
 - Student-side backend разрешает `PATCH` и повторный submit для статуса `needs_completion`.
 - Frontend student profile перестаёт быть read-only в этом статусе.
 - Причина: иначе action `Отправить на доработку` был бы продуктово бесполезным.
+
+## Решения шага 3.2.4.5: Teacher Assignment Modal Foundation
+
+### Назначение преподавателя встроено в существующий admin detail flow
+- Кнопка `Подтвердить заявку` больше не делает direct approve.
+- Вместо этого она открывает modal поверх уже открытой карточки заявки.
+- Причина: это соответствует ТЗ шага и не требует нового route или отдельной страницы.
+
+### Список преподавателей для назначения отдаётся отдельным lightweight endpoint
+- Добавлен `GET /api/v1/admin/teachers/assignment-options`.
+- Endpoint возвращает только:
+  - `teacher_user_id`
+  - `full_name`
+  - `subject_name`
+  - `student_count`
+  - `capacity`
+  - `is_available`
+- Причина: modal нужен компактный список без лишней teacher-detail логики.
+
+### Лимит преподавателя зафиксирован на backend как `15`
+- `capacity` на текущем шаге не настраивается и не хранится отдельно.
+- Доступность считается по правилу `student_count < 15`.
+- Причина: это минимально достаточный foundation без избыточной конфигурации.
+
+### Назначение преподавателя создаёт связь `teacher_students` и переводит заявку в `approved`
+- Добавлен `POST /api/v1/admin/applications/{application_id}/assign-teacher`.
+- Endpoint:
+  - проверяет teacher;
+  - считает текущую нагрузку;
+  - блокирует переполненного teacher;
+  - создаёт связь `teacher_user_id ↔ student_user_id`;
+  - переводит заявку в `approved`.
+- Причина: на текущем шаге финальное подтверждение заявки происходит только вместе с teacher assignment.
+
+### Недоступный преподаватель блокируется и во frontend, и на backend
+- Во frontend преподаватель с `15/15` рендерится disabled.
+- Backend повторно валидирует загрузку перед сохранением связи.
+- Причина: UI делает ограничение понятным, а backend остаётся источником истины.
+
+### Уведомления, email и teacher-side workflow намеренно не внедрялись
+- Assignment не создаёт notifications, email или очередь teacher review.
+- Причина: это уже следующий этап и не относится к modal foundation.

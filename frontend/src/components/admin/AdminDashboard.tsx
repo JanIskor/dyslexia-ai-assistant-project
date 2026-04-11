@@ -5,21 +5,24 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Mail } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
+import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
+  assignTeacherToApplication,
   getAdminApplicationFilters,
   getAdminApplicationDetail,
   getAdminApplications,
+  getAdminTeacherAssignmentOptions,
   updateAdminApplication,
   requestAdminApplicationChanges,
-  approveAdminApplication,
   type AdminApplication,
   type AdminApplicationDetail,
   type AdminApplicationStatusFilterOption,
+  type AdminTeacherAssignmentOption,
 } from '@/lib/adminApplicationsApi';
 
 type AdminDashboardSection = 'student-applications' | 'teachers' | 'students';
@@ -70,6 +73,12 @@ function ApplicationsPanel({ token }: { token: string }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detailMessage, setDetailMessage] = useState<string | null>(null);
   const [detailMessageType, setDetailMessageType] = useState<'error' | 'success'>('success');
+  const [assignmentOptions, setAssignmentOptions] = useState<AdminTeacherAssignmentOption[]>([]);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [isLoadingAssignmentOptions, setIsLoadingAssignmentOptions] = useState(false);
+  const [isAssigningTeacher, setIsAssigningTeacher] = useState(false);
+  const [selectedTeacherUserId, setSelectedTeacherUserId] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -138,6 +147,10 @@ function ApplicationsPanel({ token }: { token: string }) {
       if (!selectedApplicationId) {
         setSelectedApplication(null);
         setDetailMessage(null);
+        setIsAssignmentModalOpen(false);
+        setAssignmentOptions([]);
+        setSelectedTeacherUserId(null);
+        setAssignmentError(null);
         return;
       }
 
@@ -237,21 +250,57 @@ function ApplicationsPanel({ token }: { token: string }) {
       return;
     }
 
-    setIsActing(true);
+    setIsLoadingAssignmentOptions(true);
+    setDetailMessage(null);
+    setAssignmentError(null);
+    setSelectedTeacherUserId(null);
+
+    try {
+      const response = await getAdminTeacherAssignmentOptions(token);
+      setAssignmentOptions(response.items);
+      setIsAssignmentModalOpen(true);
+    } catch (error) {
+      setDetailMessageType('error');
+      setDetailMessage(error instanceof Error ? error.message : 'Не удалось загрузить преподавателей.');
+    } finally {
+      setIsLoadingAssignmentOptions(false);
+    }
+  };
+
+  const handleCloseAssignmentModal = () => {
+    if (isAssigningTeacher) {
+      return;
+    }
+
+    setIsAssignmentModalOpen(false);
+    setSelectedTeacherUserId(null);
+    setAssignmentError(null);
+  };
+
+  const handleAssignTeacher = async () => {
+    if (!selectedApplication || !selectedTeacherUserId) {
+      return;
+    }
+
+    setIsAssigningTeacher(true);
+    setAssignmentError(null);
     setDetailMessage(null);
 
     try {
-      const updatedApplication = await approveAdminApplication(token, selectedApplication.id);
+      const updatedApplication = await assignTeacherToApplication(token, selectedApplication.id, {
+        teacher_user_id: selectedTeacherUserId,
+      });
       setSelectedApplication(updatedApplication);
       setDetailMessageType('success');
-      setDetailMessage('Заявка подтверждена.');
+      setDetailMessage('Ученик назначен преподавателю.');
+      setIsAssignmentModalOpen(false);
+      setSelectedTeacherUserId(null);
       const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
       setApplications(refreshedApplications.items);
     } catch (error) {
-      setDetailMessageType('error');
-      setDetailMessage(error instanceof Error ? error.message : 'Не удалось подтвердить заявку.');
+      setAssignmentError(error instanceof Error ? error.message : 'Не удалось назначить преподавателя.');
     } finally {
-      setIsActing(false);
+      setIsAssigningTeacher(false);
     }
   };
 
@@ -274,39 +323,54 @@ function ApplicationsPanel({ token }: { token: string }) {
     }
 
     return (
-      <AdminApplicationDetailPanel
-        application={selectedApplication}
-        gradeLabel={gradeLabel}
-        enrollmentDate={enrollmentDate}
-        onGradeLabelChange={setGradeLabel}
-        onEnrollmentDateChange={setEnrollmentDate}
-        onBack={() => setSelectedApplicationId(null)}
-        onSave={handleSave}
-        onRequestChanges={handleRequestChanges}
-        onApprove={handleApprove}
-        isSaving={isSaving}
-        isActing={isActing}
-        statusMessage={detailMessage}
-        statusType={detailMessageType}
-      />
+      <>
+        <AdminApplicationDetailPanel
+          application={selectedApplication}
+          gradeLabel={gradeLabel}
+          enrollmentDate={enrollmentDate}
+          onGradeLabelChange={setGradeLabel}
+          onEnrollmentDateChange={setEnrollmentDate}
+          onBack={() => setSelectedApplicationId(null)}
+          onSave={handleSave}
+          onRequestChanges={handleRequestChanges}
+          onApprove={handleApprove}
+          isSaving={isSaving}
+          isActing={isActing || isLoadingAssignmentOptions || isAssigningTeacher}
+          statusMessage={detailMessage}
+          statusType={detailMessageType}
+        />
+        <TeacherAssignmentModal
+          isOpen={isAssignmentModalOpen}
+          options={assignmentOptions}
+          selectedTeacherUserId={selectedTeacherUserId}
+          onSelectTeacher={setSelectedTeacherUserId}
+          onClose={handleCloseAssignmentModal}
+          onSubmit={handleAssignTeacher}
+          isLoading={isLoadingAssignmentOptions}
+          isSubmitting={isAssigningTeacher}
+          errorMessage={assignmentError}
+        />
+      </>
     );
   }
 
   return (
-    <AdminApplicationsListPanel
-      searchValue={searchValue}
-      onSearchChange={setSearchValue}
-      selectedStatuses={selectedStatuses}
-      onToggleStatus={handleToggleStatus}
-      onClearStatuses={() => setSelectedStatuses([])}
-      isFilterOpen={isFilterOpen}
-      onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
-      statusOptions={statusOptions}
-      applications={applications}
-      onSelectApplication={setSelectedApplicationId}
-      isLoading={isLoading}
-      errorMessage={errorMessage}
-    />
+    <>
+      <AdminApplicationsListPanel
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        selectedStatuses={selectedStatuses}
+        onToggleStatus={handleToggleStatus}
+        onClearStatuses={() => setSelectedStatuses([])}
+        isFilterOpen={isFilterOpen}
+        onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
+        statusOptions={statusOptions}
+        applications={applications}
+        onSelectApplication={setSelectedApplicationId}
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+      />
+    </>
   );
 }
 
