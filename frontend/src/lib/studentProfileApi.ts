@@ -1,6 +1,13 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 
-export type StudentProfileStatus = 'draft' | 'submitted' | 'in_review' | 'needs_completion' | 'approved';
+export type StudentProfileStatus =
+  | 'draft'
+  | 'submitted'
+  | 'in_review'
+  | 'needs_completion'
+  | 'approved'
+  | 'teacher_accepted'
+  | 'teacher_rejected';
 export type StudentMode = 'onboarding' | 'regular';
 
 export interface StudentProfile {

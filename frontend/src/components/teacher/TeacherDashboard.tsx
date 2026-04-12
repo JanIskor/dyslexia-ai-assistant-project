@@ -20,8 +20,16 @@ import {
   type TeacherStudentsSortBy,
   type TeacherStudentsSortOrder,
 } from '@/lib/teacherStudentsApi';
+import {
+  acceptTeacherIncomingStudent,
+  getTeacherIncomingStudentDetail,
+  getTeacherIncomingStudents,
+  rejectTeacherIncomingStudent,
+  type TeacherIncomingStudentDetail,
+  type TeacherIncomingStudentListItem,
+} from '@/lib/teacherIncomingStudentsApi';
 
-type TeacherDashboardSection = 'profile' | 'students' | 'assistant';
+type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'assistant';
 
 interface TeacherProfileCardData {
   avatarUrl: string | null;
@@ -48,9 +56,19 @@ type TeacherStudentsViewState =
       studentId: string;
     };
 
+type TeacherIncomingStudentsViewState =
+  | {
+      mode: 'list';
+    }
+  | {
+      mode: 'detail';
+      studentId: string;
+    };
+
 const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> = [
   { id: 'profile', label: 'Мой профиль' },
   { id: 'students', label: 'Список учеников' },
+  { id: 'incoming-students', label: 'Новые ученики' },
   { id: 'assistant', label: 'ИИ-ассистент' },
 ];
 
@@ -253,6 +271,52 @@ function StudentCard({
   );
 }
 
+function IncomingStudentCard({
+  student,
+  onOpen,
+}: {
+  student: TeacherIncomingStudentListItem;
+  onOpen: (studentId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(student.id)}
+      className="flex w-full flex-col rounded-[28px] border border-orange-100/80 bg-white/92 px-6 py-6 text-left shadow-[0_18px_40px_rgba(221,156,130,0.10)] transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_22px_45px_rgba(221,156,130,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+    >
+      <div className="flex items-start gap-4">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
+          {student.avatar_url ? (
+            <Image
+              src={student.avatar_url}
+              alt={`Аватар ученика ${student.full_name}`}
+              width={64}
+              height={64}
+              unoptimized
+              className="h-16 w-16 rounded-full object-cover"
+            />
+          ) : (
+            <AvatarPlaceholder />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xl font-medium leading-snug text-stone-700 sm:text-2xl">
+            {student.full_name}
+          </h3>
+          <p className="mt-2 text-base text-stone-500 sm:text-lg">{student.grade_label}</p>
+          <p className="mt-2 text-sm text-stone-500 sm:text-base">
+            Дата рождения: {formatProfileDate(student.birth_date)}
+          </p>
+          <p className="mt-1 text-sm text-stone-500 sm:text-base">
+            Дата поступления: {formatProfileDate(student.enrollment_date)}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function StudentDetailProfile({
   student,
   onBack,
@@ -307,6 +371,99 @@ function StudentDetailProfile({
               </div>
             ))}
           </dl>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IncomingStudentDetailProfile({
+  student,
+  onBack,
+  onAccept,
+  onReject,
+  isSubmitting,
+  actionError,
+}: {
+  student: TeacherIncomingStudentDetail;
+  onBack: () => void;
+  onAccept: () => void;
+  onReject: () => void;
+  isSubmitting: boolean;
+  actionError: string | null;
+}) {
+  const detailFields: TeacherProfileField[] = [
+    { label: 'Дата рождения:', value: formatProfileDate(student.birth_date) },
+    { label: 'Пол:', value: student.gender },
+    { label: 'Класс обучения:', value: student.grade_label },
+    { label: 'Дата поступления:', value: formatProfileDate(student.enrollment_date) },
+  ];
+
+  return (
+    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад к списку
+      </button>
+
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col items-center text-center">
+        <ProfileAvatar avatarUrl={student.avatar_url} fullName={student.full_name} />
+
+        <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
+          {student.full_name}
+        </h2>
+
+        {student.quote ? (
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-[1.7rem] lg:leading-relaxed">
+            {student.quote}
+          </p>
+        ) : null}
+
+        <div className="mt-6 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
+          <dl className="divide-y divide-orange-100/80">
+            {detailFields.map((field) => (
+              <div
+                key={field.label}
+                className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:gap-4"
+              >
+                <dt className="text-sm font-medium text-stone-500 sm:text-base lg:text-xl">
+                  {field.label}
+                </dt>
+                <dd className="text-sm text-stone-700 sm:text-base sm:text-right lg:text-xl">
+                  {field.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        {actionError ? (
+          <p className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 sm:text-base">
+            {actionError}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex w-full max-w-2xl flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onAccept}
+            disabled={isSubmitting}
+            className="flex-1 rounded-[22px] bg-emerald-500 px-5 py-4 text-base font-medium text-white shadow-[0_14px_30px_rgba(16,185,129,0.24)] transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Принять ученика
+          </button>
+          <button
+            type="button"
+            onClick={onReject}
+            disabled={isSubmitting}
+            className="flex-1 rounded-[22px] border border-rose-200 bg-white px-5 py-4 text-base font-medium text-rose-600 shadow-[0_12px_26px_rgba(244,63,94,0.08)] transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Отклонить
+          </button>
         </div>
       </div>
     </section>
@@ -652,18 +809,215 @@ function TeacherStudentsSection({
   );
 }
 
+function TeacherIncomingStudentsSection({
+  accessToken,
+  viewState,
+  onOpenStudent,
+  onBackToList,
+}: {
+  accessToken: string;
+  viewState: TeacherIncomingStudentsViewState;
+  onOpenStudent: (studentId: string) => void;
+  onBackToList: () => void;
+}) {
+  const [students, setStudents] = useState<TeacherIncomingStudentListItem[]>([]);
+  const [studentsError, setStudentsError] = useState<string | null>(null);
+  const [isStudentsLoading, setIsStudentsLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<TeacherIncomingStudentDetail | null>(null);
+  const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
+  const [isStudentDetailLoading, setIsStudentDetailLoading] = useState(false);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadStudents = async () => {
+      setIsStudentsLoading(true);
+      setStudentsError(null);
+
+      try {
+        const response = await getTeacherIncomingStudents(accessToken);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setStudents(response.items);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStudents([]);
+        setStudentsError(
+          error instanceof Error ? error.message : 'Не удалось загрузить новых учеников',
+        );
+      } finally {
+        if (isMounted) {
+          setIsStudentsLoading(false);
+        }
+      }
+    };
+
+    void loadStudents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (viewState.mode !== 'detail') {
+      setSelectedStudent(null);
+      setStudentDetailError(null);
+      setIsStudentDetailLoading(false);
+      setActionError(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadStudentDetail = async () => {
+      setIsStudentDetailLoading(true);
+      setStudentDetailError(null);
+      setActionError(null);
+
+      try {
+        const response = await getTeacherIncomingStudentDetail(accessToken, viewState.studentId);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedStudent(response);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedStudent(null);
+        setStudentDetailError(
+          error instanceof Error ? error.message : 'Не удалось загрузить карточку ученика',
+        );
+      } finally {
+        if (isMounted) {
+          setIsStudentDetailLoading(false);
+        }
+      }
+    };
+
+    void loadStudentDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken, viewState]);
+
+  const handleAction = async (action: 'accept' | 'reject') => {
+    if (viewState.mode !== 'detail') {
+      return;
+    }
+
+    setIsSubmittingAction(true);
+    setActionError(null);
+
+    try {
+      if (action === 'accept') {
+        await acceptTeacherIncomingStudent(accessToken, viewState.studentId);
+      } else {
+        await rejectTeacherIncomingStudent(accessToken, viewState.studentId);
+      }
+
+      const response = await getTeacherIncomingStudents(accessToken);
+      setStudents(response.items);
+      setStudentsError(null);
+      onBackToList();
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : action === 'accept'
+            ? 'Не удалось принять ученика'
+            : 'Не удалось отклонить ученика',
+      );
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  if (viewState.mode === 'detail') {
+    if (isStudentDetailLoading) {
+      return <StudentsListState message="Загрузка карточки ученика..." />;
+    }
+
+    if (studentDetailError) {
+      return <StudentsListState message={studentDetailError} />;
+    }
+
+    if (!selectedStudent) {
+      return <StudentsListState message="Не удалось загрузить карточку ученика" />;
+    }
+
+    return (
+      <IncomingStudentDetailProfile
+        student={selectedStudent}
+        onBack={onBackToList}
+        onAccept={() => void handleAction('accept')}
+        onReject={() => void handleAction('reject')}
+        isSubmitting={isSubmittingAction}
+        actionError={actionError}
+      />
+    );
+  }
+
+  let content: ReactNode;
+
+  if (isStudentsLoading) {
+    content = <StudentsListState message="Загрузка новых учеников..." />;
+  } else if (studentsError) {
+    content = <StudentsListState message={studentsError} />;
+  } else if (students.length === 0) {
+    content = <StudentsListState message="Новых учеников пока нет" />;
+  } else {
+    content = (
+      <div className="grid gap-5 lg:grid-cols-2">
+        {students.map((student) => (
+          <IncomingStudentCard key={student.id} student={student} onOpen={onOpenStudent} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section>
+      <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Новые ученики</h2>
+      <p className="mt-3 max-w-3xl text-base leading-relaxed text-stone-500 sm:text-lg">
+        Здесь отображаются ученики, которых администратор уже назначил преподавателю, но которые ещё не были обработаны.
+      </p>
+      <div className="mt-6">{content}</div>
+    </section>
+  );
+}
+
 function TeacherSectionContent({
   section,
   accessToken,
   studentsViewState,
+  incomingStudentsViewState,
   onOpenStudent,
   onBackToStudentsList,
+  onOpenIncomingStudent,
+  onBackToIncomingStudentsList,
 }: {
   section: TeacherDashboardSection;
   accessToken: string;
   studentsViewState: TeacherStudentsViewState;
+  incomingStudentsViewState: TeacherIncomingStudentsViewState;
   onOpenStudent: (studentId: string) => void;
   onBackToStudentsList: () => void;
+  onOpenIncomingStudent: (studentId: string) => void;
+  onBackToIncomingStudentsList: () => void;
 }) {
   if (section === 'students') {
     return (
@@ -672,6 +1026,17 @@ function TeacherSectionContent({
         viewState={studentsViewState}
         onOpenStudent={onOpenStudent}
         onBackToList={onBackToStudentsList}
+      />
+    );
+  }
+
+  if (section === 'incoming-students') {
+    return (
+      <TeacherIncomingStudentsSection
+        accessToken={accessToken}
+        viewState={incomingStudentsViewState}
+        onOpenStudent={onOpenIncomingStudent}
+        onBackToList={onBackToIncomingStudentsList}
       />
     );
   }
@@ -721,6 +1086,10 @@ export function TeacherDashboard() {
   const [studentsViewState, setStudentsViewState] = useState<TeacherStudentsViewState>({
     mode: 'list',
   });
+  const [incomingStudentsViewState, setIncomingStudentsViewState] =
+    useState<TeacherIncomingStudentsViewState>({
+      mode: 'list',
+    });
 
   useEffect(() => {
     let isMounted = true;
@@ -770,6 +1139,10 @@ export function TeacherDashboard() {
     if (section !== 'students') {
       setStudentsViewState({ mode: 'list' });
     }
+
+    if (section !== 'incoming-students') {
+      setIncomingStudentsViewState({ mode: 'list' });
+    }
   };
 
   const handleOpenStudent = (studentId: string) => {
@@ -779,9 +1152,18 @@ export function TeacherDashboard() {
     });
   };
 
+  const handleOpenIncomingStudent = (studentId: string) => {
+    setIncomingStudentsViewState({
+      mode: 'detail',
+      studentId,
+    });
+  };
+
   const headerTitle =
     activeSection === 'students' && studentsViewState.mode === 'detail'
       ? 'Профиль ученика'
+      : activeSection === 'incoming-students' && incomingStudentsViewState.mode === 'detail'
+        ? 'Новый ученик'
       : TEACHER_MENU_ITEMS.find((item) => item.id === activeSection)?.label ?? 'Мой профиль';
 
   if (isCheckingAuth || !currentUser || !accessToken) {
@@ -843,8 +1225,11 @@ export function TeacherDashboard() {
                 section={activeSection}
                 accessToken={accessToken}
                 studentsViewState={studentsViewState}
+                incomingStudentsViewState={incomingStudentsViewState}
                 onOpenStudent={handleOpenStudent}
                 onBackToStudentsList={() => setStudentsViewState({ mode: 'list' })}
+                onOpenIncomingStudent={handleOpenIncomingStudent}
+                onBackToIncomingStudentsList={() => setIncomingStudentsViewState({ mode: 'list' })}
               />
             </section>
           </div>

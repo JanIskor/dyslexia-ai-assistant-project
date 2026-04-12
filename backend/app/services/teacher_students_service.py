@@ -68,7 +68,10 @@ def list_teacher_students(
     query = (
         db.query(StudentProfile)
         .join(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
-        .filter(TeacherStudent.teacher_user_id == teacher_user_id)
+        .filter(
+            TeacherStudent.teacher_user_id == teacher_user_id,
+            StudentProfile.profile_status == "teacher_accepted",
+        )
     )
 
     if search and search.strip():
@@ -110,6 +113,7 @@ def get_teacher_student(
         .filter(
             TeacherStudent.teacher_user_id == teacher_user_id,
             StudentProfile.user_id == student_user_id,
+            StudentProfile.profile_status == "teacher_accepted",
         )
         .first()
     )

@@ -26,6 +26,8 @@ PROFILE_STATUS_TO_APPLICATION_STATUS = {
     "in_review": "На рассмотрении",
     "needs_completion": "На доработке",
     "approved": "Подтверждена",
+    "teacher_accepted": "Принята преподавателем",
+    "teacher_rejected": "Отклонена преподавателем",
     "draft": "Черновик",
     "rejected": "Отклонена",
 }
@@ -35,9 +37,18 @@ APPLICATION_STATUS_TO_PROFILE_STATUSES = {
     "На рассмотрении": ("in_review",),
     "На доработке": ("needs_completion",),
     "Подтверждена": ("approved",),
+    "Принята преподавателем": ("teacher_accepted",),
+    "Отклонена преподавателем": ("teacher_rejected",),
 }
 
-VISIBLE_APPLICATION_STATUSES = ("submitted", "in_review", "needs_completion", "approved")
+VISIBLE_APPLICATION_STATUSES = (
+    "submitted",
+    "in_review",
+    "needs_completion",
+    "approved",
+    "teacher_accepted",
+    "teacher_rejected",
+)
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
 

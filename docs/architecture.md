@@ -265,6 +265,67 @@ Backend:
     ↓
 Frontend закрывает modal и обновляет detail/list states
     ↓
+Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
+    ↓
+В sidebar доступны разделы:
+- `Мой профиль`
+- `Список учеников`
+- `Новые ученики`
+- `ИИ-ассистент`
+    ↓
+Выбор пункта `Новые ученики`
+    ↓
+`teacherIncomingStudentsApi.ts` делает:
+- `GET /api/v1/teacher/incoming-students`
+- `GET /api/v1/teacher/incoming-students/{student_id}`
+- `POST /api/v1/teacher/incoming-students/{student_id}/accept`
+- `POST /api/v1/teacher/incoming-students/{student_id}/reject`
+    ↓
+Backend допускает только role `teacher`
+и ограничивает выборку только его связями из `teacher_students`
+    ↓
+Incoming list возвращает только профили со статусом `approved`
+и активной связью с текущим teacher
+    ↓
+List item содержит:
+- `id`
+- `full_name`
+- `grade_label`
+- `birth_date`
+- `gender`
+- `enrollment_date`
+- `avatar_url`
+    ↓
+Detail содержит:
+- `id`
+- `full_name`
+- `birth_date`
+- `gender`
+- `grade_label`
+- `enrollment_date`
+- `quote`
+- `avatar_url`
+    ↓
+Teacher action `accept`
+    ↓
+Backend переводит `student_profiles.profile_status` из `approved`
+в `teacher_accepted`
+    ↓
+Связь в `teacher_students` сохраняется
+    ↓
+Ученика начинает возвращать обычный
+`GET /api/v1/teacher/students`
+    ↓
+Teacher action `reject`
+    ↓
+Backend переводит `student_profiles.profile_status` из `approved`
+в `teacher_rejected`
+    ↓
+Связь из `teacher_students` удаляется
+    ↓
+Ученик исчезает из incoming list
+и не попадает в обычный teacher students list
+    ↓
 Кнопка `Назад` по-прежнему возвращает локальный view state к списку заявок
     ↓
 Student dashboard (`frontend/src/components/student/StudentDashboard.tsx`)

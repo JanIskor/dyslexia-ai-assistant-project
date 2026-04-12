@@ -596,3 +596,48 @@ backend/
 ### Уведомления, email и teacher-side workflow намеренно не внедрялись
 - Assignment не создаёт notifications, email или очередь teacher review.
 - Причина: это уже следующий этап и не относится к modal foundation.
+
+## Решения шага 3.2.4.6: Teacher Incoming Review Foundation
+
+### Incoming review использует три статуса поверх уже существующего assignment flow
+- `approved` означает, что admin уже назначил teacher, но teacher ещё не обработал ученика.
+- `teacher_accepted` означает, что teacher принял ученика.
+- `teacher_rejected` означает, что teacher отклонил назначение.
+- Причина: это минимальный teacher-side workflow без отдельной таблицы review событий.
+
+### Уже существующие назначенные ученики миграцией переводятся в `teacher_accepted`
+- Alembic revision `73ebec191d1f` расширяет check constraint `student_profiles`.
+- Та же миграция переводит исторические записи `approved` + связь в `teacher_students` в `teacher_accepted`.
+- Причина: после внедрения incoming review старые активные teacher-student связи не должны внезапно стать «новыми учениками».
+
+### Incoming students отдаются отдельным teacher-only API
+- Добавлены endpoints:
+  - `GET /api/v1/teacher/incoming-students`
+  - `GET /api/v1/teacher/incoming-students/{student_id}`
+  - `POST /api/v1/teacher/incoming-students/{student_id}/accept`
+  - `POST /api/v1/teacher/incoming-students/{student_id}/reject`
+- Причина: это чище, чем перегружать существующий `/teacher/students` разными режимами.
+
+### Teacher видит только собственных incoming students
+- Все incoming queries идут через join `teacher_students.teacher_user_id = current_teacher.id`.
+- Incoming list/detail дополнительно ограничены `student_profiles.profile_status = approved`.
+- Причина: teacher не должен видеть чужие назначения и уже обработанных учеников в incoming-разделе.
+
+### Accept сохраняет teacher ↔ student linkage и переводит профиль в `teacher_accepted`
+- После `POST /accept` связь в `teacher_students` остаётся.
+- Обычный `GET /api/v1/teacher/students` теперь возвращает только `teacher_accepted`.
+- Причина: после принятия ученик должен перейти из incoming-раздела в основной список учеников teacher.
+
+### Reject удаляет связь и переводит профиль в `teacher_rejected`
+- После `POST /reject` backend удаляет запись из `teacher_students`.
+- Reject не требует комментария или причины.
+- Причина: на текущем шаге достаточно базового отказа без возврата в сложный admin workflow.
+
+### Sidebar teacher dashboard расширяется без переписывания страницы
+- В sidebar добавлен раздел `Новые ученики`.
+- Existing sections `Мой профиль`, `Список учеников`, `ИИ-ассистент` сохранены.
+- Причина: шаг ограничен foundation-расширением уже существующего teacher dashboard, а не его редизайном.
+
+### Notifications, badge counters и realtime updates остаются вне шага
+- Incoming review не добавляет email, badge counters, in-app notifications или realtime sync.
+- Причина: это следующий продуктовый слой и он не нужен для foundation teacher-side review.
