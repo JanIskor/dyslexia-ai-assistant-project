@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Mail } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
 import { Header } from '@/components/layout/Header';
+import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
@@ -32,16 +33,6 @@ const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'students', label: 'Ученики' },
 ];
-
-function AdminNotificationBadge() {
-  return (
-    <div className="relative" aria-label="Уведомления администратора">
-      <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-orange-100 bg-white/90 text-orange-300 shadow-[0_10px_25px_rgba(221,156,130,0.15)]">
-        <Mail className="h-6 w-6 stroke-[1.7]" />
-      </div>
-    </div>
-  );
-}
 
 function DashboardSkeleton() {
   return (
@@ -484,7 +475,7 @@ export function AdminDashboard() {
             title="Администратор"
             rightContent={
               <div className="flex items-center gap-3">
-                <AdminNotificationBadge />
+                <NotificationsBell token={getAccessToken() ?? ''} />
                 <button
                   type="button"
                   onClick={handleLogout}

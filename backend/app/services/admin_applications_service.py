@@ -20,6 +20,7 @@ from app.schemas.admin_applications import (
     AdminTeacherAssignmentOption,
     AdminTeacherAssignmentOptionsResponse,
 )
+from app.services.notifications_service import create_notification
 
 
 PROFILE_STATUS_TO_APPLICATION_STATUS = {
@@ -334,6 +335,14 @@ def request_admin_application_changes(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be sent for revision")
 
     profile.profile_status = "needs_completion"
+    create_notification(
+        db,
+        user_id=profile.user_id,
+        role="student",
+        type="student_revision_requested",
+        title="Профиль отправлен на доработку",
+        message="Администратор попросил обновить профиль и повторно отправить его на модерацию.",
+    )
     try:
         db.commit()
         db.refresh(profile)
@@ -359,6 +368,14 @@ def approve_admin_application(
     profile.profile_status = "approved"
     profile.current_teacher_user_id = None
     profile.teacher_review_status = None
+    create_notification(
+        db,
+        user_id=profile.user_id,
+        role="student",
+        type="student_profile_approved",
+        title="Профиль подтверждён",
+        message="Администратор подтвердил профиль. Ожидайте дальнейших действий в системе.",
+    )
     try:
         db.commit()
         db.refresh(profile)
@@ -450,6 +467,22 @@ def assign_teacher_to_application(
     profile.profile_status = "approved"
     profile.current_teacher_user_id = payload.teacher_user_id
     profile.teacher_review_status = "pending"
+    create_notification(
+        db,
+        user_id=profile.user_id,
+        role="student",
+        type="student_assigned_to_teacher",
+        title="Вам назначен преподаватель",
+        message=f"Администратор назначил преподавателя {teacher_profile.full_name}.",
+    )
+    create_notification(
+        db,
+        user_id=teacher_profile.user_id,
+        role="teacher",
+        type="teacher_new_student_assigned",
+        title="Назначен новый ученик",
+        message=f"Администратор назначил вам ученика {profile.full_name}.",
+    )
 
     try:
         db.commit()

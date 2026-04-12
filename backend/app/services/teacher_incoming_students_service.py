@@ -11,6 +11,7 @@ from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentListItem,
     TeacherIncomingStudentsListResponse,
 )
+from app.services.notifications_service import create_notification, create_notifications_for_role
 
 
 INCOMING_STUDENT_STATUS = "approved"
@@ -108,6 +109,13 @@ def accept_teacher_incoming_student(
 
     profile.profile_status = ACCEPTED_STUDENT_STATUS
     profile.teacher_review_status = "accepted"
+    create_notifications_for_role(
+        db,
+        role="admin",
+        type="teacher_accepted_student",
+        title="Преподаватель принял ученика",
+        message=f"Преподаватель принял ученика {profile.full_name}.",
+    )
     db.commit()
     db.refresh(profile)
 
@@ -155,6 +163,21 @@ def reject_teacher_incoming_student(
             teacher_user_id=teacher_user_id,
             student_user_id=student_user_id,
         )
+    )
+    create_notifications_for_role(
+        db,
+        role="admin",
+        type="teacher_rejected_student",
+        title="Преподаватель отклонил ученика",
+        message=f"Преподаватель отклонил ученика {profile.full_name}.",
+    )
+    create_notification(
+        db,
+        user_id=profile.user_id,
+        role="student",
+        type="teacher_rejected_student",
+        title="Преподаватель отклонил назначение",
+        message="Назначенный преподаватель отклонил сопровождение. Администратор подберёт другого преподавателя.",
     )
     db.delete(assignment)
     db.commit()

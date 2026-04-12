@@ -3,8 +3,9 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Mail, UserRound } from 'lucide-react';
+import { LogOut, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
@@ -60,16 +61,6 @@ function buildFormState(profile: StudentProfile): StudentProfileFormState {
     gender: profile.gender ?? '',
     quote: profile.quote ?? '',
   };
-}
-
-function StudentNotificationBadge() {
-  return (
-    <div aria-label="Сообщения" className="relative">
-      <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-orange-100 bg-white/90 text-orange-300 shadow-[0_10px_25px_rgba(221,156,130,0.15)]">
-        <Mail className="h-6 w-6 stroke-[1.7]" />
-      </div>
-    </div>
-  );
 }
 
 function ModerationBanner({
@@ -637,7 +628,7 @@ export function StudentDashboard() {
             title={headerTitle}
             rightContent={
               <div className="flex items-center gap-3">
-                <StudentNotificationBadge />
+                <NotificationsBell token={getAccessToken() ?? ''} />
                 <button
                   type="button"
                   onClick={handleLogout}

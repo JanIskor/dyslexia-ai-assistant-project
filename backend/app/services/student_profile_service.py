@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
+from app.services.notifications_service import create_notifications_for_role
 
 
 EDITABLE_PROFILE_STATUSES = {"draft", "needs_completion"}
@@ -73,6 +74,8 @@ def update_student_profile(
 
 
 def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentProfile:
+    previous_status = profile.profile_status
+
     if profile.profile_status not in SUBMITTABLE_PROFILE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -87,6 +90,24 @@ def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentPr
 
     profile.profile_status = "submitted"
     profile.submitted_at = datetime.now(timezone.utc)
+
+    if previous_status == "needs_completion":
+        create_notifications_for_role(
+            db,
+            role="admin",
+            type="student_resubmitted_profile",
+            title="Ученик повторно отправил профиль",
+            message=f"Ученик {profile.full_name} повторно отправил профиль после доработки.",
+        )
+    else:
+        create_notifications_for_role(
+            db,
+            role="admin",
+            type="student_first_submitted_profile",
+            title="Новая заявка ученика",
+            message=f"Ученик {profile.full_name} впервые отправил профиль на модерацию.",
+        )
+
     db.commit()
     db.refresh(profile)
     return profile

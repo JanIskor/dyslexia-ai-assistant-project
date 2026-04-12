@@ -702,3 +702,37 @@ backend/
 - Admin может назначить другого teacher.
 - Teacher, который уже отказал, в modal становится disabled.
 - Причина: нужен controlled reassignment без избыточного workflow возврата админу.
+
+## Решения шага 3.2.4.9: In-App Notifications Foundation
+
+### Notifications выделены в отдельную простую таблицу
+- Добавлена таблица `notifications` с полями:
+  - `id`
+  - `user_id`
+  - `role`
+  - `type`
+  - `title`
+  - `message`
+  - `is_read`
+  - `created_at`
+- Причина: нужен общий foundation для всех ролей без сложной event-driven архитектуры.
+
+### Создание уведомлений встроено прямо в существующие service-слои
+- Уведомления создаются в момент уже существующих student/admin/teacher действий.
+- Причина: для текущего шага этого достаточно и это не требует отдельного event bus.
+
+### Admin notifications рассылаются всем активным admin пользователям
+- Для `student_first_submitted_profile`, `student_resubmitted_profile`, `teacher_accepted_student`, `teacher_rejected_student` используется fan-out по всем `role = admin`.
+- Причина: на этом шаге не вводится отдельный ответственный admin owner.
+
+### Header dropdown выбран как минимальный notification UX
+- Bell icon в header показывает unread badge и открывает compact dropdown.
+- Dropdown поддерживает:
+  - список уведомлений
+  - `mark as read`
+  - `mark all as read`
+- Причина: это самый лёгкий способ встроить notifications в уже существующие dashboards.
+
+### Реaltime, grouping и удаление намеренно отложены
+- Нет websocket/push, grouping/priorities, удаления и настроек.
+- Причина: текущий шаг ограничен foundation внутренних уведомлений и badge counters.

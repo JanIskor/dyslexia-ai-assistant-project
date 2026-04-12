@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Reassignment Restrictions And Admin State Guards
+## Текущая фаза: In-App Notifications Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation и teacher incoming review foundation уже реализованы. Поверх этого `/admin` получает ограничения повторного назначения, guards по состоянию заявки и teacher context в detail response.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation и teacher incoming review foundation уже реализованы. Поверх этого система получает foundation внутренних уведомлений и unread badge counters для student / teacher / admin.
 
 ### Tech Stack
 ```
@@ -45,6 +45,7 @@ app/
 │   └── session.py
 ├── models/         # SQLAlchemy модели
 │   ├── user.py
+│   ├── notification.py
 │   ├── student_profile.py
 │   ├── teacher_profile.py
 │   ├── teacher_student.py
@@ -52,11 +53,13 @@ app/
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
 │   ├── admin_applications.py
+│   ├── notifications.py
 │   ├── student_profile.py
 │   └── teacher_students.py
 ├── services/       # Бизнес-логика
 │   ├── admin_applications_service.py
 │   ├── auth_service.py
+│   ├── notifications_service.py
 │   ├── student_profile_service.py
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
@@ -66,6 +69,7 @@ app/
 └── api/v1/         # API endpoints
     ├── admin.py
     ├── health.py
+    ├── notifications.py
     ├── auth.py
     ├── student.py
     └── teacher.py
@@ -94,6 +98,7 @@ components/
 ├── auth/
 ├── layout/
 │   ├── Header.tsx
+│   ├── NotificationsBell.tsx
 │   └── Footer.tsx
 ├── student/
 │   └── StudentDashboard.tsx
@@ -114,11 +119,41 @@ lib/
 ├── authApi.ts      # Запросы register/login/me
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
+├── notificationsApi.ts # Запросы notifications list/unread/read
 ├── studentProfileApi.ts # Запросы student self-profile
 ├── teacherStudentsApi.ts # Запросы teacher students list/detail
 ├── authValidators.ts
 └── [другие helpers]
 ```
+
+## Notifications Foundation
+
+### Таблица `notifications`
+- `id`
+- `user_id`
+- `role`
+- `type`
+- `title`
+- `message`
+- `is_read`
+- `created_at`
+
+### API
+- `GET /api/v1/notifications`
+- `GET /api/v1/notifications/unread-count`
+- `POST /api/v1/notifications/{notification_id}/read`
+- `POST /api/v1/notifications/read-all`
+
+### Frontend flow
+- bell icon в header делает `GET /notifications/unread-count`
+- по клику открывается компактный dropdown
+- dropdown делает `GET /notifications`
+- внутри доступны `mark as read` и `mark all as read`
+
+### Почему dropdown
+- уже существовал header icon
+- не нужен отдельный route
+- текущие dashboards не пришлось переписывать
 
 ## Data Flow admin reassignment restrictions
 

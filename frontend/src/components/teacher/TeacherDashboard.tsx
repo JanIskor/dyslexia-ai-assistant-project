@@ -4,8 +4,9 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut, Mail, Search, SlidersHorizontal, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
@@ -62,7 +63,6 @@ const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> 
   { id: 'assistant', label: 'ИИ-ассистент' },
 ];
 
-const UNREAD_MESSAGES_COUNT = 3;
 const TEACHER_STUDENTS_PAGE_SIZE = 9;
 
 const STUDENT_PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
@@ -110,19 +110,6 @@ const TEACHER_STUDENTS_SORT_OPTIONS: TeacherStudentsSortOption[] = [
     sortOrder: 'desc',
   },
 ];
-
-function TeacherNotificationBadge() {
-  return (
-    <div className="relative" aria-label="Новые результаты тестов от учеников">
-      <div className="flex h-12 w-16 items-center justify-center rounded-2xl border border-orange-100 bg-white/90 text-orange-300 shadow-[0_10px_25px_rgba(221,156,130,0.15)]">
-        <Mail className="h-6 w-6 stroke-[1.7]" />
-      </div>
-      <span className="absolute -right-2 -top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-orange-400 px-1.5 text-sm font-semibold text-white shadow-[0_8px_16px_rgba(251,146,60,0.35)]">
-        {UNREAD_MESSAGES_COUNT}
-      </span>
-    </div>
-  );
-}
 
 function AvatarPlaceholder({ size = 'md' }: { size?: 'md' | 'lg' }) {
   const containerClassName = size === 'lg' ? 'h-24 w-24' : 'h-20 w-20';
@@ -1169,7 +1156,7 @@ export function TeacherDashboard() {
             title={headerTitle}
             rightContent={
               <div className="flex items-center gap-3">
-                <TeacherNotificationBadge />
+                <NotificationsBell token={getAccessToken() ?? ''} />
                 <button
                   type="button"
                   onClick={handleLogout}
