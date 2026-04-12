@@ -11,7 +11,9 @@ from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
     TeacherIncomingStudentsListResponse,
 )
+from app.schemas.teacher_profile import TeacherProfileResponse
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
+from app.services.teacher_profile_service import get_teacher_profile
 from app.services.teacher_incoming_students_service import (
     accept_teacher_incoming_student,
     get_teacher_incoming_student,
@@ -21,6 +23,17 @@ from app.services.teacher_incoming_students_service import (
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
+
+
+@router.get("/profile", response_model=TeacherProfileResponse)
+def read_teacher_profile(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    profile = get_teacher_profile(db, current_teacher.id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Teacher profile not found")
+    return profile
 
 
 @router.get("/students", response_model=TeacherStudentsListResponse)

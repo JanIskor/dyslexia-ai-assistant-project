@@ -201,6 +201,19 @@ def _is_student_profile_status_constraint_error(exc: IntegrityError) -> bool:
     return "ck_student_profiles_status" in str(orig)
 
 
+def _is_student_profile_complete_for_assignment(profile: StudentProfile) -> bool:
+    required_string_fields = (
+        profile.full_name,
+        profile.gender,
+        profile.grade_label,
+    )
+
+    if any(value is None or not value.strip() for value in required_string_fields):
+        return False
+
+    return profile.birth_date is not None and profile.enrollment_date is not None
+
+
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
     profile = _get_admin_application_or_404(db, application_id)
 
@@ -287,6 +300,12 @@ def assign_teacher_to_application(
     payload: AdminAssignTeacherRequest,
 ) -> AdminApplicationDetailResponse:
     profile = _get_student_profile_for_assignment_or_404(db, application_id)
+
+    if not _is_student_profile_complete_for_assignment(profile):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student profile is incomplete",
+        )
 
     teacher_profile = (
         db.query(TeacherProfile)

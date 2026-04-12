@@ -28,19 +28,9 @@ import {
   type TeacherIncomingStudentDetail,
   type TeacherIncomingStudentListItem,
 } from '@/lib/teacherIncomingStudentsApi';
+import { getTeacherProfile, type TeacherProfile } from '@/lib/teacherProfileApi';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'assistant';
-
-interface TeacherProfileCardData {
-  avatarUrl: string | null;
-  fullName: string;
-  birthDate: string;
-  gender: string;
-  position: string;
-  phoneNumber: string;
-  workEmail: string;
-  subject: string;
-}
 
 interface TeacherProfileField {
   label: string;
@@ -70,26 +60,6 @@ const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> 
   { id: 'students', label: 'Список учеников' },
   { id: 'incoming-students', label: 'Новые ученики' },
   { id: 'assistant', label: 'ИИ-ассистент' },
-];
-
-const TEACHER_PROFILE_CARD_DATA: TeacherProfileCardData = {
-  avatarUrl: null,
-  fullName: 'Попов Михаил Петрович',
-  birthDate: '17 ноября 1985 года',
-  gender: 'Мужской',
-  position: 'Преподаватель',
-  phoneNumber: '+79205224112',
-  workEmail: 'popov2178@bmstu.ru',
-  subject: 'Литература',
-};
-
-const TEACHER_PROFILE_FIELDS: TeacherProfileField[] = [
-  { label: 'Дата рождения:', value: '17 ноября 1985 года' },
-  { label: 'Пол:', value: 'Мужской' },
-  { label: 'Должность:', value: 'Преподаватель' },
-  { label: 'Номер телефона:', value: '+79205224112' },
-  { label: 'Рабочий email:', value: 'popov2178@bmstu.ru' },
-  { label: 'Предмет преподавания:', value: 'Литература' },
 ];
 
 const UNREAD_MESSAGES_COUNT = 3;
@@ -190,22 +160,28 @@ function ProfileAvatar({
   );
 }
 
-function TeacherProfileCard() {
+function TeacherProfileCard({ profile }: { profile: TeacherProfile }) {
+  const teacherProfileFields: TeacherProfileField[] = [
+    { label: 'Дата рождения:', value: formatProfileDate(profile.birth_date) },
+    { label: 'Пол:', value: profile.gender },
+    { label: 'Должность:', value: profile.position },
+    { label: 'Номер телефона:', value: profile.phone },
+    { label: 'Рабочий email:', value: profile.work_email },
+    { label: 'Предмет преподавания:', value: profile.subject_name },
+  ];
+
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
-        <ProfileAvatar
-          avatarUrl={TEACHER_PROFILE_CARD_DATA.avatarUrl}
-          fullName={TEACHER_PROFILE_CARD_DATA.fullName}
-        />
+        <ProfileAvatar avatarUrl={profile.avatar_url} fullName={profile.full_name} />
 
         <h2 className="mt-6 max-w-2xl text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
-          {TEACHER_PROFILE_CARD_DATA.fullName}
+          {profile.full_name}
         </h2>
 
         <div className="mt-6 w-full max-w-3xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
           <dl className="divide-y divide-orange-100/80">
-            {TEACHER_PROFILE_FIELDS.map((field) => (
+            {teacherProfileFields.map((field) => (
               <div
                 key={field.label}
                 className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-4"
@@ -1003,6 +979,7 @@ function TeacherIncomingStudentsSection({
 function TeacherSectionContent({
   section,
   accessToken,
+  teacherProfile,
   studentsViewState,
   incomingStudentsViewState,
   onOpenStudent,
@@ -1012,6 +989,7 @@ function TeacherSectionContent({
 }: {
   section: TeacherDashboardSection;
   accessToken: string;
+  teacherProfile: TeacherProfile;
   studentsViewState: TeacherStudentsViewState;
   incomingStudentsViewState: TeacherIncomingStudentsViewState;
   onOpenStudent: (studentId: string) => void;
@@ -1058,7 +1036,7 @@ function TeacherSectionContent({
         Профиль преподавателя
       </h1>
       <div className="mt-6">
-        <TeacherProfileCard />
+        <TeacherProfileCard profile={teacherProfile} />
       </div>
     </>
   );
@@ -1081,6 +1059,7 @@ export function TeacherDashboard() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<TeacherDashboardSection>('profile');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [studentsViewState, setStudentsViewState] = useState<TeacherStudentsViewState>({
@@ -1110,12 +1089,20 @@ export function TeacherDashboard() {
           return;
         }
 
+        const profile = await getTeacherProfile(token);
+
         if (isMounted) {
           setCurrentUser(user);
+          setTeacherProfile(profile);
           setAccessToken(token);
           setIsCheckingAuth(false);
         }
       } catch {
+        if (isMounted) {
+          setCurrentUser(null);
+          setTeacherProfile(null);
+          setAccessToken(null);
+        }
         clearAccessToken();
         router.replace('/login');
       }
@@ -1129,6 +1116,9 @@ export function TeacherDashboard() {
   }, [router]);
 
   const handleLogout = () => {
+    setCurrentUser(null);
+    setTeacherProfile(null);
+    setAccessToken(null);
     clearAccessToken();
     router.replace('/login');
   };
@@ -1166,7 +1156,7 @@ export function TeacherDashboard() {
         ? 'Новый ученик'
       : TEACHER_MENU_ITEMS.find((item) => item.id === activeSection)?.label ?? 'Мой профиль';
 
-  if (isCheckingAuth || !currentUser || !accessToken) {
+  if (isCheckingAuth || !currentUser || !accessToken || !teacherProfile) {
     return <DashboardSkeleton />;
   }
 
@@ -1224,6 +1214,7 @@ export function TeacherDashboard() {
               <TeacherSectionContent
                 section={activeSection}
                 accessToken={accessToken}
+                teacherProfile={teacherProfile}
                 studentsViewState={studentsViewState}
                 incomingStudentsViewState={incomingStudentsViewState}
                 onOpenStudent={handleOpenStudent}

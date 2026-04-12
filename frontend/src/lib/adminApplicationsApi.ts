@@ -80,6 +80,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Профиль ученика не найден.';
   }
 
+  if (detail === 'Student profile is incomplete') {
+    return 'Не все обязательные поля профиля ученика заполнены.';
+  }
+
   if (detail === 'Application cannot be sent for revision') {
     return 'Эту заявку сейчас нельзя отправить на доработку.';
   }
