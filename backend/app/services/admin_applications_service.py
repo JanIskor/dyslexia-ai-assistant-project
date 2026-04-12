@@ -1,12 +1,13 @@
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from uuid import UUID
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_student import TeacherStudent
+from app.models.teacher_student_rejection import TeacherStudentRejection
 from app.models.user import User
 from app.schemas.admin_applications import (
     AdminAssignTeacherRequest,
@@ -50,11 +51,24 @@ VISIBLE_APPLICATION_STATUSES = (
     "teacher_rejected",
 )
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
+ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "teacher_rejected"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
+TEACHER_REVIEW_STATUS_LABELS = {
+    "pending": "Ожидает решения преподавателя",
+    "accepted": "Принята преподавателем",
+    "rejected": "Отклонена преподавателем",
+}
 
 
 def map_application_status(profile_status: str) -> str:
     return PROFILE_STATUS_TO_APPLICATION_STATUS.get(profile_status, "На рассмотрении")
+
+
+def map_teacher_review_status(review_status: str | None) -> str | None:
+    if review_status is None:
+        return None
+
+    return TEACHER_REVIEW_STATUS_LABELS.get(review_status, review_status)
 
 
 def get_admin_application_status_filters() -> AdminApplicationsFiltersResponse:
@@ -66,7 +80,21 @@ def get_admin_application_status_filters() -> AdminApplicationsFiltersResponse:
     )
 
 
-def list_admin_teacher_assignment_options(db: Session) -> AdminTeacherAssignmentOptionsResponse:
+def list_admin_teacher_assignment_options(
+    db: Session,
+    *,
+    application_id: UUID | None = None,
+) -> AdminTeacherAssignmentOptionsResponse:
+    rejected_teacher_ids: set[UUID] = set()
+    if application_id is not None:
+        profile = _get_student_profile_for_assignment_or_404(db, application_id)
+        rejected_teacher_ids = {
+            row.teacher_user_id
+            for row in db.query(TeacherStudentRejection.teacher_user_id)
+            .filter(TeacherStudentRejection.student_user_id == profile.user_id)
+            .all()
+        }
+
     teacher_rows = (
         db.query(
             TeacherProfile.user_id.label("teacher_user_id"),
@@ -90,7 +118,17 @@ def list_admin_teacher_assignment_options(db: Session) -> AdminTeacherAssignment
                 subject_name=row.subject_name,
                 student_count=row.student_count,
                 capacity=TEACHER_ASSIGNMENT_CAPACITY,
-                is_available=row.student_count < TEACHER_ASSIGNMENT_CAPACITY,
+                is_available=(
+                    row.student_count < TEACHER_ASSIGNMENT_CAPACITY
+                    and row.teacher_user_id not in rejected_teacher_ids
+                ),
+                unavailable_reason=(
+                    "full_capacity"
+                    if row.student_count >= TEACHER_ASSIGNMENT_CAPACITY
+                    else "already_rejected_this_student"
+                    if row.teacher_user_id in rejected_teacher_ids
+                    else None
+                ),
             )
             for row in teacher_rows
         ]
@@ -150,6 +188,15 @@ def list_admin_applications(
 
 
 def _build_admin_application_detail(profile: StudentProfile) -> AdminApplicationDetailResponse:
+    db = object_session(profile)
+    current_teacher = None
+    if db is not None and profile.current_teacher_user_id is not None:
+        current_teacher = (
+            db.query(TeacherProfile)
+            .filter(TeacherProfile.user_id == profile.current_teacher_user_id)
+            .first()
+        )
+
     return AdminApplicationDetailResponse(
         id=profile.id,
         full_name=profile.full_name,
@@ -160,6 +207,10 @@ def _build_admin_application_detail(profile: StudentProfile) -> AdminApplication
         status=map_application_status(profile.profile_status),
         grade_label=profile.grade_label,
         enrollment_date=profile.enrollment_date,
+        current_teacher_user_id=profile.current_teacher_user_id,
+        current_teacher_full_name=current_teacher.full_name if current_teacher is not None else None,
+        current_teacher_subject_name=current_teacher.subject_name if current_teacher is not None else None,
+        teacher_review_status=map_teacher_review_status(profile.teacher_review_status),
     )
 
 
@@ -182,7 +233,15 @@ def _get_admin_application_or_404(db: Session, application_id) -> StudentProfile
 
 
 def _get_student_profile_for_assignment_or_404(db: Session, application_id: UUID) -> StudentProfile:
-    profile = db.query(StudentProfile).filter(StudentProfile.id == application_id).first()
+    profile = (
+        db.query(StudentProfile)
+        .join(User, User.id == StudentProfile.user_id)
+        .filter(
+            StudentProfile.id == application_id,
+            User.role == "student",
+        )
+        .first()
+    )
 
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
@@ -212,6 +271,23 @@ def _is_student_profile_complete_for_assignment(profile: StudentProfile) -> bool
         return False
 
     return profile.birth_date is not None and profile.enrollment_date is not None
+
+
+def _has_teacher_rejected_student(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    student_user_id: UUID,
+) -> bool:
+    return (
+        db.query(TeacherStudentRejection)
+        .filter(
+            TeacherStudentRejection.teacher_user_id == teacher_user_id,
+            TeacherStudentRejection.student_user_id == student_user_id,
+        )
+        .first()
+        is not None
+    )
 
 
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
@@ -281,6 +357,8 @@ def approve_admin_application(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be approved")
 
     profile.profile_status = "approved"
+    profile.current_teacher_user_id = None
+    profile.teacher_review_status = None
     try:
         db.commit()
         db.refresh(profile)
@@ -305,6 +383,12 @@ def assign_teacher_to_application(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Student profile is incomplete",
+        )
+
+    if profile.profile_status == "needs_completion":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Application is in needs completion state",
         )
 
     teacher_profile = (
@@ -334,7 +418,7 @@ def assign_teacher_to_application(
 
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student already assigned")
 
-    if profile.profile_status not in REVIEWABLE_APPLICATION_STATUSES:
+    if profile.profile_status not in ASSIGNABLE_APPLICATION_STATUSES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be assigned")
 
     student_count = (
@@ -345,7 +429,17 @@ def assign_teacher_to_application(
     )
 
     if student_count >= TEACHER_ASSIGNMENT_CAPACITY:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teacher is at full capacity")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Teacher is at full capacity")
+
+    if _has_teacher_rejected_student(
+        db,
+        teacher_user_id=payload.teacher_user_id,
+        student_user_id=profile.user_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Teacher already rejected this student",
+        )
 
     db.add(
         TeacherStudent(
@@ -354,6 +448,8 @@ def assign_teacher_to_application(
         )
     )
     profile.profile_status = "approved"
+    profile.current_teacher_user_id = payload.teacher_user_id
+    profile.teacher_review_status = "pending"
 
     try:
         db.commit()

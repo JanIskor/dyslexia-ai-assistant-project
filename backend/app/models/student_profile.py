@@ -13,6 +13,10 @@ class StudentProfile(Base):
             "profile_status IN ('draft', 'submitted', 'in_review', 'needs_completion', 'approved', 'teacher_accepted', 'teacher_rejected')",
             name="ck_student_profiles_status",
         ),
+        CheckConstraint(
+            "teacher_review_status IS NULL OR teacher_review_status IN ('pending', 'accepted', 'rejected')",
+            name="ck_student_profiles_teacher_review_status",
+        ),
     )
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -25,8 +29,10 @@ class StudentProfile(Base):
     quote = Column(Text, nullable=True)
     avatar_url = Column(String, nullable=True)
     profile_status = Column(String, nullable=False, default="draft", server_default="draft")
+    current_teacher_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    teacher_review_status = Column(String, nullable=True)
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    user = relationship("User", back_populates="student_profile")
+    user = relationship("User", back_populates="student_profile", foreign_keys=[user_id])

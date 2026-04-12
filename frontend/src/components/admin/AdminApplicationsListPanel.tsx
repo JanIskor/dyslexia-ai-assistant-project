@@ -2,13 +2,7 @@
 
 import { Filter, Search } from 'lucide-react';
 import type { AdminApplication, AdminApplicationStatusFilterOption } from '@/lib/adminApplicationsApi';
-
-const APPLICATION_STATUS_STYLES: Record<string, string> = {
-  Новая: 'bg-[#ffe4cc] text-[#db8b42]',
-  'На рассмотрении': 'bg-[#ece8ef] text-[#6e6670]',
-  'На доработке': 'bg-[#f9ddd8] text-[#d46d63]',
-  Подтверждена: 'bg-[#dff3e4] text-[#4f8c5f]',
-};
+import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
 
 interface AdminApplicationsListPanelProps {
   searchValue: string;
@@ -117,7 +111,7 @@ export function AdminApplicationsListPanel({
           <span
             key={status}
             className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-              APPLICATION_STATUS_STYLES[status] ?? APPLICATION_STATUS_STYLES['На рассмотрении']
+              getAdminApplicationStatusStyle(status)
             }`}
           >
             {status}
@@ -151,7 +145,7 @@ export function AdminApplicationsListPanel({
                   </span>
                   <span
                     className={`ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:min-w-[168px] sm:text-base ${
-                      APPLICATION_STATUS_STYLES[application.status] ?? APPLICATION_STATUS_STYLES['На рассмотрении']
+                      getAdminApplicationStatusStyle(application.status)
                     }`}
                   >
                     {application.status}

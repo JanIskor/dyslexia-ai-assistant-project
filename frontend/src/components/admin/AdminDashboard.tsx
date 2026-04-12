@@ -80,6 +80,31 @@ function ApplicationsPanel({ token }: { token: string }) {
   const [selectedTeacherUserId, setSelectedTeacherUserId] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
+  const isProfileCompleteForAssignment = (application: AdminApplicationDetail) =>
+    Boolean(
+      application.full_name?.trim() &&
+        application.birth_date &&
+        application.gender?.trim() &&
+        application.grade_label?.trim() &&
+        application.enrollment_date
+    );
+
+  const getApproveGuardMessage = (application: AdminApplicationDetail | null) => {
+    if (!application) {
+      return null;
+    }
+
+    if (application.status === 'На доработке') {
+      return 'Заявка находится на доработке';
+    }
+
+    if (!isProfileCompleteForAssignment(application)) {
+      return 'Сначала заполните обязательные поля';
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -250,13 +275,20 @@ function ApplicationsPanel({ token }: { token: string }) {
       return;
     }
 
+    const guardMessage = getApproveGuardMessage(selectedApplication);
+    if (guardMessage) {
+      setDetailMessageType('error');
+      setDetailMessage(guardMessage);
+      return;
+    }
+
     setIsLoadingAssignmentOptions(true);
     setDetailMessage(null);
     setAssignmentError(null);
     setSelectedTeacherUserId(null);
 
     try {
-      const response = await getAdminTeacherAssignmentOptions(token);
+      const response = await getAdminTeacherAssignmentOptions(token, selectedApplication.id);
       setAssignmentOptions(response.items);
       setIsAssignmentModalOpen(true);
     } catch (error) {
@@ -334,6 +366,7 @@ function ApplicationsPanel({ token }: { token: string }) {
           onSave={handleSave}
           onRequestChanges={handleRequestChanges}
           onApprove={handleApprove}
+          approveGuardMessage={getApproveGuardMessage(selectedApplication)}
           isSaving={isSaving}
           isActing={isActing || isLoadingAssignmentOptions || isAssigningTeacher}
           statusMessage={detailMessage}

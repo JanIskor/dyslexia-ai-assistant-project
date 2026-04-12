@@ -30,6 +30,18 @@ export function TeacherAssignmentModal({
     return null;
   }
 
+  const getUnavailableReasonLabel = (reason: AdminTeacherAssignmentOption['unavailable_reason']) => {
+    if (reason === 'full_capacity') {
+      return 'Лимит 15 из 15 учеников уже заполнен';
+    }
+
+    if (reason === 'already_rejected_this_student') {
+      return 'Этот преподаватель уже отклонил ученика';
+    }
+
+    return 'Недоступен';
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/20 px-4 py-6 backdrop-blur-[2px]">
       <div className="w-full max-w-3xl rounded-[32px] border border-orange-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,247,242,0.96))] p-5 shadow-[0_20px_60px_rgba(150,92,46,0.18)] sm:p-7">
@@ -86,6 +98,11 @@ export function TeacherAssignmentModal({
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-medium text-stone-700 sm:text-lg">{teacher.full_name}</p>
                       <p className="mt-1 text-sm text-stone-500 sm:text-base">{teacher.subject_name}</p>
+                      {!teacher.is_available ? (
+                        <p className="mt-2 text-sm font-medium text-rose-600">
+                          {getUnavailableReasonLabel(teacher.unavailable_reason)}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="shrink-0 text-right">

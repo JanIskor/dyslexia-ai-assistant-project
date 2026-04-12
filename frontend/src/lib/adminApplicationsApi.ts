@@ -16,6 +16,10 @@ export interface AdminApplicationDetail {
   status: string;
   grade_label: string | null;
   enrollment_date: string | null;
+  current_teacher_user_id: string | null;
+  current_teacher_full_name: string | null;
+  current_teacher_subject_name: string | null;
+  teacher_review_status: string | null;
 }
 
 export interface AdminApplicationStatusFilterOption {
@@ -30,6 +34,7 @@ export interface AdminTeacherAssignmentOption {
   student_count: number;
   capacity: number;
   is_available: boolean;
+  unavailable_reason: 'full_capacity' | 'already_rejected_this_student' | null;
 }
 
 export interface AdminApplicationsResponse {
@@ -96,12 +101,20 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Эту заявку сейчас нельзя отправить преподавателю.';
   }
 
+  if (detail === 'Application is in needs completion state') {
+    return 'Заявка находится на доработке и пока не может быть отправлена преподавателю.';
+  }
+
   if (detail === 'Teacher not found') {
     return 'Преподаватель не найден.';
   }
 
   if (detail === 'Teacher is at full capacity') {
     return 'У выбранного преподавателя уже 15 из 15 учеников.';
+  }
+
+  if (detail === 'Teacher already rejected this student') {
+    return 'Этот преподаватель уже отклонил данного ученика.';
   }
 
   if (detail === 'Student already assigned') {
@@ -197,8 +210,10 @@ export const getAdminApplicationFilters = async (
 
 export const getAdminTeacherAssignmentOptions = async (
   token: string,
+  applicationId: string,
 ): Promise<AdminTeacherAssignmentOptionsResponse> => {
-  const response = await fetch(buildApiUrl('/api/v1/admin/teachers/assignment-options'), {
+  const params = new URLSearchParams({ application_id: applicationId });
+  const response = await fetch(buildApiUrl(`/api/v1/admin/teachers/assignment-options?${params.toString()}`), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

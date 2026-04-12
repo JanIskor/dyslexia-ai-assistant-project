@@ -2,13 +2,7 @@
 
 import { ArrowLeft, Check, RefreshCcw, Save, UserRound } from 'lucide-react';
 import type { AdminApplicationDetail } from '@/lib/adminApplicationsApi';
-
-const APPLICATION_STATUS_STYLES: Record<string, string> = {
-  Новая: 'bg-[#ffe4cc] text-[#db8b42]',
-  'На рассмотрении': 'bg-[#ece8ef] text-[#6e6670]',
-  'На доработке': 'bg-[#f9ddd8] text-[#d46d63]',
-  Подтверждена: 'bg-[#dff3e4] text-[#4f8c5f]',
-};
+import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
 
 interface AdminApplicationDetailPanelProps {
   application: AdminApplicationDetail;
@@ -20,6 +14,7 @@ interface AdminApplicationDetailPanelProps {
   onSave: () => void;
   onRequestChanges: () => void;
   onApprove: () => void;
+  approveGuardMessage: string | null;
   isSaving: boolean;
   isActing: boolean;
   statusMessage: string | null;
@@ -62,6 +57,7 @@ export function AdminApplicationDetailPanel({
   onSave,
   onRequestChanges,
   onApprove,
+  approveGuardMessage,
   isSaving,
   isActing,
   statusMessage,
@@ -91,7 +87,7 @@ export function AdminApplicationDetailPanel({
 
             <span
               className={`mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:text-base ${
-                APPLICATION_STATUS_STYLES[application.status] ?? APPLICATION_STATUS_STYLES['На рассмотрении']
+                getAdminApplicationStatusStyle(application.status)
               }`}
             >
               {application.status}
@@ -102,6 +98,25 @@ export function AdminApplicationDetailPanel({
             <DetailRow label="Дата рождения" value={formatDisplayDate(application.birth_date)} />
             <DetailRow label="Пол" value={application.gender ?? 'Не указан'} />
             <DetailRow label="Цитата" value={application.quote ?? 'Не указана'} />
+          </dl>
+        </div>
+
+        <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
+          <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Контекст назначения</h3>
+
+          <dl className="mt-4 divide-y divide-orange-100/80">
+            <DetailRow
+              label="Последний преподаватель"
+              value={application.current_teacher_full_name ?? 'Не назначался'}
+            />
+            <DetailRow
+              label="Предмет"
+              value={application.current_teacher_subject_name ?? 'Не указан'}
+            />
+            <DetailRow
+              label="Статус решения преподавателя"
+              value={application.teacher_review_status ?? 'Пока не отправлялась преподавателю'}
+            />
           </dl>
         </div>
 
@@ -165,13 +180,19 @@ export function AdminApplicationDetailPanel({
             <button
               type="button"
               onClick={onApprove}
-              disabled={isSaving || isActing}
+              disabled={isSaving || isActing || Boolean(approveGuardMessage)}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
               Подтвердить заявку
             </button>
           </div>
+
+          {approveGuardMessage ? (
+            <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:text-base">
+              {approveGuardMessage}
+            </p>
+          ) : null}
 
           {statusMessage ? (
             <p

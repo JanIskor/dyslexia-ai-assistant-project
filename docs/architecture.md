@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Assignment Modal Foundation
+## Текущая фаза: Reassignment Restrictions And Admin State Guards
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation и admin application detail / review foundation уже реализованы. Поверх этого `/admin` получает foundation назначения преподавателя через modal внутри уже существующего review flow.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation и teacher incoming review foundation уже реализованы. Поверх этого `/admin` получает ограничения повторного назначения, guards по состоянию заявки и teacher context в detail response.
 
 ### Tech Stack
 ```
@@ -47,7 +47,8 @@ app/
 │   ├── user.py
 │   ├── student_profile.py
 │   ├── teacher_profile.py
-│   └── teacher_student.py
+│   ├── teacher_student.py
+│   └── teacher_student_rejection.py
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
 │   ├── admin_applications.py
@@ -119,7 +120,7 @@ lib/
 └── [другие helpers]
 ```
 
-## Data Flow teacher assignment modal foundation
+## Data Flow admin reassignment restrictions
 
 ```
 User Browser
@@ -223,7 +224,7 @@ Editable admin fields:
 Admin actions:
 - `PATCH /api/v1/admin/applications/{application_id}`
 - `POST /api/v1/admin/applications/{application_id}/request-changes`
-- `GET /api/v1/admin/teachers/assignment-options`
+- `GET /api/v1/admin/teachers/assignment-options?application_id=...`
 - `POST /api/v1/admin/applications/{application_id}/assign-teacher`
     ↓
 Кнопка `Подтвердить заявку`
@@ -232,10 +233,11 @@ Frontend не делает direct approve
     ↓
 Открывается `TeacherAssignmentModal`
     ↓
-`adminApplicationsApi.ts` делает `GET /api/v1/admin/teachers/assignment-options`
+`adminApplicationsApi.ts` делает `GET /api/v1/admin/teachers/assignment-options?application_id=...`
     ↓
 Backend делает выборку из `teacher_profiles`
 с outer join на `teacher_students`
+и при наличии `application_id` учитывает `teacher_student_rejections`
     ↓
 Для каждого преподавателя считаются:
 - `teacher_user_id`
@@ -244,13 +246,16 @@ Backend делает выборку из `teacher_profiles`
 - `student_count`
 - `capacity = 15`
 - `is_available = student_count < 15`
+- `unavailable_reason = null | full_capacity | already_rejected_this_student`
     ↓
 В modal отображаются:
 - ФИО преподавателя
 - предмет
 - занятость `current/15`
+- причина недоступности, если teacher disabled
     ↓
-Если преподаватель имеет `15/15`,
+Если преподаватель имеет `15/15`
+или уже отклонял этого ученика,
 строка недоступна для выбора
     ↓
 После выбора frontend делает

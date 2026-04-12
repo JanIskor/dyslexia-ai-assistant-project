@@ -20,7 +20,12 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    student_profile = relationship("StudentProfile", back_populates="user", uselist=False)
+    student_profile = relationship(
+        "StudentProfile",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="StudentProfile.user_id",
+    )
     teacher_profile = relationship("TeacherProfile", back_populates="user", uselist=False)
     teacher_links = relationship(
         "TeacherStudent",

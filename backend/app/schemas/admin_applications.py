@@ -30,6 +30,7 @@ class AdminTeacherAssignmentOption(BaseModel):
     student_count: int
     capacity: int
     is_available: bool
+    unavailable_reason: str | None = None
 
 
 class AdminTeacherAssignmentOptionsResponse(BaseModel):
@@ -46,6 +47,10 @@ class AdminApplicationDetailResponse(BaseModel):
     status: str
     grade_label: str | None = None
     enrollment_date: date | None = None
+    current_teacher_user_id: UUID | None = None
+    current_teacher_full_name: str | None = None
+    current_teacher_subject_name: str | None = None
+    teacher_review_status: str | None = None
 
 
 class AdminApplicationUpdateRequest(BaseModel):

@@ -49,10 +49,11 @@ def read_admin_application_filters(current_admin: User = Depends(get_current_adm
 
 @router.get("/teachers/assignment-options", response_model=AdminTeacherAssignmentOptionsResponse)
 def read_admin_teacher_assignment_options(
+    application_id: UUID | None = Query(default=None),
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    return list_admin_teacher_assignment_options(db)
+    return list_admin_teacher_assignment_options(db, application_id=application_id)
 
 
 @router.get("/applications/{application_id}", response_model=AdminApplicationDetailResponse)

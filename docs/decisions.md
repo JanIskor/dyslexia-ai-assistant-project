@@ -641,3 +641,64 @@ backend/
 ### Notifications, badge counters и realtime updates остаются вне шага
 - Incoming review не добавляет email, badge counters, in-app notifications или realtime sync.
 - Причина: это следующий продуктовый слой и он не нужен для foundation teacher-side review.
+
+## Решения шага 3.2.4.8: Reassignment Restrictions And Admin Application State Guards
+
+### Detail заявки хранит текущий teacher context прямо в `student_profiles`
+- В `student_profiles` добавлены:
+  - `current_teacher_user_id`
+  - `teacher_review_status`
+- Detail response admin теперь возвращает:
+  - `current_teacher_user_id`
+  - `current_teacher_full_name`
+  - `current_teacher_subject_name`
+  - `teacher_review_status`
+- Причина: admin должен видеть, кому уже отправляли ученика и чем закончился teacher review, без отдельной истории действий.
+
+### История teacher reject хранится отдельно минимальной таблицей
+- Добавлена таблица `teacher_student_rejections` с уникальной парой `teacher_user_id + student_user_id`.
+- Причина: после reject активная связь из `teacher_students` удаляется, поэтому для блокировки повторного назначения тому же teacher нужен отдельный lightweight history layer.
+
+### Reassign разрешён только после `teacher_rejected`
+- `assign-teacher` допускает отправку teacher только из статусов:
+  - `submitted`
+  - `in_review`
+  - `teacher_rejected`
+- Причина: pending/accepted teacher flow не должен silently перетираться повторным назначением.
+
+### Assignment options стали зависеть от конкретной заявки
+- `GET /api/v1/admin/teachers/assignment-options` теперь принимает `application_id`.
+- Для каждого teacher backend возвращает:
+  - `teacher_user_id`
+  - `full_name`
+  - `subject_name`
+  - `student_count`
+  - `capacity`
+  - `is_available`
+  - `unavailable_reason`
+- `unavailable_reason` может быть:
+  - `null`
+  - `full_capacity`
+  - `already_rejected_this_student`
+- Причина: modal должен заранее показывать, кого нельзя выбрать именно для этого ученика.
+
+### Guard на неполный профиль остаётся backend-first и дублируется в admin detail UI
+- Перед assign backend проверяет обязательные поля:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `grade_label`
+  - `enrollment_date`
+- Frontend одновременно disable'ит `Подтвердить заявку` и показывает сообщение прямо на странице заявки.
+- Причина: admin должен видеть проблему до открытия modal, но backend остаётся источником истины.
+
+### Guard на `needs_completion` показывается прямо в detail карточке
+- Если заявка в статусе `needs_completion`, action `Подтвердить заявку` disabled ещё до открытия modal.
+- Backend также повторно валидирует это в `assign-teacher`.
+- Причина: заявка на доработке не должна попадать в teacher review flow.
+
+### Teacher reject блокирует только конкретного teacher, а не весь reassignment flow
+- После reject сохраняется `teacher_review_status = rejected`, удаляется активная связь и создаётся запись в `teacher_student_rejections`.
+- Admin может назначить другого teacher.
+- Teacher, который уже отказал, в modal становится disabled.
+- Причина: нужен controlled reassignment без избыточного workflow возврата админу.

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
+from app.models.teacher_student_rejection import TeacherStudentRejection
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
     TeacherIncomingStudentListItem,
@@ -106,6 +107,7 @@ def accept_teacher_incoming_student(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incoming student not found")
 
     profile.profile_status = ACCEPTED_STUDENT_STATUS
+    profile.teacher_review_status = "accepted"
     db.commit()
     db.refresh(profile)
 
@@ -147,6 +149,13 @@ def reject_teacher_incoming_student(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incoming student not found")
 
     profile.profile_status = REJECTED_STUDENT_STATUS
+    profile.teacher_review_status = "rejected"
+    db.add(
+        TeacherStudentRejection(
+            teacher_user_id=teacher_user_id,
+            student_user_id=student_user_id,
+        )
+    )
     db.delete(assignment)
     db.commit()
     db.refresh(profile)
