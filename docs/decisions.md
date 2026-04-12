@@ -262,6 +262,16 @@ backend/
 - `/admin`, `/teacher`, `/student` page entrypoints обёрнуты в `Suspense`.
 - Причина: это минимальная совместимая интеграция с App Router без redesign страниц.
 
+### Dropdown layering поднят в отдельный верхний stacking layer
+- `Header` и `NotificationsBell` получили более высокий stacking context.
+- Причина: bell dropdown должен гарантированно перекрывать поиск, карточки и прочие dashboard elements, а не конкурировать с ними по случайным локальным `z-index`.
+
+### Teacher assignment modal прокручивает только список преподавателей
+- header и footer оставлены в фиксированных секциях modal;
+- средняя часть со списком teacher options вынесена в отдельный scroll container;
+- при открытом modal прокрутка `body` блокируется.
+- Причина: длинный список преподавателей должен оставаться удобным и не сдвигать CTA/заголовок, а страница под modal не должна «уезжать».
+
 ### Teacher students integration встроена в существующий `/teacher`, без новых маршрутов
 - Раздел `Список учеников` реализован внутри уже существующего `TeacherDashboard`.
 - Переключение между grid списка и profile view ученика сделано через локальный React state.

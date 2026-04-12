@@ -29,7 +29,7 @@ export function Header({
 
   if (variant === 'dashboard') {
     return (
-      <header className="rounded-[28px] border border-orange-100/80 bg-white/75 px-5 py-4 shadow-[0_12px_40px_rgba(221,156,130,0.12)] backdrop-blur sm:px-7">
+      <header className="relative z-[100] rounded-[28px] border border-orange-100/80 bg-white/75 px-5 py-4 shadow-[0_12px_40px_rgba(221,156,130,0.12)] backdrop-blur sm:px-7">
         <div className="grid items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
           <div className="flex justify-start">{brand}</div>
           <div className="text-center text-2xl font-medium text-stone-700">{title}</div>

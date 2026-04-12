@@ -165,7 +165,7 @@ export function NotificationsBell({ token }: { token: string }) {
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative z-[110]">
       <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
@@ -182,7 +182,7 @@ export function NotificationsBell({ token }: { token: string }) {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 z-30 mt-3 w-[22rem] rounded-[26px] border border-orange-100/80 bg-white/98 p-4 shadow-[0_20px_45px_rgba(221,156,130,0.18)] sm:w-[25rem]">
+        <div className="absolute right-0 z-[130] mt-3 w-[22rem] rounded-[26px] border border-orange-100/80 bg-white/98 p-4 shadow-[0_20px_45px_rgba(221,156,130,0.18)] sm:w-[25rem]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-medium text-stone-700">Уведомления</h3>

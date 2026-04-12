@@ -155,6 +155,7 @@ lib/
 - клик по телу уведомления делает `mark as read` и затем `router.push(...)`
 - кнопка `Прочитать` делает только `mark as read`
 - после прочтения уведомление сразу исчезает из dropdown
+- dropdown рендерится в верхнем stacking layer и перекрывает поиск, карточки и dashboard content
 
 ### Routing mapping
 - `teacher_incoming_students` → `/teacher?tab=incoming-students&studentId=...`
@@ -167,6 +168,13 @@ lib/
 - не нужен отдельный route
 - текущие dashboards не пришлось переписывать
 - query params достаточно для открытия нужной вкладки и правой карточки без новой routing subsystem
+
+## Teacher Assignment Modal UX
+
+- modal ограничен по высоте относительно viewport;
+- header и footer находятся в фиксированных секциях внутри modal;
+- только список teacher options живёт в `overflow-y-auto` контейнере;
+- при открытом modal у `document.body` ставится `overflow: hidden`, поэтому страница заявки под overlay не прокручивается.
 
 ## Data Flow admin reassignment restrictions
 
