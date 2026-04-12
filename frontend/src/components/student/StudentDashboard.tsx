@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { LogOut, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
@@ -17,8 +17,15 @@ import {
   type StudentProfile,
   updateStudentProfile,
 } from '@/lib/studentProfileApi';
+import {
+  getStudentMessageDetail,
+  getStudentMessages,
+  markStudentMessageAsRead,
+  type TeacherStudentMessage,
+  type TeacherStudentMessagesResponse,
+} from '@/lib/teacherStudentMessagesApi';
 
-type StudentDashboardSection = 'profile' | 'materials' | 'tests' | 'edit-profile';
+type StudentDashboardSection = 'profile' | 'materials' | 'tests' | 'edit-profile' | 'messages';
 
 interface StudentProfileFormState {
   fullName: string;
@@ -32,10 +39,20 @@ const ONBOARDING_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string 
 ];
 const REGULAR_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> = [
   { id: 'profile', label: 'Мой профиль' },
+  { id: 'messages', label: 'Сообщения' },
   { id: 'materials', label: 'Учебные материалы' },
   { id: 'tests', label: 'Мои тесты' },
   { id: 'edit-profile', label: 'Редактирование профиля' },
 ];
+
+type StudentMessagesViewState =
+  | {
+      mode: 'list';
+    }
+  | {
+      mode: 'detail';
+      messageId: string;
+    };
 
 function formatProfileDate(value: string | null): string {
   if (!value) {
@@ -61,6 +78,20 @@ function buildFormState(profile: StudentProfile): StudentProfileFormState {
     gender: profile.gender ?? '',
     quote: profile.quote ?? '',
   };
+}
+
+function formatMessageDate(value: string): string {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsedDate);
 }
 
 function ModerationBanner({
@@ -323,6 +354,7 @@ function StudentProfileEditCard({
 
 function StudentSectionContent({
   activeSection,
+  accessToken,
   profile,
   form,
   onChange,
@@ -333,8 +365,12 @@ function StudentSectionContent({
   regularSubmittedNotice,
   statusMessage,
   statusType,
+  messagesViewState,
+  onOpenMessage,
+  onBackToMessagesList,
 }: {
   activeSection: StudentDashboardSection;
+  accessToken: string;
   profile: StudentProfile;
   form: StudentProfileFormState;
   onChange: (field: keyof StudentProfileFormState, value: string) => void;
@@ -345,8 +381,22 @@ function StudentSectionContent({
   regularSubmittedNotice: boolean;
   statusMessage: string | null;
   statusType: 'error' | 'success';
+  messagesViewState: StudentMessagesViewState;
+  onOpenMessage: (messageId: string) => void;
+  onBackToMessagesList: () => void;
 }) {
   const isRegularMode = profile.student_mode === 'regular';
+
+  if (activeSection === 'messages') {
+    return (
+      <StudentMessagesSection
+        accessToken={accessToken}
+        viewState={messagesViewState}
+        onOpenMessage={onOpenMessage}
+        onBackToList={onBackToMessagesList}
+      />
+    );
+  }
 
   if (activeSection === 'materials') {
     return (
@@ -441,6 +491,232 @@ function StudentSectionContent({
   );
 }
 
+function StudentMessagesState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[18rem] items-center justify-center rounded-[28px] border border-orange-100/80 bg-white/90 px-6 py-10 text-center text-base text-stone-500 shadow-[0_18px_40px_rgba(221,156,130,0.10)] sm:text-lg">
+      {message}
+    </div>
+  );
+}
+
+function StudentMessageCard({
+  message,
+  onOpen,
+}: {
+  message: TeacherStudentMessage;
+  onOpen: (messageId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(message.id)}
+      className="w-full rounded-[24px] border border-orange-100/80 bg-white/92 px-5 py-5 text-left shadow-[0_18px_40px_rgba(221,156,130,0.10)] transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_22px_45px_rgba(221,156,130,0.14)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-lg font-medium text-stone-700 sm:text-xl">{message.title}</h3>
+          <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-stone-500 sm:text-base">
+            {message.body}
+          </p>
+        </div>
+        {!message.is_read_by_student ? (
+          <span className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-600">
+            Новое
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-4 text-xs text-stone-400 sm:text-sm">{formatMessageDate(message.created_at)}</p>
+    </button>
+  );
+}
+
+function StudentMessageDetailCard({
+  message,
+  onBack,
+}: {
+  message: TeacherStudentMessage;
+  onBack: () => void;
+}) {
+  return (
+    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад к сообщениям
+      </button>
+
+      <div className="mx-auto mt-6 w-full max-w-3xl rounded-[28px] border border-orange-100/70 bg-white/80 px-5 py-6 sm:px-6 sm:py-7">
+        <p className="text-sm text-stone-400 sm:text-base">{formatMessageDate(message.created_at)}</p>
+        <h2 className="mt-3 text-2xl font-medium text-stone-700 sm:text-3xl">{message.title}</h2>
+        <div className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-stone-600 sm:text-lg">
+          {message.body}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StudentMessagesSection({
+  accessToken,
+  viewState,
+  onOpenMessage,
+  onBackToList,
+}: {
+  accessToken: string;
+  viewState: StudentMessagesViewState;
+  onOpenMessage: (messageId: string) => void;
+  onBackToList: () => void;
+}) {
+  const [messages, setMessages] = useState<TeacherStudentMessage[]>([]);
+  const [messagesListResponse, setMessagesListResponse] = useState<TeacherStudentMessagesResponse | null>(null);
+  const [isMessagesLoading, setIsMessagesLoading] = useState(true);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<TeacherStudentMessage | null>(null);
+  const [isMessageDetailLoading, setIsMessageDetailLoading] = useState(false);
+  const [messageDetailError, setMessageDetailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMessages = async () => {
+      setIsMessagesLoading(true);
+      setMessagesError(null);
+
+      try {
+        const response = await getStudentMessages(accessToken);
+        if (!isMounted) {
+          return;
+        }
+
+        setMessages(response.items);
+        setMessagesListResponse(response);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setMessages([]);
+        setMessagesListResponse(null);
+        setMessagesError(error instanceof Error ? error.message : 'Не удалось загрузить сообщения.');
+      } finally {
+        if (isMounted) {
+          setIsMessagesLoading(false);
+        }
+      }
+    };
+
+    void loadMessages();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (viewState.mode !== 'detail') {
+      setSelectedMessage(null);
+      setMessageDetailError(null);
+      setIsMessageDetailLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadMessageDetail = async () => {
+      setIsMessageDetailLoading(true);
+      setMessageDetailError(null);
+
+      try {
+        const message = await getStudentMessageDetail(accessToken, viewState.messageId);
+        if (!isMounted) {
+          return;
+        }
+
+        let detailMessage = message;
+
+        if (!message.is_read_by_student) {
+          detailMessage = await markStudentMessageAsRead(accessToken, viewState.messageId);
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedMessage(detailMessage);
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === detailMessage.id ? detailMessage : currentMessage,
+          ),
+        );
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedMessage(null);
+        setMessageDetailError(error instanceof Error ? error.message : 'Не удалось загрузить сообщение.');
+      } finally {
+        if (isMounted) {
+          setIsMessageDetailLoading(false);
+        }
+      }
+    };
+
+    void loadMessageDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken, viewState]);
+
+  if (viewState.mode === 'detail') {
+    if (isMessageDetailLoading) {
+      return <StudentMessagesState message="Загрузка сообщения..." />;
+    }
+
+    if (messageDetailError) {
+      return <StudentMessagesState message={messageDetailError} />;
+    }
+
+    if (!selectedMessage) {
+      return <StudentMessagesState message="Не удалось загрузить сообщение." />;
+    }
+
+    return <StudentMessageDetailCard message={selectedMessage} onBack={onBackToList} />;
+  }
+
+  let content;
+
+  if (isMessagesLoading) {
+    content = <StudentMessagesState message="Загрузка сообщений..." />;
+  } else if (messagesError) {
+    content = <StudentMessagesState message={messagesError} />;
+  } else if ((messagesListResponse?.items.length ?? 0) === 0) {
+    content = <StudentMessagesState message="Сообщений пока нет" />;
+  } else {
+    content = (
+      <div className="space-y-4">
+        {messages.map((message) => (
+          <StudentMessageCard key={message.id} message={message} onOpen={onOpenMessage} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section>
+      <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Сообщения</h2>
+      <p className="mt-3 max-w-3xl text-base leading-relaxed text-stone-500 sm:text-lg">
+        Здесь отображаются сообщения от преподавателя, отправленные внутри системы.
+      </p>
+      <div className="mt-6">{content}</div>
+    </section>
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <div className="flex min-h-screen flex-col bg-[linear-gradient(180deg,#fff9f5_0%,#fdf2eb_100%)] text-stone-700">
@@ -472,6 +748,8 @@ export function StudentDashboard() {
   const [regularSubmittedNotice, setRegularSubmittedNotice] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'error' | 'success'>('success');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [messagesViewState, setMessagesViewState] = useState<StudentMessagesViewState>({ mode: 'list' });
 
   useEffect(() => {
     let isMounted = true;
@@ -498,6 +776,7 @@ export function StudentDashboard() {
           setCurrentUser(user);
           setProfile(studentProfile);
           setForm(buildFormState(studentProfile));
+          setAccessToken(token);
           setActiveSection(studentProfile.student_mode === 'regular' ? 'profile' : 'profile');
           setIsCheckingAuth(false);
         }
@@ -515,6 +794,7 @@ export function StudentDashboard() {
   }, [router]);
 
   const handleLogout = () => {
+    setAccessToken(null);
     clearAccessToken();
     router.replace('/login');
   };
@@ -615,20 +895,33 @@ export function StudentDashboard() {
     const timeoutId = window.setTimeout(() => {
       if (requestedTab === 'materials' && profile.student_mode === 'regular') {
         setActiveSection('materials');
+        setMessagesViewState({ mode: 'list' });
         return;
       }
 
       if (requestedTab === 'tests' && profile.student_mode === 'regular') {
         setActiveSection('tests');
+        setMessagesViewState({ mode: 'list' });
         return;
       }
 
       if (requestedTab === 'edit-profile' || requestedTab === 'profile-edit') {
         setActiveSection(profile.student_mode === 'regular' ? 'edit-profile' : 'profile');
+        setMessagesViewState({ mode: 'list' });
+        return;
+      }
+
+      if (requestedTab === 'messages' && profile.student_mode === 'regular') {
+        setActiveSection('messages');
+        const requestedMessageId = searchParams.get('messageId');
+        setMessagesViewState(
+          requestedMessageId ? { mode: 'detail', messageId: requestedMessageId } : { mode: 'list' },
+        );
         return;
       }
 
       setActiveSection('profile');
+      setMessagesViewState({ mode: 'list' });
     }, 0);
 
     return () => {
@@ -636,7 +929,15 @@ export function StudentDashboard() {
     };
   }, [profile, searchParams]);
 
-  if (isCheckingAuth || !currentUser || !profile) {
+  const handleSectionChange = (section: StudentDashboardSection) => {
+    setActiveSection(section);
+
+    if (section !== 'messages') {
+      setMessagesViewState({ mode: 'list' });
+    }
+  };
+
+  if (isCheckingAuth || !currentUser || !profile || !accessToken) {
     return <DashboardSkeleton />;
   }
 
@@ -644,6 +945,10 @@ export function StudentDashboard() {
   const headerTitle =
     activeSection === 'edit-profile'
       ? 'Редактирование профиля'
+      : activeSection === 'messages' && messagesViewState.mode === 'detail'
+        ? 'Сообщение'
+        : activeSection === 'messages'
+          ? 'Сообщения'
       : activeSection === 'materials'
         ? 'Учебные материалы'
         : activeSection === 'tests'
@@ -683,7 +988,7 @@ export function StudentDashboard() {
                       <li key={item.id}>
                         <button
                           type="button"
-                          onClick={() => setActiveSection(item.id)}
+                          onClick={() => handleSectionChange(item.id)}
                           className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
@@ -703,6 +1008,7 @@ export function StudentDashboard() {
             <section className="rounded-[28px] border border-orange-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,247,242,0.4))] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
               <StudentSectionContent
                 activeSection={activeSection}
+                accessToken={accessToken}
                 profile={profile}
                 form={form}
                 onChange={handleFormChange}
@@ -713,6 +1019,9 @@ export function StudentDashboard() {
                 regularSubmittedNotice={regularSubmittedNotice}
                 statusMessage={statusMessage}
                 statusType={statusType}
+                messagesViewState={messagesViewState}
+                onOpenMessage={(messageId) => setMessagesViewState({ mode: 'detail', messageId })}
+                onBackToMessagesList={() => setMessagesViewState({ mode: 'list' })}
               />
             </section>
           </div>

@@ -1,14 +1,22 @@
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_student, get_db
 from app.models.user import User
 from app.schemas.student_profile import StudentProfileResponse, StudentProfileUpdateRequest
+from app.schemas.teacher_student_messages import TeacherStudentMessageItem, TeacherStudentMessagesListResponse
 from app.services.student_profile_service import (
     get_or_create_student_profile,
     get_student_mode,
     submit_student_profile,
     update_student_profile,
+)
+from app.services.teacher_student_messages_service import (
+    get_student_message,
+    list_student_messages,
+    mark_student_message_as_read,
 )
 
 router = APIRouter(prefix="/student", tags=["Student"])
@@ -65,3 +73,32 @@ def submit_current_student_profile(
     profile = get_or_create_student_profile(db, current_student.id)
     submitted_profile = submit_student_profile(db, profile=profile)
     return build_student_profile_response(db, submitted_profile)
+
+
+@router.get("/messages", response_model=TeacherStudentMessagesListResponse)
+def read_student_messages(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return list_student_messages(db, student_user_id=current_student.id)
+
+
+@router.get("/messages/{message_id}", response_model=TeacherStudentMessageItem)
+def read_student_message(
+    message_id: UUID,
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    message = get_student_message(db, student_user_id=current_student.id, message_id=message_id)
+    if message is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return message
+
+
+@router.post("/messages/{message_id}/read", response_model=TeacherStudentMessageItem)
+def read_student_message_as_read(
+    message_id: UUID,
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return mark_student_message_as_read(db, student_user_id=current_student.id, message_id=message_id)

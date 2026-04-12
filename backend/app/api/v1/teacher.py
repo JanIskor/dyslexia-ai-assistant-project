@@ -12,6 +12,7 @@ from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentsListResponse,
 )
 from app.schemas.teacher_profile import TeacherProfileResponse
+from app.schemas.teacher_student_messages import TeacherStudentMessageCreateRequest, TeacherStudentMessageItem
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_profile_service import get_teacher_profile
 from app.services.teacher_incoming_students_service import (
@@ -20,6 +21,7 @@ from app.services.teacher_incoming_students_service import (
     list_teacher_incoming_students,
     reject_teacher_incoming_student,
 )
+from app.services.teacher_student_messages_service import create_teacher_student_message
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
@@ -67,6 +69,21 @@ def read_teacher_student(
     if student is None:
         raise HTTPException(status_code=404, detail="Student not found")
     return student
+
+
+@router.post("/students/{student_id}/messages", response_model=TeacherStudentMessageItem)
+def create_teacher_student_message_endpoint(
+    student_id: UUID,
+    payload: TeacherStudentMessageCreateRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return create_teacher_student_message(
+        db,
+        teacher_user_id=current_teacher.id,
+        student_user_id=student_id,
+        payload=payload,
+    )
 
 
 @router.get("/incoming-students", response_model=TeacherIncomingStudentsListResponse)

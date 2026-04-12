@@ -24,6 +24,15 @@ export function getNotificationHref(notification: NotificationItem): string | nu
       return '/student?tab=profile-edit';
     case 'student_profile':
       return '/student?tab=profile';
+    case 'student_messages': {
+      const searchParams = new URLSearchParams({ tab: 'messages' });
+
+      if (notification.target_id) {
+        searchParams.set('messageId', notification.target_id);
+      }
+
+      return `/student?${searchParams.toString()}`;
+    }
     default:
       return null;
   }

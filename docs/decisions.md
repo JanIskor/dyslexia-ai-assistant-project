@@ -258,6 +258,28 @@ backend/
 - Используются `/admin`, `/teacher`, `/student` с query params вроде `tab` и `applicationId` / `studentId`.
 - Причина: это даёт deep-link-like поведение без nested routing, отдельного notification center и переписывания dashboard layout.
 
+## Решения шага 3.2.4.11: Teacher-To-Student Communication Foundation
+
+### Teacher message хранится отдельно от notifications
+- Добавлена таблица `teacher_student_messages`.
+- Причина: сообщение преподавателя является самостоятельной доменной сущностью с собственным read-state, а notification здесь играет только роль delivery signal.
+
+### Teacher может писать только ученику из своей текущей связки
+- Перед созданием сообщения backend проверяет наличие записи в `teacher_students`.
+- Причина: это минимальная и достаточная бизнес-валидация без нового permission layer.
+
+### Student messages вынесены в отдельную вкладку dashboard, а не в notifications dropdown
+- Sidebar student dashboard получил раздел `Сообщения`, где есть список и detail-view.
+- Причина: содержательные teacher сообщения длиннее обычных уведомлений и требуют отдельного места для чтения.
+
+### Открытие сообщения автоматически помечает его прочитанным
+- При загрузке detail-view frontend вызывает `POST /student/messages/{id}/read`, если сообщение ещё не прочитано.
+- Причина: это делает UX ближе к обычной inbox-модели без отдельней кнопки внутри message detail.
+
+### Notifications routing переиспользован вместо нового messaging router
+- Notification `teacher_message_received` ведёт в существующий `/student` route с `tab=messages&messageId=...`.
+- Причина: это сохраняет уже принятый query-param подход и не требует переписывать dashboard layout или вводить nested routes.
+
 ### Для `useSearchParams` оставлены существующие client dashboards
 - `/admin`, `/teacher`, `/student` page entrypoints обёрнуты в `Suspense`.
 - Причина: это минимальная совместимая интеграция с App Router без redesign страниц.

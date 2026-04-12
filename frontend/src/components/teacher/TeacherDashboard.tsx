@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, LogOut, Search, SlidersHorizontal, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, Search, Send, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
@@ -30,6 +30,7 @@ import {
   type TeacherIncomingStudentListItem,
 } from '@/lib/teacherIncomingStudentsApi';
 import { getTeacherProfile, type TeacherProfile } from '@/lib/teacherProfileApi';
+import { sendTeacherStudentMessage } from '@/lib/teacherStudentMessagesApi';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'assistant';
 
@@ -283,9 +284,25 @@ function IncomingStudentCard({
 function StudentDetailProfile({
   student,
   onBack,
+  messageTitle,
+  messageBody,
+  onMessageTitleChange,
+  onMessageBodyChange,
+  onSendMessage,
+  isSendingMessage,
+  sendStatusMessage,
+  sendStatusType,
 }: {
   student: TeacherStudentDetail;
   onBack: () => void;
+  messageTitle: string;
+  messageBody: string;
+  onMessageTitleChange: (value: string) => void;
+  onMessageBodyChange: (value: string) => void;
+  onSendMessage: () => void;
+  isSendingMessage: boolean;
+  sendStatusMessage: string | null;
+  sendStatusType: 'error' | 'success';
 }) {
   const detailFields: TeacherProfileField[] = [
     { label: 'Дата рождения:', value: formatProfileDate(student.birth_date) },
@@ -334,6 +351,73 @@ function StudentDetailProfile({
               </div>
             ))}
           </dl>
+        </div>
+
+        <div className="mt-8 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 text-left sm:px-5 sm:py-6">
+          <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Сообщение ученику</h3>
+          <p className="mt-2 text-sm leading-relaxed text-stone-500 sm:text-base">
+            Отправьте ученику содержательное сообщение внутри системы.
+          </p>
+
+          <div className="mt-5 space-y-4">
+            <div>
+              <label
+                htmlFor="teacher-message-title"
+                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+              >
+                Заголовок
+              </label>
+              <input
+                id="teacher-message-title"
+                type="text"
+                value={messageTitle}
+                onChange={(event) => onMessageTitleChange(event.target.value)}
+                className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+                placeholder="Введите заголовок сообщения"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="teacher-message-body"
+                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+              >
+                Текст сообщения
+              </label>
+              <textarea
+                id="teacher-message-body"
+                value={messageBody}
+                onChange={(event) => onMessageBodyChange(event.target.value)}
+                rows={6}
+                className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+                placeholder="Введите сообщение для ученика"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onSendMessage}
+              disabled={isSendingMessage}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send className="h-4 w-4" />
+              {isSendingMessage ? 'Отправляем...' : 'Отправить сообщение'}
+            </button>
+          </div>
+
+          {sendStatusMessage ? (
+            <p
+              className={`mt-5 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
+                sendStatusType === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-red-200 bg-red-50 text-red-700'
+              }`}
+            >
+              {sendStatusMessage}
+            </p>
+          ) : null}
         </div>
       </div>
     </section>
@@ -581,6 +665,11 @@ function TeacherStudentsSection({
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
+  const [messageTitle, setMessageTitle] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [sendStatusMessage, setSendStatusMessage] = useState<string | null>(null);
+  const [sendStatusType, setSendStatusType] = useState<'error' | 'success'>('success');
 
   useEffect(() => {
     setCurrentPage(1);
@@ -656,6 +745,9 @@ function TeacherStudentsSection({
       setSelectedStudent(null);
       setStudentDetailError(null);
       setIsStudentDetailLoading(false);
+      setMessageTitle('');
+      setMessageBody('');
+      setSendStatusMessage(null);
       return;
     }
 
@@ -704,6 +796,39 @@ function TeacherStudentsSection({
     };
   }, [accessToken, selectedStudent?.id, viewState]);
 
+  const handleSendMessage = async () => {
+    if (viewState.mode !== 'detail') {
+      return;
+    }
+
+    if (!messageTitle.trim() || !messageBody.trim()) {
+      setSendStatusType('error');
+      setSendStatusMessage('Заполните заголовок и текст сообщения.');
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setSendStatusMessage(null);
+
+    try {
+      await sendTeacherStudentMessage(accessToken, viewState.studentId, {
+        title: messageTitle,
+        body: messageBody,
+      });
+      setMessageTitle('');
+      setMessageBody('');
+      setSendStatusType('success');
+      setSendStatusMessage('Сообщение отправлено ученику.');
+    } catch (error) {
+      setSendStatusType('error');
+      setSendStatusMessage(
+        error instanceof Error ? error.message : 'Не удалось отправить сообщение.',
+      );
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   if (viewState.mode === 'detail') {
     if (isStudentDetailLoading) {
       return <StudentsListState message="Загрузка профиля ученика..." />;
@@ -717,7 +842,20 @@ function TeacherStudentsSection({
       return <StudentsListState message="Не удалось загрузить профиль ученика" />;
     }
 
-    return <StudentDetailProfile student={selectedStudent} onBack={onBackToList} />;
+    return (
+      <StudentDetailProfile
+        student={selectedStudent}
+        onBack={onBackToList}
+        messageTitle={messageTitle}
+        messageBody={messageBody}
+        onMessageTitleChange={setMessageTitle}
+        onMessageBodyChange={setMessageBody}
+        onSendMessage={() => void handleSendMessage()}
+        isSendingMessage={isSendingMessage}
+        sendStatusMessage={sendStatusMessage}
+        sendStatusType={sendStatusType}
+      />
+    );
   }
 
   let listContent: ReactNode;

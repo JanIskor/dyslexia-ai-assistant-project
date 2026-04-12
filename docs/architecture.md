@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Notification Routing And Read-Flow Polish
+## Текущая фаза: Teacher-To-Student Communication Foundation
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation и базовые in-app notifications уже реализованы. Поверх этого добавлен routing context уведомлений и polished read-flow для dropdown.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation, in-app notifications и notification routing уже реализованы. Поверх этого добавлен foundation внутренней односторонней коммуникации teacher → student.
 
 ### Tech Stack
 ```
@@ -49,18 +49,21 @@ app/
 │   ├── student_profile.py
 │   ├── teacher_profile.py
 │   ├── teacher_student.py
+│   ├── teacher_student_message.py
 │   └── teacher_student_rejection.py
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
 │   ├── admin_applications.py
 │   ├── notifications.py
 │   ├── student_profile.py
+│   ├── teacher_student_messages.py
 │   └── teacher_students.py
 ├── services/       # Бизнес-логика
 │   ├── admin_applications_service.py
 │   ├── auth_service.py
 │   ├── notifications_service.py
 │   ├── student_profile_service.py
+│   ├── teacher_student_messages_service.py
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
 │   ├── create_teacher_user.py
@@ -120,11 +123,44 @@ lib/
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
 ├── notificationsApi.ts # Запросы notifications list/unread/read
+├── teacherStudentMessagesApi.ts # Teacher send + student read messages
 ├── studentProfileApi.ts # Запросы student self-profile
 ├── teacherStudentsApi.ts # Запросы teacher students list/detail
 ├── authValidators.ts
 └── [другие helpers]
 ```
+
+## Teacher-To-Student Messaging Foundation
+
+### Таблица `teacher_student_messages`
+- `id`
+- `teacher_user_id`
+- `student_user_id`
+- `title`
+- `body`
+- `is_read_by_student`
+- `created_at`
+
+### API
+- `POST /api/v1/teacher/students/{student_id}/messages`
+- `GET /api/v1/student/messages`
+- `GET /api/v1/student/messages/{message_id}`
+- `POST /api/v1/student/messages/{message_id}/read`
+
+### Backend flow
+- teacher endpoint проверяет, что связь teacher ↔ student существует в `teacher_students`
+- сообщение сохраняется как отдельная сущность, а не как запись в `notifications`
+- после сохранения student получает notification `teacher_message_received`
+- notification использует:
+  - `target_view = student_messages`
+  - `action_key = open_detail`
+  - `target_id = id сообщения`
+
+### Frontend flow
+- teacher отправляет сообщение из карточки конкретного ученика в `TeacherDashboard`
+- student открывает вкладку `Сообщения` в `StudentDashboard`
+- при открытии detail-view непрочитанное сообщение автоматически переводится в `is_read_by_student = true`
+- notifications routing может открыть `/student?tab=messages&messageId=...`
 
 ## Notifications Foundation
 
@@ -162,6 +198,7 @@ lib/
 - `admin_applications` → `/admin?tab=applications&applicationId=...`
 - `student_profile_edit` → `/student?tab=profile-edit`
 - `student_profile` → `/student?tab=profile`
+- `student_messages` → `/student?tab=messages&messageId=...`
 
 ### Почему dropdown
 - уже существовал header icon
