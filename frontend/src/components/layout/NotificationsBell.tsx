@@ -2,6 +2,8 @@
 
 import { Bell, CheckCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getNotificationHref } from '@/lib/notificationRouting';
 import {
   getNotifications,
   getUnreadNotificationsCount,
@@ -26,6 +28,7 @@ function formatNotificationDate(value: string): string {
 }
 
 export function NotificationsBell({ token }: { token: string }) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -71,7 +74,7 @@ export function NotificationsBell({ token }: { token: string }) {
 
       try {
         const [notificationsResponse, unreadCountResponse] = await Promise.all([
-          getNotifications(token),
+          getNotifications(token, { onlyUnread: true }),
           getUnreadNotificationsCount(token),
         ]);
 
@@ -116,15 +119,33 @@ export function NotificationsBell({ token }: { token: string }) {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const updatedNotification = await markNotificationAsRead(token, notificationId);
+      await markNotificationAsRead(token, notificationId);
       setNotifications((currentNotifications) =>
-        currentNotifications.map((notification) =>
-          notification.id === updatedNotification.id ? updatedNotification : notification
-        )
+        currentNotifications.filter((notification) => notification.id !== notificationId)
       );
       setUnreadCount((currentCount) => Math.max(0, currentCount - 1));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Не удалось отметить уведомление прочитанным.');
+    }
+  };
+
+  const handleNotificationClick = async (notification: NotificationItem) => {
+    setErrorMessage(null);
+
+    try {
+      await markNotificationAsRead(token, notification.id);
+      setNotifications((currentNotifications) =>
+        currentNotifications.filter((currentNotification) => currentNotification.id !== notification.id)
+      );
+      setUnreadCount((currentCount) => Math.max(0, currentCount - 1));
+      setIsOpen(false);
+
+      const href = getNotificationHref(notification);
+      if (href) {
+        router.push(href);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Не удалось открыть уведомление.');
     }
   };
 
@@ -134,12 +155,7 @@ export function NotificationsBell({ token }: { token: string }) {
 
     try {
       await markAllNotificationsAsRead(token);
-      setNotifications((currentNotifications) =>
-        currentNotifications.map((notification) => ({
-          ...notification,
-          is_read: true,
-        }))
-      );
+      setNotifications([]);
       setUnreadCount(0);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Не удалось отметить уведомления прочитанными.');
@@ -197,32 +213,29 @@ export function NotificationsBell({ token }: { token: string }) {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`rounded-[20px] border px-4 py-3 shadow-sm ${
-                    notification.is_read
-                      ? 'border-stone-200 bg-stone-50/80'
-                      : 'border-orange-200 bg-orange-50/70'
-                  }`}
+                  className="rounded-[20px] border border-orange-200 bg-orange-50/70 px-4 py-3 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => void handleNotificationClick(notification)}
+                      className="min-w-0 flex-1 rounded-2xl text-left outline-none transition hover:bg-white/30 focus-visible:ring-2 focus-visible:ring-orange-200"
+                    >
                       <p className="text-sm font-medium text-stone-700">{notification.title}</p>
                       <p className="mt-1 text-sm leading-relaxed text-stone-500">{notification.message}</p>
                       <p className="mt-2 text-xs text-stone-400">{formatNotificationDate(notification.created_at)}</p>
-                    </div>
+                    </button>
 
-                    {!notification.is_read ? (
-                      <button
-                        type="button"
-                        onClick={() => handleMarkAsRead(notification.id)}
-                        className="shrink-0 rounded-xl border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-orange-600 transition hover:bg-orange-50"
-                      >
-                        Прочитать
-                      </button>
-                    ) : (
-                      <span className="shrink-0 rounded-xl bg-stone-200 px-3 py-1.5 text-xs font-medium text-stone-500">
-                        Прочитано
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleMarkAsRead(notification.id);
+                      }}
+                      className="shrink-0 rounded-xl border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-orange-600 transition hover:bg-orange-50"
+                    >
+                      Прочитать
+                    </button>
                   </div>
                 </div>
               ))

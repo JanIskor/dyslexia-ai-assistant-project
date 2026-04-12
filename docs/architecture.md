@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: In-App Notifications Foundation
+## Текущая фаза: Notification Routing And Read-Flow Polish
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation и teacher incoming review foundation уже реализованы. Поверх этого система получает foundation внутренних уведомлений и unread badge counters для student / teacher / admin.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation и базовые in-app notifications уже реализованы. Поверх этого добавлен routing context уведомлений и polished read-flow для dropdown.
 
 ### Tech Stack
 ```
@@ -135,11 +135,15 @@ lib/
 - `type`
 - `title`
 - `message`
+- `target_view`
+- `action_key`
+- `target_id`
 - `is_read`
 - `created_at`
 
 ### API
 - `GET /api/v1/notifications`
+- `GET /api/v1/notifications?only_unread=true`
 - `GET /api/v1/notifications/unread-count`
 - `POST /api/v1/notifications/{notification_id}/read`
 - `POST /api/v1/notifications/read-all`
@@ -147,13 +151,22 @@ lib/
 ### Frontend flow
 - bell icon в header делает `GET /notifications/unread-count`
 - по клику открывается компактный dropdown
-- dropdown делает `GET /notifications`
-- внутри доступны `mark as read` и `mark all as read`
+- dropdown делает `GET /notifications?only_unread=true`
+- клик по телу уведомления делает `mark as read` и затем `router.push(...)`
+- кнопка `Прочитать` делает только `mark as read`
+- после прочтения уведомление сразу исчезает из dropdown
+
+### Routing mapping
+- `teacher_incoming_students` → `/teacher?tab=incoming-students&studentId=...`
+- `admin_applications` → `/admin?tab=applications&applicationId=...`
+- `student_profile_edit` → `/student?tab=profile-edit`
+- `student_profile` → `/student?tab=profile`
 
 ### Почему dropdown
 - уже существовал header icon
 - не нужен отдельный route
 - текущие dashboards не пришлось переписывать
+- query params достаточно для открытия нужной вкладки и правой карточки без новой routing subsystem
 
 ## Data Flow admin reassignment restrictions
 

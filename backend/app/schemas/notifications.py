@@ -10,6 +10,9 @@ class NotificationItem(BaseModel):
     type: str
     title: str
     message: str
+    target_view: str | None = None
+    action_key: str | None = None
+    target_id: UUID | None = None
     is_read: bool
     created_at: datetime
 

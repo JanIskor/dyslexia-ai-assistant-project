@@ -6,6 +6,9 @@ export interface NotificationItem {
   type: string;
   title: string;
   message: string;
+  target_view: string | null;
+  action_key: string | null;
+  target_id: string | null;
   is_read: boolean;
   created_at: string;
 }
@@ -69,8 +72,19 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
   return parseJson<T>(response);
 }
 
-export const getNotifications = async (token: string): Promise<NotificationsResponse> =>
-  request<NotificationsResponse>('/api/v1/notifications', token, { method: 'GET' });
+export const getNotifications = async (
+  token: string,
+  options?: { onlyUnread?: boolean },
+): Promise<NotificationsResponse> => {
+  const searchParams = new URLSearchParams();
+
+  if (options?.onlyUnread) {
+    searchParams.set('only_unread', 'true');
+  }
+
+  const path = searchParams.size > 0 ? `/api/v1/notifications?${searchParams.toString()}` : '/api/v1/notifications';
+  return request<NotificationsResponse>(path, token, { method: 'GET' });
+};
 
 export const getUnreadNotificationsCount = async (
   token: string,

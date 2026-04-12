@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, LogOut, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
@@ -1044,6 +1044,7 @@ function DashboardSkeleton() {
 
 export function TeacherDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<TeacherDashboardSection>('profile');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
@@ -1101,6 +1102,45 @@ export function TeacherDashboard() {
       isMounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    const requestedStudentId = searchParams.get('studentId');
+    const timeoutId = window.setTimeout(() => {
+      if (requestedTab === 'incoming-students') {
+        setActiveSection('incoming-students');
+        setStudentsViewState({ mode: 'list' });
+        setIncomingStudentsViewState(
+          requestedStudentId ? { mode: 'detail', studentId: requestedStudentId } : { mode: 'list' },
+        );
+        return;
+      }
+
+      if (requestedTab === 'students') {
+        setActiveSection('students');
+        setIncomingStudentsViewState({ mode: 'list' });
+        setStudentsViewState(
+          requestedStudentId ? { mode: 'detail', studentId: requestedStudentId } : { mode: 'list' },
+        );
+        return;
+      }
+
+      if (requestedTab === 'assistant') {
+        setActiveSection('assistant');
+        setStudentsViewState({ mode: 'list' });
+        setIncomingStudentsViewState({ mode: 'list' });
+        return;
+      }
+
+      setActiveSection('profile');
+      setStudentsViewState({ mode: 'list' });
+      setIncomingStudentsViewState({ mode: 'list' });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchParams]);
 
   const handleLogout = () => {
     setCurrentUser(null);

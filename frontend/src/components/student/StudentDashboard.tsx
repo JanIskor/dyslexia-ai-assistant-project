@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogOut, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
@@ -456,6 +456,7 @@ function DashboardSkeleton() {
 
 export function StudentDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<StudentDashboardSection>('profile');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
@@ -604,6 +605,36 @@ export function StudentDashboard() {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    const requestedTab = searchParams.get('tab');
+    const timeoutId = window.setTimeout(() => {
+      if (requestedTab === 'materials' && profile.student_mode === 'regular') {
+        setActiveSection('materials');
+        return;
+      }
+
+      if (requestedTab === 'tests' && profile.student_mode === 'regular') {
+        setActiveSection('tests');
+        return;
+      }
+
+      if (requestedTab === 'edit-profile' || requestedTab === 'profile-edit') {
+        setActiveSection(profile.student_mode === 'regular' ? 'edit-profile' : 'profile');
+        return;
+      }
+
+      setActiveSection('profile');
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [profile, searchParams]);
 
   if (isCheckingAuth || !currentUser || !profile) {
     return <DashboardSkeleton />;

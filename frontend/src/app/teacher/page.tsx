@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 
 export default function TeacherPage() {
-  return <TeacherDashboard />;
+  return (
+    <Suspense fallback={null}>
+      <TeacherDashboard />
+    </Suspense>
+  );
 }

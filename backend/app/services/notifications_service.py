@@ -16,6 +16,9 @@ def _build_notification_item(notification: Notification) -> NotificationItem:
         type=notification.type,
         title=notification.title,
         message=notification.message,
+        target_view=notification.target_view,
+        action_key=notification.action_key,
+        target_id=notification.target_id,
         is_read=notification.is_read,
         created_at=notification.created_at,
     )
@@ -29,6 +32,9 @@ def create_notification(
     type: str,
     title: str,
     message: str,
+    target_view: str | None = None,
+    action_key: str | None = None,
+    target_id: UUID | None = None,
 ) -> Notification:
     notification = Notification(
         user_id=user_id,
@@ -36,6 +42,9 @@ def create_notification(
         type=type,
         title=title,
         message=message,
+        target_view=target_view,
+        action_key=action_key,
+        target_id=target_id,
     )
     db.add(notification)
     return notification
@@ -48,6 +57,9 @@ def create_notifications_for_role(
     type: str,
     title: str,
     message: str,
+    target_view: str | None = None,
+    action_key: str | None = None,
+    target_id: UUID | None = None,
 ) -> None:
     recipient_ids = [
         row.id
@@ -67,16 +79,24 @@ def create_notifications_for_role(
             type=type,
             title=title,
             message=message,
+            target_view=target_view,
+            action_key=action_key,
+            target_id=target_id,
         )
 
 
-def list_user_notifications(db: Session, *, user_id: UUID) -> NotificationsListResponse:
-    notifications = (
-        db.query(Notification)
-        .filter(Notification.user_id == user_id)
-        .order_by(Notification.created_at.desc())
-        .all()
-    )
+def list_user_notifications(
+    db: Session,
+    *,
+    user_id: UUID,
+    only_unread: bool = False,
+) -> NotificationsListResponse:
+    query = db.query(Notification).filter(Notification.user_id == user_id)
+
+    if only_unread:
+        query = query.filter(Notification.is_read.is_(False))
+
+    notifications = query.order_by(Notification.created_at.desc()).all()
     return NotificationsListResponse(items=[_build_notification_item(notification) for notification in notifications])
 
 

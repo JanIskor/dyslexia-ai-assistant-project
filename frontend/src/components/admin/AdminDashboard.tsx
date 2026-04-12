@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
@@ -47,7 +47,13 @@ function DashboardSkeleton() {
   );
 }
 
-function ApplicationsPanel({ token }: { token: string }) {
+function ApplicationsPanel({
+  token,
+  initialApplicationId,
+}: {
+  token: string;
+  initialApplicationId: string | null;
+}) {
   const [searchValue, setSearchValue] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState<AdminApplicationStatusFilterOption[]>([]);
@@ -70,6 +76,10 @@ function ApplicationsPanel({ token }: { token: string }) {
   const [isAssigningTeacher, setIsAssigningTeacher] = useState(false);
   const [selectedTeacherUserId, setSelectedTeacherUserId] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedApplicationId(initialApplicationId);
+  }, [initialApplicationId]);
 
   const isProfileCompleteForAssignment = (application: AdminApplicationDetail) =>
     Boolean(
@@ -398,11 +408,19 @@ function ApplicationsPanel({ token }: { token: string }) {
   );
 }
 
-function AdminSectionContent({ section, token }: { section: AdminDashboardSection; token: string }) {
+function AdminSectionContent({
+  section,
+  token,
+  initialApplicationId,
+}: {
+  section: AdminDashboardSection;
+  token: string;
+  initialApplicationId: string | null;
+}) {
   const title = section === 'student-applications' ? 'Заявки учеников' : section === 'teachers' ? 'Преподаватели' : 'Ученики';
 
   if (section === 'student-applications') {
-    return <ApplicationsPanel token={token} />;
+    return <ApplicationsPanel token={token} initialApplicationId={initialApplicationId} />;
   }
 
   return (
@@ -417,7 +435,9 @@ function AdminSectionContent({ section, token }: { section: AdminDashboardSectio
 
 export function AdminDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<AdminDashboardSection>('student-applications');
+  const [initialApplicationId, setInitialApplicationId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -456,6 +476,31 @@ export function AdminDashboard() {
       isMounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    const requestedApplicationId = searchParams.get('applicationId');
+    const timeoutId = window.setTimeout(() => {
+      if (requestedTab === 'teachers') {
+        setActiveSection('teachers');
+        setInitialApplicationId(null);
+        return;
+      }
+
+      if (requestedTab === 'students') {
+        setActiveSection('students');
+        setInitialApplicationId(null);
+        return;
+      }
+
+      setActiveSection('student-applications');
+      setInitialApplicationId(requestedApplicationId);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchParams]);
 
   const handleLogout = () => {
     clearAccessToken();
@@ -516,7 +561,11 @@ export function AdminDashboard() {
             </aside>
 
             <div className="min-w-0">
-              <AdminSectionContent section={activeSection} token={getAccessToken() ?? ''} />
+              <AdminSectionContent
+                section={activeSection}
+                token={getAccessToken() ?? ''}
+                initialApplicationId={initialApplicationId}
+              />
             </div>
           </div>
         </div>

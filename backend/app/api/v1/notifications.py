@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -34,10 +34,11 @@ def get_current_user_for_notifications(
 
 @router.get("", response_model=NotificationsListResponse)
 def read_notifications(
+    only_unread: bool = Query(default=False),
     current_user: User = Depends(get_current_user_for_notifications),
     db: Session = Depends(get_db),
 ):
-    return list_user_notifications(db, user_id=current_user.id)
+    return list_user_notifications(db, user_id=current_user.id, only_unread=only_unread)
 
 
 @router.get("/unread-count", response_model=NotificationUnreadCountResponse)

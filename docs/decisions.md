@@ -238,6 +238,30 @@ backend/
 
 ## Решения шага 3.2.3.1: Frontend Integration Teacher Students
 
+## Решения шага 3.2.4.10: Notification Routing And Read-Flow Polish
+
+### Уведомление связано не с frontend-компонентом, а с product target metadata
+- В `notifications` добавлены `target_view`, `action_key`, `target_id`.
+- Причина: backend описывает intent перехода, а frontend сам переводит его в конкретный route/query params без жёсткой привязки к внутренним React state names.
+
+### Dropdown показывает только unread
+- `GET /api/v1/notifications` получил параметр `only_unread`.
+- Bell dropdown теперь всегда запрашивает только непрочитанные уведомления.
+- Причина: прочитанные элементы не должны повторно захламлять компактный header UI.
+
+### Read + navigate и read only разведены в два независимых user action
+- Клик по основной области уведомления делает `POST /read`, затем `router.push(...)`.
+- Кнопка `Прочитать` делает только `POST /read`.
+- Причина: пользователь должен явно различать «открыть связанное место» и «просто убрать уведомление».
+
+### Routing сделан через query params существующих dashboard routes
+- Используются `/admin`, `/teacher`, `/student` с query params вроде `tab` и `applicationId` / `studentId`.
+- Причина: это даёт deep-link-like поведение без nested routing, отдельного notification center и переписывания dashboard layout.
+
+### Для `useSearchParams` оставлены существующие client dashboards
+- `/admin`, `/teacher`, `/student` page entrypoints обёрнуты в `Suspense`.
+- Причина: это минимальная совместимая интеграция с App Router без redesign страниц.
+
 ### Teacher students integration встроена в существующий `/teacher`, без новых маршрутов
 - Раздел `Список учеников` реализован внутри уже существующего `TeacherDashboard`.
 - Переключение между grid списка и profile view ученика сделано через локальный React state.

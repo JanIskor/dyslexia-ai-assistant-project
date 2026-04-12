@@ -14,5 +14,8 @@ class Notification(Base):
     type = Column(String, nullable=False)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
+    target_view = Column(String, nullable=True)
+    action_key = Column(String, nullable=True)
+    target_id = Column(Uuid(as_uuid=True), nullable=True)
     is_read = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

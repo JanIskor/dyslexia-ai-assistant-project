@@ -98,6 +98,9 @@ def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentPr
             type="student_resubmitted_profile",
             title="Ученик повторно отправил профиль",
             message=f"Ученик {profile.full_name} повторно отправил профиль после доработки.",
+            target_view="admin_applications",
+            action_key="open_detail",
+            target_id=profile.id,
         )
     else:
         create_notifications_for_role(
@@ -106,6 +109,9 @@ def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentPr
             type="student_first_submitted_profile",
             title="Новая заявка ученика",
             message=f"Ученик {profile.full_name} впервые отправил профиль на модерацию.",
+            target_view="admin_applications",
+            action_key="open_detail",
+            target_id=profile.id,
         )
 
     db.commit()

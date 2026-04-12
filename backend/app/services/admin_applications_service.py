@@ -342,6 +342,8 @@ def request_admin_application_changes(
         type="student_revision_requested",
         title="Профиль отправлен на доработку",
         message="Администратор попросил обновить профиль и повторно отправить его на модерацию.",
+        target_view="student_profile_edit",
+        action_key="open_tab",
     )
     try:
         db.commit()
@@ -375,6 +377,8 @@ def approve_admin_application(
         type="student_profile_approved",
         title="Профиль подтверждён",
         message="Администратор подтвердил профиль. Ожидайте дальнейших действий в системе.",
+        target_view="student_profile",
+        action_key="open_tab",
     )
     try:
         db.commit()
@@ -474,6 +478,8 @@ def assign_teacher_to_application(
         type="student_assigned_to_teacher",
         title="Вам назначен преподаватель",
         message=f"Администратор назначил преподавателя {teacher_profile.full_name}.",
+        target_view="student_profile",
+        action_key="open_tab",
     )
     create_notification(
         db,
@@ -482,6 +488,9 @@ def assign_teacher_to_application(
         type="teacher_new_student_assigned",
         title="Назначен новый ученик",
         message=f"Администратор назначил вам ученика {profile.full_name}.",
+        target_view="teacher_incoming_students",
+        action_key="open_detail",
+        target_id=profile.user_id,
     )
 
     try:
