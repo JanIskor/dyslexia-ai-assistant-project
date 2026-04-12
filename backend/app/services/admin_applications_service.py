@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, object_session
 from uuid import UUID
 
 from app.models.student_profile import StudentProfile
+from app.models.student_profile_update_request import StudentProfileUpdateRequest
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_student import TeacherStudent
 from app.models.teacher_student_rejection import TeacherStudentRejection
@@ -21,6 +22,10 @@ from app.schemas.admin_applications import (
     AdminTeacherAssignmentOptionsResponse,
 )
 from app.services.notifications_service import create_notification
+from app.services.student_profile_update_requests_service import (
+    approve_student_profile_update_request,
+    request_student_profile_update_changes,
+)
 
 
 PROFILE_STATUS_TO_APPLICATION_STATUS = {
@@ -51,6 +56,11 @@ VISIBLE_APPLICATION_STATUSES = (
     "teacher_accepted",
     "teacher_rejected",
 )
+VISIBLE_UPDATE_REQUEST_STATUSES = (
+    "submitted",
+    "in_review",
+    "revision_requested",
+)
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
 ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "teacher_rejected"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
@@ -59,10 +69,21 @@ TEACHER_REVIEW_STATUS_LABELS = {
     "accepted": "Принята преподавателем",
     "rejected": "Отклонена преподавателем",
 }
+UPDATE_REQUEST_STATUS_TO_APPLICATION_STATUS = {
+    "submitted": "Новая",
+    "in_review": "На рассмотрении",
+    "revision_requested": "На доработке",
+    "approved": "Подтверждена",
+    "draft": "Черновик",
+}
 
 
 def map_application_status(profile_status: str) -> str:
     return PROFILE_STATUS_TO_APPLICATION_STATUS.get(profile_status, "На рассмотрении")
+
+
+def map_update_request_status(status_value: str) -> str:
+    return UPDATE_REQUEST_STATUS_TO_APPLICATION_STATUS.get(status_value, "На рассмотрении")
 
 
 def map_teacher_review_status(review_status: str | None) -> str | None:
@@ -146,7 +167,7 @@ def list_admin_applications(
     search: str | None = None,
     statuses: list[str] | None = None,
 ) -> AdminApplicationsListResponse:
-    query = (
+    profile_query = (
         db.query(StudentProfile)
         .join(User, User.id == StudentProfile.user_id)
         .filter(
@@ -159,33 +180,78 @@ def list_admin_applications(
     )
 
     if search and search.strip():
-        query = query.filter(_build_surname_prefix_search_filter(search))
+        profile_query = profile_query.filter(_build_surname_prefix_search_filter(search))
 
     if statuses:
-        allowed_profile_statuses = sorted(
-            {
-                profile_status
-                for status_label in statuses
-                for profile_status in APPLICATION_STATUS_TO_PROFILE_STATUSES.get(status_label, ())
-            }
-        )
+        allowed_profile_statuses = {
+            profile_status
+            for status_label in statuses
+            for profile_status in APPLICATION_STATUS_TO_PROFILE_STATUSES.get(status_label, ())
+        }
+        allowed_update_request_statuses = {
+            status_value
+            for status_label in statuses
+            for status_value, mapped_label in UPDATE_REQUEST_STATUS_TO_APPLICATION_STATUS.items()
+            if mapped_label == status_label
+        }
         if allowed_profile_statuses:
-            query = query.filter(StudentProfile.profile_status.in_(allowed_profile_statuses))
+            profile_query = profile_query.filter(StudentProfile.profile_status.in_(sorted(allowed_profile_statuses)))
         else:
-            return AdminApplicationsListResponse(items=[])
+            profile_query = profile_query.filter(False)
+    else:
+        allowed_update_request_statuses = set(VISIBLE_UPDATE_REQUEST_STATUSES)
 
-    profiles = query.all()
+    profiles = profile_query.all()
 
-    return AdminApplicationsListResponse(
-        items=[
-            AdminApplicationListItem(
-                id=profile.id,
-                full_name=profile.full_name,
-                status=map_application_status(profile.profile_status),
-            )
-            for profile in profiles
-        ]
+    update_query = (
+        db.query(StudentProfileUpdateRequest, StudentProfile)
+        .join(StudentProfile, StudentProfile.user_id == StudentProfileUpdateRequest.student_user_id)
+        .join(User, User.id == StudentProfileUpdateRequest.student_user_id)
+        .filter(
+            User.role == "student",
+            StudentProfileUpdateRequest.status.in_(VISIBLE_UPDATE_REQUEST_STATUSES),
+        )
+        .order_by(StudentProfileUpdateRequest.full_name.asc())
     )
+
+    if search and search.strip():
+        update_query = update_query.filter(StudentProfileUpdateRequest.full_name.ilike(f"{search.strip()}%"))
+
+    if statuses:
+        if allowed_update_request_statuses:
+            update_query = update_query.filter(
+                StudentProfileUpdateRequest.status.in_(sorted(allowed_update_request_statuses))
+            )
+        else:
+            update_query = update_query.filter(False)
+
+    update_requests = update_query.all()
+    update_request_student_ids = {update_request.student_user_id for update_request, _ in update_requests}
+
+    items = [
+        AdminApplicationListItem(
+            id=profile.id,
+            full_name=profile.full_name,
+            status=map_application_status(profile.profile_status),
+            request_kind="initial_profile",
+            request_kind_label="Первичная заявка",
+        )
+        for profile in profiles
+        if profile.user_id not in update_request_student_ids
+    ] + [
+        AdminApplicationListItem(
+            id=update_request.id,
+            full_name=update_request.full_name or profile.full_name or "Без имени",
+            status=map_update_request_status(update_request.status),
+            request_kind="profile_update",
+            request_kind_label="Обновление профиля",
+        )
+        for update_request, profile in update_requests
+    ]
+
+    items.sort(key=lambda item: item.full_name.lower())
+
+    return AdminApplicationsListResponse(items=items)
 
 
 def _build_admin_application_detail(profile: StudentProfile) -> AdminApplicationDetailResponse:
@@ -200,6 +266,8 @@ def _build_admin_application_detail(profile: StudentProfile) -> AdminApplication
 
     return AdminApplicationDetailResponse(
         id=profile.id,
+        request_kind="initial_profile",
+        request_kind_label="Первичная заявка",
         full_name=profile.full_name,
         birth_date=profile.birth_date,
         gender=profile.gender,
@@ -212,6 +280,46 @@ def _build_admin_application_detail(profile: StudentProfile) -> AdminApplication
         current_teacher_full_name=current_teacher.full_name if current_teacher is not None else None,
         current_teacher_subject_name=current_teacher.subject_name if current_teacher is not None else None,
         teacher_review_status=map_teacher_review_status(profile.teacher_review_status),
+        can_edit_admin_fields=True,
+        can_assign_teacher=True,
+    )
+
+
+def _build_admin_profile_update_detail(
+    profile: StudentProfile,
+    update_request: StudentProfileUpdateRequest,
+) -> AdminApplicationDetailResponse:
+    db = object_session(profile)
+    current_teacher = None
+    if db is not None and profile.current_teacher_user_id is not None:
+        current_teacher = (
+            db.query(TeacherProfile)
+            .filter(TeacherProfile.user_id == profile.current_teacher_user_id)
+            .first()
+        )
+
+    return AdminApplicationDetailResponse(
+        id=update_request.id,
+        request_kind="profile_update",
+        request_kind_label="Обновление профиля",
+        full_name=update_request.full_name or profile.full_name,
+        birth_date=update_request.birth_date,
+        gender=update_request.gender,
+        quote=update_request.quote,
+        avatar_url=update_request.avatar_url,
+        status=map_update_request_status(update_request.status),
+        grade_label=profile.grade_label,
+        enrollment_date=profile.enrollment_date,
+        current_teacher_user_id=profile.current_teacher_user_id,
+        current_teacher_full_name=current_teacher.full_name if current_teacher is not None else None,
+        current_teacher_subject_name=current_teacher.subject_name if current_teacher is not None else None,
+        teacher_review_status=map_teacher_review_status(profile.teacher_review_status),
+        current_profile_full_name=profile.full_name,
+        current_profile_birth_date=profile.birth_date,
+        current_profile_gender=profile.gender,
+        current_profile_quote=profile.quote,
+        can_edit_admin_fields=False,
+        can_assign_teacher=False,
     )
 
 
@@ -248,6 +356,34 @@ def _get_student_profile_for_assignment_or_404(db: Session, application_id: UUID
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student profile not found")
 
     return profile
+
+
+def _get_profile_update_request_or_none(
+    db: Session,
+    application_id: UUID,
+) -> tuple[StudentProfileUpdateRequest, StudentProfile] | None:
+    update_request = (
+        db.query(StudentProfileUpdateRequest)
+        .join(StudentProfile, StudentProfile.user_id == StudentProfileUpdateRequest.student_user_id)
+        .join(User, User.id == StudentProfileUpdateRequest.student_user_id)
+        .filter(
+            StudentProfileUpdateRequest.id == application_id,
+            User.role == "student",
+        )
+        .first()
+    )
+    if update_request is None:
+        return None
+
+    profile = (
+        db.query(StudentProfile)
+        .filter(StudentProfile.user_id == update_request.student_user_id)
+        .first()
+    )
+    if profile is None:
+        return None
+
+    return update_request, profile
 
 
 def _is_student_profile_status_constraint_error(exc: IntegrityError) -> bool:
@@ -292,6 +428,17 @@ def _has_teacher_rejected_student(
 
 
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
+    update_request_entry = _get_profile_update_request_or_none(db, application_id)
+    if update_request_entry is not None:
+        update_request, profile = update_request_entry
+
+        if update_request.status == "submitted":
+            update_request.status = "in_review"
+            db.commit()
+            db.refresh(update_request)
+
+        return _build_admin_profile_update_detail(profile, update_request)
+
     profile = _get_admin_application_or_404(db, application_id)
 
     if profile.profile_status == "submitted":
@@ -312,6 +459,13 @@ def update_admin_application(
     application_id,
     payload: AdminApplicationUpdateRequest,
 ) -> AdminApplicationDetailResponse:
+    update_request_entry = _get_profile_update_request_or_none(db, application_id)
+    if update_request_entry is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Profile update request does not support admin fields editing",
+        )
+
     profile = _get_admin_application_or_404(db, application_id)
 
     if payload.grade_label is not None:
@@ -329,6 +483,24 @@ def request_admin_application_changes(
     *,
     application_id,
 ) -> AdminApplicationDetailResponse:
+    update_request_entry = _get_profile_update_request_or_none(db, application_id)
+    if update_request_entry is not None:
+        update_request, profile = update_request_entry
+
+        if update_request.status not in REVIEWABLE_APPLICATION_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Application cannot be sent for revision",
+            )
+
+        request_student_profile_update_changes(
+            db,
+            student_profile=profile,
+            update_request=update_request,
+        )
+        db.refresh(update_request)
+        return _build_admin_profile_update_detail(profile, update_request)
+
     profile = _get_admin_application_or_404(db, application_id)
 
     if profile.profile_status not in REVIEWABLE_APPLICATION_STATUSES:
@@ -362,6 +534,22 @@ def approve_admin_application(
     *,
     application_id,
 ) -> AdminApplicationDetailResponse:
+    update_request_entry = _get_profile_update_request_or_none(db, application_id)
+    if update_request_entry is not None:
+        update_request, profile = update_request_entry
+
+        if update_request.status not in REVIEWABLE_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be approved")
+
+        approve_student_profile_update_request(
+            db,
+            student_profile=profile,
+            update_request=update_request,
+        )
+        db.refresh(profile)
+        db.refresh(update_request)
+        return _build_admin_profile_update_detail(profile, update_request)
+
     profile = _get_admin_application_or_404(db, application_id)
 
     if profile.profile_status not in REVIEWABLE_APPLICATION_STATUSES:

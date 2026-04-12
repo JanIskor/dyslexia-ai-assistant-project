@@ -4,10 +4,14 @@ export interface AdminApplication {
   id: string;
   full_name: string;
   status: string;
+  request_kind: 'initial_profile' | 'profile_update';
+  request_kind_label: string;
 }
 
 export interface AdminApplicationDetail {
   id: string;
+  request_kind: 'initial_profile' | 'profile_update';
+  request_kind_label: string;
   full_name: string;
   birth_date: string | null;
   gender: string | null;
@@ -20,6 +24,12 @@ export interface AdminApplicationDetail {
   current_teacher_full_name: string | null;
   current_teacher_subject_name: string | null;
   teacher_review_status: string | null;
+  current_profile_full_name: string | null;
+  current_profile_birth_date: string | null;
+  current_profile_gender: string | null;
+  current_profile_quote: string | null;
+  can_edit_admin_fields: boolean;
+  can_assign_teacher: boolean;
 }
 
 export interface AdminApplicationStatusFilterOption {
@@ -95,6 +105,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
 
   if (detail === 'Application cannot be approved') {
     return 'Эту заявку сейчас нельзя подтвердить.';
+  }
+
+  if (detail === 'Profile update request does not support admin fields editing') {
+    return 'Для обновления профиля поля администратора не редактируются.';
   }
 
   if (detail === 'Application cannot be assigned') {

@@ -85,6 +85,10 @@ export function AdminApplicationDetailPanel({
 
             <h2 className="mt-5 text-2xl font-medium text-stone-700 sm:text-3xl">{application.full_name}</h2>
 
+            <p className="mt-2 text-sm font-medium text-stone-400 sm:text-base">
+              {application.request_kind_label}
+            </p>
+
             <span
               className={`mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:text-base ${
                 getAdminApplicationStatusStyle(application.status)
@@ -100,6 +104,22 @@ export function AdminApplicationDetailPanel({
             <DetailRow label="Цитата" value={application.quote ?? 'Не указана'} />
           </dl>
         </div>
+
+        {application.request_kind === 'profile_update' ? (
+          <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
+            <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Текущий подтверждённый профиль</h3>
+
+            <dl className="mt-4 divide-y divide-orange-100/80">
+              <DetailRow label="ФИО" value={application.current_profile_full_name ?? 'Не указано'} />
+              <DetailRow
+                label="Дата рождения"
+                value={formatDisplayDate(application.current_profile_birth_date)}
+              />
+              <DetailRow label="Пол" value={application.current_profile_gender ?? 'Не указан'} />
+              <DetailRow label="Цитата" value={application.current_profile_quote ?? 'Не указана'} />
+            </dl>
+          </div>
+        ) : null}
 
         <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Контекст назначения</h3>
@@ -121,53 +141,63 @@ export function AdminApplicationDetailPanel({
         </div>
 
         <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
-          <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Поля администратора</h3>
+          <h3 className="text-lg font-medium text-stone-700 sm:text-xl">
+            {application.request_kind === 'profile_update' ? 'Решение администратора' : 'Поля администратора'}
+          </h3>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="admin-grade-label"
-                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-              >
-                Класс обучения
-              </label>
-              <input
-                id="admin-grade-label"
-                type="text"
-                value={gradeLabel}
-                onChange={(event) => onGradeLabelChange(event.target.value)}
-                className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
-                placeholder="Например, 4А класс"
-              />
-            </div>
+          {application.can_edit_admin_fields ? (
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="admin-grade-label"
+                  className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+                >
+                  Класс обучения
+                </label>
+                <input
+                  id="admin-grade-label"
+                  type="text"
+                  value={gradeLabel}
+                  onChange={(event) => onGradeLabelChange(event.target.value)}
+                  className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+                  placeholder="Например, 4А класс"
+                />
+              </div>
 
-            <div>
-              <label
-                htmlFor="admin-enrollment-date"
-                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-              >
-                Дата поступления
-              </label>
-              <input
-                id="admin-enrollment-date"
-                type="date"
-                value={enrollmentDate}
-                onChange={(event) => onEnrollmentDateChange(event.target.value)}
-                className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
-              />
+              <div>
+                <label
+                  htmlFor="admin-enrollment-date"
+                  className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+                >
+                  Дата поступления
+                </label>
+                <input
+                  id="admin-enrollment-date"
+                  type="date"
+                  value={enrollmentDate}
+                  onChange={(event) => onEnrollmentDateChange(event.target.value)}
+                  className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="mt-4 text-sm leading-relaxed text-stone-500 sm:text-base">
+              Для обновления профиля администратор проверяет предложенные изменения и либо подтверждает их, либо отправляет на доработку.
+            </p>
+          )}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={isSaving || isActing}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? 'Сохраняем...' : 'Сохранить'}
-            </button>
+            {application.can_edit_admin_fields ? (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={isSaving || isActing}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" />
+                {isSaving ? 'Сохраняем...' : 'Сохранить'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onRequestChanges}
@@ -175,7 +205,7 @@ export function AdminApplicationDetailPanel({
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCcw className="h-4 w-4" />
-              Отправить на доработку
+              {application.request_kind === 'profile_update' ? 'Отправить изменения на доработку' : 'Отправить на доработку'}
             </button>
             <button
               type="button"
@@ -184,7 +214,7 @@ export function AdminApplicationDetailPanel({
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
-              Подтвердить заявку
+              {application.request_kind === 'profile_update' ? 'Подтвердить изменения' : 'Подтвердить заявку'}
             </button>
           </div>
 

@@ -13,6 +13,7 @@ import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
+  approveAdminApplication,
   assignTeacherToApplication,
   getAdminApplicationFilters,
   getAdminApplicationDetail,
@@ -92,6 +93,10 @@ function ApplicationsPanel({
 
   const getApproveGuardMessage = (application: AdminApplicationDetail | null) => {
     if (!application) {
+      return null;
+    }
+
+    if (!application.can_assign_teacher) {
       return null;
     }
 
@@ -221,7 +226,7 @@ function ApplicationsPanel({
   };
 
   const handleSave = async () => {
-    if (!selectedApplication) {
+    if (!selectedApplication || !selectedApplication.can_edit_admin_fields) {
       return;
     }
 
@@ -273,6 +278,26 @@ function ApplicationsPanel({
 
   const handleApprove = async () => {
     if (!selectedApplication) {
+      return;
+    }
+
+    if (!selectedApplication.can_assign_teacher) {
+      setIsActing(true);
+      setDetailMessage(null);
+
+      try {
+        const updatedApplication = await approveAdminApplication(token, selectedApplication.id);
+        setSelectedApplication(updatedApplication);
+        setDetailMessageType('success');
+        setDetailMessage('Изменения профиля подтверждены.');
+        const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+        setApplications(refreshedApplications.items);
+      } catch (error) {
+        setDetailMessageType('error');
+        setDetailMessage(error instanceof Error ? error.message : 'Не удалось подтвердить изменения профиля.');
+      } finally {
+        setIsActing(false);
+      }
       return;
     }
 

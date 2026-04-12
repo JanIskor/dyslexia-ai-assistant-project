@@ -140,8 +140,13 @@ export function AdminApplicationsListPanel({
                   onClick={() => onSelectApplication(application.id)}
                   className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-orange-50/60 sm:px-5"
                 >
-                  <span className="min-w-0 flex-1 text-base text-stone-700 sm:text-[1.05rem]">
-                    {application.full_name}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-base text-stone-700 sm:text-[1.05rem]">
+                      {application.full_name}
+                    </span>
+                    <span className="mt-1 block text-sm text-stone-400">
+                      {application.request_kind_label}
+                    </span>
                   </span>
                   <span
                     className={`ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:min-w-[168px] sm:text-base ${

@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher-To-Student Communication Foundation
+## Текущая фаза: Student Profile Edit Resubmission Flow
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation, in-app notifications и notification routing уже реализованы. Поверх этого добавлен foundation внутренней односторонней коммуникации teacher → student.
+На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation, in-app notifications, notification routing и teacher → student communication уже реализованы. Поверх этого добавлен flow повторного редактирования student profile через отдельный pending update layer.
 
 ### Tech Stack
 ```
@@ -47,6 +47,7 @@ app/
 │   ├── user.py
 │   ├── notification.py
 │   ├── student_profile.py
+│   ├── student_profile_update_request.py
 │   ├── teacher_profile.py
 │   ├── teacher_student.py
 │   ├── teacher_student_message.py
@@ -55,6 +56,7 @@ app/
 │   ├── auth.py
 │   ├── admin_applications.py
 │   ├── notifications.py
+│   ├── student_profile_edit.py
 │   ├── student_profile.py
 │   ├── teacher_student_messages.py
 │   └── teacher_students.py
@@ -63,6 +65,7 @@ app/
 │   ├── auth_service.py
 │   ├── notifications_service.py
 │   ├── student_profile_service.py
+│   ├── student_profile_update_requests_service.py
 │   ├── teacher_student_messages_service.py
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
@@ -130,37 +133,43 @@ lib/
 └── [другие helpers]
 ```
 
-## Teacher-To-Student Messaging Foundation
+## Student Profile Edit Resubmission Foundation
 
-### Таблица `teacher_student_messages`
+### Таблица `student_profile_update_requests`
 - `id`
-- `teacher_user_id`
 - `student_user_id`
-- `title`
-- `body`
-- `is_read_by_student`
+- `full_name`
+- `birth_date`
+- `gender`
+- `quote`
+- `avatar_url`
+- `status`
+- `admin_comment`
 - `created_at`
+- `updated_at`
 
 ### API
-- `POST /api/v1/teacher/students/{student_id}/messages`
-- `GET /api/v1/student/messages`
-- `GET /api/v1/student/messages/{message_id}`
-- `POST /api/v1/student/messages/{message_id}/read`
+- `GET /api/v1/student/profile-edit`
+- `PUT /api/v1/student/profile-edit`
+- `POST /api/v1/student/profile-edit/submit`
 
-### Backend flow
-- teacher endpoint проверяет, что связь teacher ↔ student существует в `teacher_students`
-- сообщение сохраняется как отдельная сущность, а не как запись в `notifications`
-- после сохранения student получает notification `teacher_message_received`
-- notification использует:
-  - `target_view = student_messages`
-  - `action_key = open_detail`
-  - `target_id = id сообщения`
+### Student flow
+- confirmed данные продолжают жить в `student_profiles`
+- pending edit живёт в `student_profile_update_requests`
+- GET возвращает pending request, если он есть, иначе prefilled confirmed values
+- PUT сохраняет draft изменений отдельно от confirmed profile
+- POST submit переводит draft в moderation flow
 
-### Frontend flow
-- teacher отправляет сообщение из карточки конкретного ученика в `TeacherDashboard`
-- student открывает вкладку `Сообщения` в `StudentDashboard`
-- при открытии detail-view непрочитанное сообщение автоматически переводится в `is_read_by_student = true`
-- notifications routing может открыть `/student?tab=messages&messageId=...`
+### Admin flow
+- existing admin applications list/detail умеет показывать как первичные заявки, так и profile update requests
+- update request detail показывает текущие confirmed values и предложенные новые данные без сложного diff viewer
+- approve переносит pending values в `student_profiles`
+- request changes оставляет pending row и переводит её в `revision_requested`
+
+### Почему confirmed profile отделён от pending update
+- активный профиль не ломается во время модерации
+- student сохраняет доступ к остальным разделам dashboard
+- admin проверяет именно новую предложенную версию профиля
 
 ## Notifications Foundation
 

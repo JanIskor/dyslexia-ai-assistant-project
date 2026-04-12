@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_student, get_db
 from app.models.user import User
+from app.schemas.student_profile_edit import StudentProfileEditRequest, StudentProfileEditResponse
 from app.schemas.student_profile import StudentProfileResponse, StudentProfileUpdateRequest
 from app.schemas.teacher_student_messages import TeacherStudentMessageItem, TeacherStudentMessagesListResponse
 from app.services.student_profile_service import (
@@ -12,6 +13,11 @@ from app.services.student_profile_service import (
     get_student_mode,
     submit_student_profile,
     update_student_profile,
+)
+from app.services.student_profile_update_requests_service import (
+    get_student_profile_edit_state,
+    save_student_profile_edit_draft,
+    submit_student_profile_edit_request,
 )
 from app.services.teacher_student_messages_service import (
     get_student_message,
@@ -73,6 +79,35 @@ def submit_current_student_profile(
     profile = get_or_create_student_profile(db, current_student.id)
     submitted_profile = submit_student_profile(db, profile=profile)
     return build_student_profile_response(db, submitted_profile)
+
+
+@router.get("/profile-edit", response_model=StudentProfileEditResponse)
+def read_student_profile_edit_state(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return get_student_profile_edit_state(db, student_user_id=current_student.id)
+
+
+@router.put("/profile-edit", response_model=StudentProfileEditResponse)
+def put_student_profile_edit_state(
+    payload: StudentProfileEditRequest,
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return save_student_profile_edit_draft(
+        db,
+        student_user_id=current_student.id,
+        payload=payload,
+    )
+
+
+@router.post("/profile-edit/submit", response_model=StudentProfileEditResponse)
+def submit_student_profile_edit_state(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return submit_student_profile_edit_request(db, student_user_id=current_student.id)
 
 
 @router.get("/messages", response_model=TeacherStudentMessagesListResponse)

@@ -280,6 +280,29 @@ backend/
 - Notification `teacher_message_received` ведёт в существующий `/student` route с `tab=messages&messageId=...`.
 - Причина: это сохраняет уже принятый query-param подход и не требует переписывать dashboard layout или вводить nested routes.
 
+## Решения шага 3.2.4.12: Student Profile Edit Resubmission Flow
+
+### Pending profile edits вынесены в отдельную таблицу
+- Добавлена таблица `student_profile_update_requests`.
+- Причина: confirmed `student_profiles` не должен подменяться draft-версией до admin approve.
+
+### Regular student редактирует pending copy, а не active profile
+- `GET /student/profile-edit` возвращает pending request или prefilled confirmed values.
+- `PUT /student/profile-edit` сохраняет черновик изменений отдельно от confirmed profile.
+- Причина: это даёт повторную модерацию без потери текущей рабочей версии профиля.
+
+### Existing admin applications flow переиспользован для review profile updates
+- Admin list/detail и approve/request-changes endpoints теперь работают и с первичными заявками, и с profile update requests.
+- Причина: это минимально меняет уже существующий admin dashboard и не требует нового review layout.
+
+### Student не теряет доступ к системе во время модерации edits
+- Пока pending update находится в `submitted` / `in_review`, student по-прежнему может пользоваться `Мой профиль`, `Учебные материалы`, `Мои тесты`, `Сообщения`.
+- Причина: на этом шаге модерируются только personal data changes, а не весь student account.
+
+### Grade и enrollment остаются admin-controlled
+- Student edit flow не меняет `grade_label` и `enrollment_date`.
+- Причина: эти school-context поля уже принадлежат admin review flow и не должны редактироваться student-side.
+
 ### Для `useSearchParams` оставлены существующие client dashboards
 - `/admin`, `/teacher`, `/student` page entrypoints обёрнуты в `Suspense`.
 - Причина: это минимальная совместимая интеграция с App Router без redesign страниц.

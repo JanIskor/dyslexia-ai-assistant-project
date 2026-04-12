@@ -8,6 +8,8 @@ class AdminApplicationListItem(BaseModel):
     id: UUID
     full_name: str
     status: str
+    request_kind: str = "initial_profile"
+    request_kind_label: str = "Первичная заявка"
 
 
 class AdminApplicationsListResponse(BaseModel):
@@ -39,6 +41,8 @@ class AdminTeacherAssignmentOptionsResponse(BaseModel):
 
 class AdminApplicationDetailResponse(BaseModel):
     id: UUID
+    request_kind: str = "initial_profile"
+    request_kind_label: str = "Первичная заявка"
     full_name: str
     birth_date: date | None = None
     gender: str | None = None
@@ -51,6 +55,12 @@ class AdminApplicationDetailResponse(BaseModel):
     current_teacher_full_name: str | None = None
     current_teacher_subject_name: str | None = None
     teacher_review_status: str | None = None
+    current_profile_full_name: str | None = None
+    current_profile_birth_date: date | None = None
+    current_profile_gender: str | None = None
+    current_profile_quote: str | None = None
+    can_edit_admin_fields: bool = True
+    can_assign_teacher: bool = True
 
 
 class AdminApplicationUpdateRequest(BaseModel):

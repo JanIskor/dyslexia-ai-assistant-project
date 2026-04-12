@@ -12,9 +12,12 @@ import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
   getStudentProfile,
+  getStudentProfileEditState,
+  submitStudentProfileEditState,
   submitStudentProfile,
-  type StudentMode,
+  type StudentProfileEditState,
   type StudentProfile,
+  updateStudentProfileEditState,
   updateStudentProfile,
 } from '@/lib/studentProfileApi';
 import {
@@ -71,7 +74,12 @@ function formatProfileDate(value: string | null): string {
   }).format(parsedDate);
 }
 
-function buildFormState(profile: StudentProfile): StudentProfileFormState {
+function buildFormState(profile: {
+  full_name: string | null;
+  birth_date: string | null;
+  gender: string | null;
+  quote: string | null;
+}): StudentProfileFormState {
   return {
     fullName: profile.full_name ?? '',
     birthDate: profile.birth_date ?? '',
@@ -95,32 +103,28 @@ function formatMessageDate(value: string): string {
 }
 
 function ModerationBanner({
-  profileStatus,
-  studentMode,
-  regularSubmittedNotice,
+  status,
+  variant,
 }: {
-  profileStatus: StudentProfile['profile_status'];
-  studentMode: StudentMode;
-  regularSubmittedNotice: boolean;
+  status: string;
+  variant: 'onboarding' | 'regular';
 }) {
-  const isSubmitted =
-    studentMode === 'regular'
-      ? regularSubmittedNotice
-      : profileStatus === 'submitted' || profileStatus === 'in_review';
-  const needsCompletion = profileStatus === 'needs_completion';
-  const isApproved = profileStatus === 'approved';
-  const draftMessage =
-    studentMode === 'regular'
-      ? 'Проверьте данные профиля, при необходимости обновите их и отправьте изменения на модерацию администратору.'
-      : 'Заполните профиль и отправьте его на модерацию администратору.';
-  const needsCompletionMessage =
-    'Администратор отправил профиль на доработку. Обновите данные и снова отправьте заявку на модерацию.';
-  const submittedMessage =
-    studentMode === 'regular'
-      ? 'Изменения отправлены на модерацию. Они будут применены после проверки администратором.'
-      : 'Профиль на модерации у администратора. Ожидайте назначения преподавателя.';
-  const approvedMessage =
-    'Профиль подтверждён администратором. Дополнительные шаги будут доступны на следующих этапах.';
+  const isRegular = variant === 'regular';
+  const isSubmitted = status === 'submitted' || status === 'in_review';
+  const needsCompletion = isRegular ? status === 'revision_requested' : status === 'needs_completion';
+  const isApproved = status === 'approved';
+  const draftMessage = isRegular
+    ? 'Изменяйте данные профиля в черновике и отправляйте их на повторную модерацию администратору.'
+    : 'Заполните профиль и отправьте его на модерацию администратору.';
+  const needsCompletionMessage = isRegular
+    ? 'Администратор отправил изменения профиля на доработку. Обновите данные и снова отправьте их на модерацию.'
+    : 'Администратор отправил профиль на доработку. Обновите данные и снова отправьте заявку на модерацию.';
+  const submittedMessage = isRegular
+    ? 'Изменения профиля находятся на модерации. Подтверждённый профиль продолжает использоваться в системе.'
+    : 'Профиль на модерации у администратора. Ожидайте назначения преподавателя.';
+  const approvedMessage = isRegular
+    ? 'Последняя версия изменений профиля подтверждена администратором.'
+    : 'Профиль подтверждён администратором. Дополнительные шаги будут доступны на следующих этапах.';
 
   return (
     <div
@@ -161,7 +165,11 @@ function ProfileInfoRow({
 }
 
 function StudentProfileEditCard({
-  profile,
+  avatarUrl,
+  displayFullName,
+  gradeLabel,
+  enrollmentDate,
+  isReadOnly,
   form,
   onChange,
   onSave,
@@ -171,7 +179,11 @@ function StudentProfileEditCard({
   statusMessage,
   statusType,
 }: {
-  profile: StudentProfile;
+  avatarUrl: string | null;
+  displayFullName: string | null;
+  gradeLabel: string | null;
+  enrollmentDate: string | null;
+  isReadOnly: boolean;
   form: StudentProfileFormState;
   onChange: (field: keyof StudentProfileFormState, value: string) => void;
   onSave: () => void;
@@ -181,18 +193,14 @@ function StudentProfileEditCard({
   statusMessage: string | null;
   statusType: 'error' | 'success';
 }) {
-  const isReadOnly =
-    profile.student_mode === 'onboarding' &&
-    ['submitted', 'in_review', 'approved'].includes(profile.profile_status);
-
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
         <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-          {profile.avatar_url ? (
+          {avatarUrl ? (
             <Image
-              src={profile.avatar_url}
-              alt={`Аватар ученика ${profile.full_name ?? 'ученика'}`}
+              src={avatarUrl}
+              alt={`Аватар ученика ${displayFullName ?? 'ученика'}`}
               width={96}
               height={96}
               unoptimized
@@ -306,11 +314,11 @@ function StudentProfileEditCard({
           <dl className="divide-y divide-orange-100/80">
             <ProfileInfoRow
               label="Класс обучения:"
-              value={profile.grade_label ?? 'Будет назначен после модерации'}
+              value={gradeLabel ?? 'Будет назначен после модерации'}
             />
             <ProfileInfoRow
               label="Дата поступления:"
-              value={formatProfileDate(profile.enrollment_date)}
+              value={formatProfileDate(enrollmentDate)}
             />
           </dl>
         </div>
@@ -356,13 +364,13 @@ function StudentSectionContent({
   activeSection,
   accessToken,
   profile,
+  profileEditState,
   form,
   onChange,
   onSave,
   onSubmit,
   isSaving,
   isSubmitting,
-  regularSubmittedNotice,
   statusMessage,
   statusType,
   messagesViewState,
@@ -372,13 +380,13 @@ function StudentSectionContent({
   activeSection: StudentDashboardSection;
   accessToken: string;
   profile: StudentProfile;
+  profileEditState: StudentProfileEditState | null;
   form: StudentProfileFormState;
   onChange: (field: keyof StudentProfileFormState, value: string) => void;
   onSave: () => void;
   onSubmit: () => void;
   isSaving: boolean;
   isSubmitting: boolean;
-  regularSubmittedNotice: boolean;
   statusMessage: string | null;
   statusType: 'error' | 'success';
   messagesViewState: StudentMessagesViewState;
@@ -386,6 +394,8 @@ function StudentSectionContent({
   onBackToMessagesList: () => void;
 }) {
   const isRegularMode = profile.student_mode === 'regular';
+  const regularEditStatus = profileEditState?.status ?? 'approved';
+  const regularEditIsReadOnly = ['submitted', 'in_review'].includes(regularEditStatus);
 
   if (activeSection === 'messages') {
     return (
@@ -469,14 +479,21 @@ function StudentSectionContent({
       </h1>
       <div className="mt-6">
         <ModerationBanner
-          profileStatus={profile.profile_status}
-          studentMode={profile.student_mode}
-          regularSubmittedNotice={regularSubmittedNotice}
+          status={isRegularMode ? regularEditStatus : profile.profile_status}
+          variant={isRegularMode ? 'regular' : 'onboarding'}
         />
       </div>
       <div className="mt-6">
         <StudentProfileEditCard
-          profile={profile}
+          avatarUrl={isRegularMode ? profileEditState?.avatar_url ?? profile.avatar_url : profile.avatar_url}
+          displayFullName={isRegularMode ? profileEditState?.full_name ?? profile.full_name : profile.full_name}
+          gradeLabel={profile.grade_label}
+          enrollmentDate={profile.enrollment_date}
+          isReadOnly={
+            isRegularMode
+              ? regularEditIsReadOnly
+              : ['submitted', 'in_review', 'approved'].includes(profile.profile_status)
+          }
           form={form}
           onChange={onChange}
           onSave={onSave}
@@ -745,11 +762,11 @@ export function StudentDashboard() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [regularSubmittedNotice, setRegularSubmittedNotice] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'error' | 'success'>('success');
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [messagesViewState, setMessagesViewState] = useState<StudentMessagesViewState>({ mode: 'list' });
+  const [profileEditState, setProfileEditState] = useState<StudentProfileEditState | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -771,11 +788,16 @@ export function StudentDashboard() {
         }
 
         const studentProfile = await getStudentProfile(token);
+        const editState =
+          studentProfile.student_mode === 'regular'
+            ? await getStudentProfileEditState(token)
+            : null;
 
         if (isMounted) {
           setCurrentUser(user);
           setProfile(studentProfile);
-          setForm(buildFormState(studentProfile));
+          setProfileEditState(editState);
+          setForm(buildFormState(editState ?? studentProfile));
           setAccessToken(token);
           setActiveSection(studentProfile.student_mode === 'regular' ? 'profile' : 'profile');
           setIsCheckingAuth(false);
@@ -795,14 +817,12 @@ export function StudentDashboard() {
 
   const handleLogout = () => {
     setAccessToken(null);
+    setProfileEditState(null);
     clearAccessToken();
     router.replace('/login');
   };
 
   const handleFormChange = (field: keyof StudentProfileFormState, value: string) => {
-    if (profile?.student_mode === 'regular') {
-      setRegularSubmittedNotice(false);
-    }
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -819,8 +839,16 @@ export function StudentDashboard() {
 
     try {
       if (profile.student_mode === 'regular') {
+        const updatedEditState = await updateStudentProfileEditState(token, {
+          full_name: form.fullName,
+          birth_date: form.birthDate || null,
+          gender: form.gender,
+          quote: form.quote,
+        });
+        setProfileEditState(updatedEditState);
+        setForm(buildFormState(updatedEditState));
         setStatusType('success');
-        setStatusMessage('Изменения сохранены в форме. Отправьте их на модерацию, когда будете готовы.');
+        setStatusMessage('Черновик изменений сохранён.');
         return;
       }
 
@@ -857,9 +885,11 @@ export function StudentDashboard() {
 
     try {
       if (profile.student_mode === 'regular') {
-        setRegularSubmittedNotice(true);
+        const submittedEditState = await submitStudentProfileEditState(token);
+        setProfileEditState(submittedEditState);
+        setForm(buildFormState(submittedEditState));
         setStatusType('success');
-        setStatusMessage('Форма остаётся доступной для редактирования.');
+        setStatusMessage('Изменения отправлены на модерацию.');
         return;
       }
 
@@ -1010,13 +1040,13 @@ export function StudentDashboard() {
                 activeSection={activeSection}
                 accessToken={accessToken}
                 profile={profile}
+                profileEditState={profileEditState}
                 form={form}
                 onChange={handleFormChange}
                 onSave={handleSave}
                 onSubmit={handleSubmitProfile}
                 isSaving={isSaving}
                 isSubmitting={isSubmitting}
-                regularSubmittedNotice={regularSubmittedNotice}
                 statusMessage={statusMessage}
                 statusType={statusType}
                 messagesViewState={messagesViewState}
