@@ -11,10 +11,16 @@ from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
     TeacherIncomingStudentsListResponse,
 )
+from app.schemas.teacher_profile_edit import TeacherProfileEditRequest, TeacherProfileEditResponse
 from app.schemas.teacher_profile import TeacherProfileResponse
 from app.schemas.teacher_student_messages import TeacherStudentMessageCreateRequest, TeacherStudentMessageItem
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_profile_service import get_teacher_profile
+from app.services.teacher_profile_update_requests_service import (
+    get_teacher_profile_edit_state,
+    save_teacher_profile_edit_draft,
+    submit_teacher_profile_edit_request,
+)
 from app.services.teacher_incoming_students_service import (
     accept_teacher_incoming_student,
     get_teacher_incoming_student,
@@ -36,6 +42,38 @@ def read_teacher_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Teacher profile not found")
     return profile
+
+
+@router.get("/profile-edit", response_model=TeacherProfileEditResponse)
+def read_teacher_profile_edit(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return get_teacher_profile_edit_state(db, teacher_user_id=current_teacher.id)
+
+
+@router.put("/profile-edit", response_model=TeacherProfileEditResponse)
+def update_teacher_profile_edit(
+    payload: TeacherProfileEditRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return save_teacher_profile_edit_draft(
+        db,
+        teacher_user_id=current_teacher.id,
+        payload=payload,
+    )
+
+
+@router.post("/profile-edit/submit", response_model=TeacherProfileEditResponse)
+def submit_teacher_profile_edit(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return submit_teacher_profile_edit_request(
+        db,
+        teacher_user_id=current_teacher.id,
+    )
 
 
 @router.get("/students", response_model=TeacherStudentsListResponse)

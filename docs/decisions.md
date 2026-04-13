@@ -815,3 +815,48 @@ backend/
 ### Реaltime, grouping и удаление намеренно отложены
 - Нет websocket/push, grouping/priorities, удаления и настроек.
 - Причина: текущий шаг ограничен foundation внутренних уведомлений и badge counters.
+
+## Решения шага 3.2.4.13: Teacher Profile Edit Moderation Flow
+
+### Confirmed teacher profile отделён от pending edits
+- `teacher_profiles` остаётся источником истины для активного профиля преподавателя.
+- Новые изменения сохраняются в `teacher_profile_update_requests`.
+- Причина: преподаватель не должен менять рабочий профиль мгновенно, пока admin не подтвердил правки.
+
+### Teacher update request сделан one-to-one на пользователя
+- Для каждого teacher хранится одна актуальная запись update request.
+- Статусы:
+  - `draft`
+  - `submitted`
+  - `in_review`
+  - `revision_requested`
+  - `approved`
+- Причина: на текущем шаге достаточно одного pending цикла без истории версий.
+
+### Teacher edit API зеркалит student edit flow
+- Добавлены endpoints:
+  - `GET /api/v1/teacher/profile-edit`
+  - `PUT /api/v1/teacher/profile-edit`
+  - `POST /api/v1/teacher/profile-edit/submit`
+- Причина: это уменьшает архитектурную сложность и делает moderation flows симметричными.
+
+### Обязательные поля ограничены только teacher-специфичным минимумом
+- Перед submit проверяются:
+  - `full_name`
+  - `work_email`
+  - `subject_name`
+- Причина: именно эти поля критичны для рабочего teacher профиля на текущем шаге.
+
+### Admin review переиспользует existing applications flow
+- Teacher profile updates попадают в тот же admin applications list/detail.
+- Для них используется `request_kind = teacher_profile_update`.
+- Причина: шаг не требует отдельного teacher moderation dashboard.
+
+### Update flows не показывают заголовок `Решение администратора`
+- В update requests UI используется контекстный блок модерации обновления, а не общий заголовок `Решение администратора`.
+- Причина: это убирает лишнюю путаницу между первичной student заявкой и profile update moderation.
+
+### Teacher получает внутренние уведомления о moderation cycle
+- После submit teacher получает системное уведомление о том, что изменения отправлены.
+- После request changes и approve teacher также получает уведомления с routing в нужную teacher-вкладку.
+- Причина: teacher должен понимать текущее состояние правок без отдельного центра статусов.

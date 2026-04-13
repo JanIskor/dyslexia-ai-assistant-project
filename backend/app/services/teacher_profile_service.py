@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.teacher_profile import TeacherProfile
+from app.models.teacher_profile_update_request import TeacherProfileUpdateRequest
 from app.schemas.teacher_profile import TeacherProfileResponse
 
 
@@ -11,6 +12,12 @@ def get_teacher_profile(db: Session, teacher_user_id: UUID) -> TeacherProfileRes
 
     if profile is None:
         return None
+
+    update_request = (
+        db.query(TeacherProfileUpdateRequest)
+        .filter(TeacherProfileUpdateRequest.teacher_user_id == teacher_user_id)
+        .first()
+    )
 
     return TeacherProfileResponse(
         id=profile.id,
@@ -23,4 +30,6 @@ def get_teacher_profile(db: Session, teacher_user_id: UUID) -> TeacherProfileRes
         work_email=profile.work_email,
         subject_name=profile.subject_name,
         avatar_url=profile.avatar_url,
+        profile_edit_status=update_request.status if update_request is not None else None,
+        profile_edit_admin_comment=update_request.admin_comment if update_request is not None else None,
     )

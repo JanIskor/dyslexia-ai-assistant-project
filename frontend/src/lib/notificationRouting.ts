@@ -24,6 +24,10 @@ export function getNotificationHref(notification: NotificationItem): string | nu
       return '/student?tab=profile-edit';
     case 'student_profile':
       return '/student?tab=profile';
+    case 'teacher_profile_edit':
+      return '/teacher?tab=profile-edit';
+    case 'teacher_profile':
+      return '/teacher?tab=profile';
     case 'student_messages': {
       const searchParams = new URLSearchParams({ tab: 'messages' });
 

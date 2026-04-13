@@ -63,6 +63,9 @@ export function AdminApplicationDetailPanel({
   statusMessage,
   statusType,
 }: AdminApplicationDetailPanelProps) {
+  const isStudentProfileUpdate = application.request_kind === 'profile_update';
+  const isTeacherProfileUpdate = application.request_kind === 'teacher_profile_update';
+
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-5 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-7 sm:py-7">
       <button
@@ -101,11 +104,20 @@ export function AdminApplicationDetailPanel({
           <dl className="mt-6 divide-y divide-orange-100/80">
             <DetailRow label="Дата рождения" value={formatDisplayDate(application.birth_date)} />
             <DetailRow label="Пол" value={application.gender ?? 'Не указан'} />
-            <DetailRow label="Цитата" value={application.quote ?? 'Не указана'} />
+            {isTeacherProfileUpdate ? (
+              <>
+                <DetailRow label="Должность" value={application.position ?? 'Не указана'} />
+                <DetailRow label="Телефон" value={application.phone ?? 'Не указан'} />
+                <DetailRow label="Рабочий email" value={application.work_email ?? 'Не указан'} />
+                <DetailRow label="Предмет" value={application.subject_name ?? 'Не указан'} />
+              </>
+            ) : (
+              <DetailRow label="Цитата" value={application.quote ?? 'Не указана'} />
+            )}
           </dl>
         </div>
 
-        {application.request_kind === 'profile_update' ? (
+        {isStudentProfileUpdate || isTeacherProfileUpdate ? (
           <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
             <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Текущий подтверждённый профиль</h3>
 
@@ -116,12 +128,22 @@ export function AdminApplicationDetailPanel({
                 value={formatDisplayDate(application.current_profile_birth_date)}
               />
               <DetailRow label="Пол" value={application.current_profile_gender ?? 'Не указан'} />
-              <DetailRow label="Цитата" value={application.current_profile_quote ?? 'Не указана'} />
+              {isTeacherProfileUpdate ? (
+                <>
+                  <DetailRow label="Должность" value={application.current_profile_position ?? 'Не указана'} />
+                  <DetailRow label="Телефон" value={application.current_profile_phone ?? 'Не указан'} />
+                  <DetailRow label="Рабочий email" value={application.current_profile_work_email ?? 'Не указан'} />
+                  <DetailRow label="Предмет" value={application.current_profile_subject_name ?? 'Не указан'} />
+                </>
+              ) : (
+                <DetailRow label="Цитата" value={application.current_profile_quote ?? 'Не указана'} />
+              )}
             </dl>
           </div>
         ) : null}
 
-        <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
+        {!isTeacherProfileUpdate ? (
+          <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Контекст назначения</h3>
 
           <dl className="mt-4 divide-y divide-orange-100/80">
@@ -138,11 +160,16 @@ export function AdminApplicationDetailPanel({
               value={application.teacher_review_status ?? 'Пока не отправлялась преподавателю'}
             />
           </dl>
-        </div>
+          </div>
+        ) : null}
 
         <div className="rounded-[26px] border border-orange-50/90 bg-white/95 px-5 py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">
-            {application.request_kind === 'profile_update' ? 'Решение администратора' : 'Поля администратора'}
+            {isTeacherProfileUpdate
+              ? 'Модерация обновления профиля преподавателя'
+              : isStudentProfileUpdate
+                ? 'Модерация обновления профиля ученика'
+                : 'Поля администратора'}
           </h3>
 
           {application.can_edit_admin_fields ? (
@@ -182,7 +209,9 @@ export function AdminApplicationDetailPanel({
             </div>
           ) : (
             <p className="mt-4 text-sm leading-relaxed text-stone-500 sm:text-base">
-              Для обновления профиля администратор проверяет предложенные изменения и либо подтверждает их, либо отправляет на доработку.
+              {isTeacherProfileUpdate
+                ? 'Администратор проверяет предложенные изменения профиля преподавателя и либо подтверждает их, либо отправляет на доработку.'
+                : 'Для обновления профиля администратор проверяет предложенные изменения и либо подтверждает их, либо отправляет на доработку.'}
             </p>
           )}
 
@@ -205,7 +234,9 @@ export function AdminApplicationDetailPanel({
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCcw className="h-4 w-4" />
-              {application.request_kind === 'profile_update' ? 'Отправить изменения на доработку' : 'Отправить на доработку'}
+              {isStudentProfileUpdate || isTeacherProfileUpdate
+                ? 'Отправить изменения на доработку'
+                : 'Отправить на доработку'}
             </button>
             <button
               type="button"
@@ -214,7 +245,7 @@ export function AdminApplicationDetailPanel({
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
-              {application.request_kind === 'profile_update' ? 'Подтвердить изменения' : 'Подтвердить заявку'}
+              {isStudentProfileUpdate || isTeacherProfileUpdate ? 'Подтвердить изменения' : 'Подтвердить заявку'}
             </button>
           </div>
 

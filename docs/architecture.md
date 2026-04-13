@@ -660,3 +660,45 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
 - назначение класса и даты поступления student через продуктовый workflow;
 - выбор конкретных классов или множественные фильтры для teacher students list.
 - cursor/infinite pagination для teacher students list.
+
+## Teacher Profile Edit Moderation Flow
+
+- Для teacher profile moderation добавлена отдельная таблица `teacher_profile_update_requests`.
+- Confirmed teacher profile продолжает храниться в `teacher_profiles`.
+- Pending teacher edits хранятся отдельно и не подменяют confirmed профиль до admin approve.
+- Teacher edit API использует отдельные endpoints:
+  - `GET /api/v1/teacher/profile-edit`
+  - `PUT /api/v1/teacher/profile-edit`
+  - `POST /api/v1/teacher/profile-edit/submit`
+- Teacher edit response возвращает текущее pending состояние:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `position`
+  - `phone`
+  - `work_email`
+  - `subject_name`
+  - `avatar_url`
+  - `status`
+  - `admin_comment`
+- Admin applications flow теперь агрегирует три вида сущностей:
+  - первичные student applications
+  - student profile update requests
+  - teacher profile update requests
+- Teacher profile update request отображается в admin UI как `request_kind = teacher_profile_update`.
+- Для teacher update moderation admin получает:
+  - предложенные teacher fields
+  - текущие confirmed teacher fields
+  - action `approve`
+  - action `request changes`
+- В teacher dashboard profile section остался внутри `/teacher` и не создаёт новый layout.
+- Режим редактирования teacher profile открывается тем же dashboard через локальный state и `?tab=profile-edit`.
+- Во время статусов `submitted` и `in_review` форма teacher profile edit переводится в read-only режим.
+- Notification routing расширен target views:
+  - `teacher_profile_edit`
+  - `teacher_profile`
+- Teacher notifications используются для:
+  - submit на модерацию
+  - возврата на доработку
+  - approve изменений
+- Admin notifications получают событие `teacher_profile_update_submitted`.

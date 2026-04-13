@@ -48,6 +48,10 @@ class AdminApplicationDetailResponse(BaseModel):
     gender: str | None = None
     quote: str | None = None
     avatar_url: str | None = None
+    position: str | None = None
+    phone: str | None = None
+    work_email: str | None = None
+    subject_name: str | None = None
     status: str
     grade_label: str | None = None
     enrollment_date: date | None = None
@@ -59,6 +63,10 @@ class AdminApplicationDetailResponse(BaseModel):
     current_profile_birth_date: date | None = None
     current_profile_gender: str | None = None
     current_profile_quote: str | None = None
+    current_profile_position: str | None = None
+    current_profile_phone: str | None = None
+    current_profile_work_email: str | None = None
+    current_profile_subject_name: str | None = None
     can_edit_admin_fields: bool = True
     can_assign_teacher: bool = True
 

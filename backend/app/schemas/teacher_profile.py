@@ -15,3 +15,5 @@ class TeacherProfileResponse(BaseModel):
     work_email: str
     subject_name: str
     avatar_url: str | None = None
+    profile_edit_status: str | None = None
+    profile_edit_admin_comment: str | None = None

@@ -1,22 +1,31 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 
+export type AdminApplicationRequestKind =
+  | 'initial_profile'
+  | 'profile_update'
+  | 'teacher_profile_update';
+
 export interface AdminApplication {
   id: string;
   full_name: string;
   status: string;
-  request_kind: 'initial_profile' | 'profile_update';
+  request_kind: AdminApplicationRequestKind;
   request_kind_label: string;
 }
 
 export interface AdminApplicationDetail {
   id: string;
-  request_kind: 'initial_profile' | 'profile_update';
+  request_kind: AdminApplicationRequestKind;
   request_kind_label: string;
   full_name: string;
   birth_date: string | null;
   gender: string | null;
   quote: string | null;
   avatar_url: string | null;
+  position: string | null;
+  phone: string | null;
+  work_email: string | null;
+  subject_name: string | null;
   status: string;
   grade_label: string | null;
   enrollment_date: string | null;
@@ -28,6 +37,10 @@ export interface AdminApplicationDetail {
   current_profile_birth_date: string | null;
   current_profile_gender: string | null;
   current_profile_quote: string | null;
+  current_profile_position: string | null;
+  current_profile_phone: string | null;
+  current_profile_work_email: string | null;
+  current_profile_subject_name: string | null;
   can_edit_admin_fields: boolean;
   can_assign_teacher: boolean;
 }
