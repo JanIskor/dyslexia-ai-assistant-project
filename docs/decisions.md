@@ -840,12 +840,16 @@ backend/
   - `POST /api/v1/teacher/profile-edit/submit`
 - Причина: это уменьшает архитектурную сложность и делает moderation flows симметричными.
 
-### Обязательные поля ограничены только teacher-специфичным минимумом
+### Teacher submit проверяет полный набор обязательных profile fields
 - Перед submit проверяются:
   - `full_name`
+  - `birth_date`
+  - `gender`
+  - `position`
+  - `phone`
   - `work_email`
   - `subject_name`
-- Причина: именно эти поля критичны для рабочего teacher профиля на текущем шаге.
+- Причина: teacher edit flow теперь должен быть симметричен student update flow и не пропускать частично заполненный confirmed profile.
 
 ### Admin review переиспользует existing applications flow
 - Teacher profile updates попадают в тот же admin applications list/detail.
@@ -860,3 +864,25 @@ backend/
 - После submit teacher получает системное уведомление о том, что изменения отправлены.
 - После request changes и approve teacher также получает уведомления с routing в нужную teacher-вкладку.
 - Причина: teacher должен понимать текущее состояние правок без отдельного центра статусов.
+
+### Student и teacher profile edit используют один reusable component
+- За основу взят teacher profile edit UI.
+- Разница между student и teacher задаётся только конфигурацией полей и read-only секцией.
+- Причина: это убирает дублирование двух почти одинаковых реализаций и не добавляет отдельный abstraction layer поверх одного компонента.
+
+### Student regular profile edit больше не живёт в отдельной sidebar-вкладке
+- Student открывает `Мой профиль`, видит profile view и переключается в edit form кнопкой `Редактировать профиль`.
+- Возврат выполняется кнопкой `Назад к профилю` в той же правой части dashboard.
+- Причина: это выравнивает UX student с teacher и убирает лишнюю навигационную сущность.
+
+### Gender в edit flows ограничен select-значениями
+- Для student и teacher profile edit допустимы только:
+  - `Мужской`
+  - `Женский`
+- Те же значения валидируются backend helper'ом перед сохранением.
+- Причина: это делает UI и API согласованными и убирает расхождение между свободным вводом и moderation-данными.
+
+### Avatar change подготовлен только на уровне UI-структуры
+- В reusable edit form добавлена единая avatar zone с disabled CTA `Сменить аватар`.
+- Полноценный upload flow намеренно не реализован до следующего шага с MinIO.
+- Причина: это готовит layout и component contract без временных костылей в API или storage layer.

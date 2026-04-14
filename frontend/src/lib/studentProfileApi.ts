@@ -70,6 +70,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
     return 'Заполните ФИО, дату рождения и пол перед отправкой на модерацию.';
   }
 
+  if (detail === 'Gender must be either Мужской or Женский') {
+    return 'Пол можно выбрать только из значений «Мужской» или «Женский».';
+  }
+
   if (detail === 'Profile changes are read-only during moderation') {
     return 'Изменения уже находятся на модерации и временно недоступны для редактирования.';
   }

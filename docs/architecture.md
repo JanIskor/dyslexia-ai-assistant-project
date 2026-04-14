@@ -702,3 +702,76 @@ Teacher dashboard (`frontend/src/components/teacher/TeacherDashboard.tsx`)
   - возврата на доработку
   - approve изменений
 - Admin notifications получают событие `teacher_profile_update_submitted`.
+
+## Profile Edit UI Unification
+
+- Student regular profile edit и teacher profile edit используют один и тот же frontend component: `ProfileEditForm`.
+- Визуальной основой выбран существующий teacher edit UI:
+  - одна карточка формы;
+  - общий moderation banner;
+  - единые action buttons;
+  - общий read-only state для `submitted` и `in_review`.
+- Поведение student regular profile теперь совпадает с teacher:
+  - в sidebar остаётся только `Мой профиль`;
+  - правая часть переключается между profile view и edit form локальным state;
+  - возврат выполняется кнопкой `Назад к профилю`.
+- Различия между ролями задаются только конфигурацией полей и read-only blocks.
+
+### Student Profile Edit Form
+
+- Editable fields:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `quote`
+- Read-only/admin-managed fields:
+  - `grade_label`
+  - `enrollment_date`
+- Эти поля показываются в том же reusable form без отдельного служебного explanatory heading.
+
+### Teacher Profile Edit Form
+
+- Editable fields:
+  - `full_name`
+  - `birth_date`
+  - `gender`
+  - `position`
+  - `phone`
+  - `work_email`
+  - `subject_name`
+- Дополнительный read-only admin-managed block не нужен, потому что confirmed teacher profile и pending teacher update уже сравниваются на стороне admin review UI.
+
+### Gender Field
+
+- В student и teacher edit flows поле `gender` теперь рендерится как select.
+- Допустимые значения:
+  - `Мужской`
+  - `Женский`
+- Backend normalizes и принимает только эти значения для:
+  - student onboarding profile save;
+  - student profile update request save;
+  - teacher profile update request save.
+
+### Admin Update Review Cleanup
+
+- В admin detail panel для `profile_update` и `teacher_profile_update` больше не показывается explanatory block c заголовком `Решение администратора` и текстом-пояснением.
+- Для update requests остаются только:
+  - proposed fields;
+  - current confirmed profile;
+  - actions `request changes` и `approve`.
+
+### Avatar Preparation
+
+- В `ProfileEditForm` добавлена единая avatar area для student и teacher edit forms.
+- На текущем шаге это только UI-подготовка под следующий MinIO-based upload flow:
+  - есть место под текущий avatar preview;
+  - есть disabled action button `Сменить аватар`;
+  - нет временного upload endpoint или локального file workaround.
+
+## Что ещё не реализовано в рамках шага 3.2.4.13
+
+- история версий profile updates;
+- avatar upload;
+- diff viewer между confirmed и pending profile;
+- email notifications;
+- AI-specific functionality вокруг moderation.

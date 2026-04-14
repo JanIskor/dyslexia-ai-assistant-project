@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_profile_update_request import TeacherProfileUpdateRequest
 from app.schemas.teacher_profile_edit import TeacherProfileEditRequest, TeacherProfileEditResponse
+from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notification, create_notifications_for_role
 
 
@@ -138,7 +139,7 @@ def save_teacher_profile_edit_draft(
 
     update_request.full_name = _normalize_text(payload.full_name)
     update_request.birth_date = payload.birth_date
-    update_request.gender = _normalize_text(payload.gender)
+    update_request.gender = normalize_profile_gender(payload.gender)
     update_request.position = _normalize_text(payload.position)
     update_request.phone = _normalize_text(payload.phone)
     update_request.work_email = _normalize_text(payload.work_email)
@@ -166,7 +167,15 @@ def submit_teacher_profile_edit_request(
             detail="Profile changes already submitted",
         )
 
-    if not update_request.full_name or not update_request.work_email or not update_request.subject_name:
+    if (
+        not update_request.full_name
+        or update_request.birth_date is None
+        or not update_request.gender
+        or not update_request.position
+        or not update_request.phone
+        or not update_request.work_email
+        or not update_request.subject_name
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Required profile fields are missing",

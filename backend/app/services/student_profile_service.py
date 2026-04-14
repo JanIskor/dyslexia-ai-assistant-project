@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
+from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notifications_for_role
 
 
@@ -64,7 +65,7 @@ def update_student_profile(
     if "birth_date" in updates:
         profile.birth_date = updates["birth_date"]
     if "gender" in updates:
-        profile.gender = _normalize_text(updates["gender"])
+        profile.gender = normalize_profile_gender(updates["gender"])
     if "quote" in updates:
         profile.quote = _normalize_text(updates["quote"])
 

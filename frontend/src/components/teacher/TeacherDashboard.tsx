@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Check, LogOut, PencilLine, Save, Search, Send, SlidersHorizontal, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, PencilLine, Search, Send, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
@@ -38,6 +38,7 @@ import {
   type TeacherProfileEditState,
 } from '@/lib/teacherProfileApi';
 import { sendTeacherStudentMessage } from '@/lib/teacherStudentMessagesApi';
+import { GENDER_OPTIONS, ProfileEditForm, type ProfileEditFieldConfig } from '@/components/profile/ProfileEditForm';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'assistant';
 type TeacherProfileViewMode = 'view' | 'edit';
@@ -84,6 +85,15 @@ const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> 
 ];
 
 const TEACHER_STUDENTS_PAGE_SIZE = 9;
+const TEACHER_PROFILE_EDIT_FIELDS: ProfileEditFieldConfig[] = [
+  { key: 'full_name', label: 'ФИО', type: 'text' },
+  { key: 'birth_date', label: 'Дата рождения', type: 'date' },
+  { key: 'gender', label: 'Пол', type: 'select', options: GENDER_OPTIONS },
+  { key: 'position', label: 'Должность', type: 'text' },
+  { key: 'phone', label: 'Телефон', type: 'text' },
+  { key: 'work_email', label: 'Рабочий email', type: 'email' },
+  { key: 'subject_name', label: 'Предмет преподавания', type: 'text', colSpan: 2 },
+];
 
 const STUDENT_PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
@@ -173,16 +183,19 @@ function getTeacherProfileEditStatusMeta(status: string | null) {
     case 'in_review':
       return {
         text: 'Изменения профиля находятся на модерации.',
+        tone: 'info' as const,
         className: 'border-blue-200 bg-blue-50 text-blue-700',
       };
     case 'revision_requested':
       return {
         text: 'Изменения профиля отправлены на доработку.',
+        tone: 'warning' as const,
         className: 'border-orange-200 bg-orange-50 text-orange-700',
       };
     case 'approved':
       return {
         text: 'Последние изменения профиля подтверждены.',
+        tone: 'success' as const,
         className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
       };
     default:
@@ -279,189 +292,6 @@ function buildTeacherProfileEditFormState(
     subject_name: source.subject_name ?? '',
     avatar_url: source.avatar_url ?? null,
   };
-}
-
-function TeacherProfileEditBanner({
-  status,
-  adminComment,
-}: {
-  status: TeacherProfileEditState['status'];
-  adminComment: string | null;
-}) {
-  const statusMeta = getTeacherProfileEditStatusMeta(status);
-
-  if (!statusMeta) {
-    return (
-      <p className="rounded-[22px] border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600 sm:text-base">
-        Внесите изменения в профиль преподавателя, сохраните черновик и отправьте его администратору на модерацию.
-      </p>
-    );
-  }
-
-  return (
-    <p className={`rounded-[22px] border px-4 py-3 text-sm sm:text-base ${statusMeta.className}`}>
-      {statusMeta.text}
-      {adminComment ? ` Комментарий администратора: ${adminComment}` : ''}
-    </p>
-  );
-}
-
-function TeacherProfileEditCard({
-  formState,
-  profileEditState,
-  isSaving,
-  isSubmitting,
-  statusMessage,
-  statusType,
-  onBack,
-  onChange,
-  onSave,
-  onSubmit,
-}: {
-  formState: TeacherProfileEditFormState;
-  profileEditState: TeacherProfileEditState;
-  isSaving: boolean;
-  isSubmitting: boolean;
-  statusMessage: string | null;
-  statusType: 'error' | 'success';
-  onBack: () => void;
-  onChange: (field: keyof TeacherProfileEditFormState, value: string) => void;
-  onSave: () => void;
-  onSubmit: () => void;
-}) {
-  const isReadOnly = profileEditState.status === 'submitted' || profileEditState.status === 'in_review';
-
-  return (
-    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад к профилю
-      </button>
-
-      <div className="mt-6 space-y-6">
-        <TeacherProfileEditBanner
-          status={profileEditState.status}
-          adminComment={profileEditState.admin_comment}
-        />
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">ФИО</span>
-            <input
-              type="text"
-              value={formState.full_name}
-              onChange={(event) => onChange('full_name', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Дата рождения</span>
-            <input
-              type="date"
-              value={formState.birth_date}
-              onChange={(event) => onChange('birth_date', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Пол</span>
-            <input
-              type="text"
-              value={formState.gender}
-              onChange={(event) => onChange('gender', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Должность</span>
-            <input
-              type="text"
-              value={formState.position}
-              onChange={(event) => onChange('position', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Телефон</span>
-            <input
-              type="text"
-              value={formState.phone}
-              onChange={(event) => onChange('phone', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Рабочий email</span>
-            <input
-              type="email"
-              value={formState.work_email}
-              onChange={(event) => onChange('work_email', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-
-          <label className="block sm:col-span-2">
-            <span className="mb-2 block text-sm font-medium text-stone-500 sm:text-base">Предмет преподавания</span>
-            <input
-              type="text"
-              value={formState.subject_name}
-              onChange={(event) => onChange('subject_name', event.target.value)}
-              disabled={isReadOnly}
-              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:bg-stone-50 sm:text-lg"
-            />
-          </label>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isReadOnly || isSaving || isSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? 'Сохраняем...' : 'Сохранить изменения'}
-          </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={isReadOnly || isSaving || isSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Check className="h-4 w-4" />
-            {isSubmitting ? 'Отправляем...' : 'Отправить на модерацию'}
-          </button>
-        </div>
-
-        {statusMessage ? (
-          <p
-            className={`rounded-2xl border px-4 py-3 text-sm sm:text-base ${
-              statusType === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {statusMessage}
-          </p>
-        ) : null}
-      </div>
-    </section>
-  );
 }
 
 function StudentCard({
@@ -1450,20 +1280,33 @@ function TeacherSectionContent({
         Профиль преподавателя
       </h1>
       <div className="mt-6">
-        {profileViewMode === 'edit' ? (
-          <TeacherProfileEditCard
-            formState={teacherProfileFormState}
-            profileEditState={teacherProfileEditState}
-            isSaving={isSavingTeacherProfile}
-            isSubmitting={isSubmittingTeacherProfile}
-            statusMessage={teacherProfileStatusMessage}
-            statusType={teacherProfileStatusType}
-            onBack={onBackToProfile}
-            onChange={onTeacherProfileChange}
-            onSave={onSaveTeacherProfile}
-            onSubmit={onSubmitTeacherProfile}
-          />
-        ) : (
+        {profileViewMode === 'edit' ? (() => {
+          const statusMeta = getTeacherProfileEditStatusMeta(teacherProfileEditState.status);
+          const bannerText = statusMeta
+            ? `${statusMeta.text}${teacherProfileEditState.admin_comment ? ` Комментарий администратора: ${teacherProfileEditState.admin_comment}` : ''}`
+            : 'Внесите изменения в профиль преподавателя, сохраните черновик и отправьте его администратору на модерацию.';
+
+          return (
+            <ProfileEditForm
+              fields={TEACHER_PROFILE_EDIT_FIELDS}
+              values={teacherProfileFormState}
+              isReadOnly={teacherProfileEditState.status === 'submitted' || teacherProfileEditState.status === 'in_review'}
+              isSaving={isSavingTeacherProfile}
+              isSubmitting={isSubmittingTeacherProfile}
+              statusMessage={teacherProfileStatusMessage}
+              statusType={teacherProfileStatusType}
+              bannerText={bannerText}
+              bannerTone={statusMeta?.tone ?? 'neutral'}
+              avatarUrl={teacherProfileFormState.avatar_url}
+              avatarAlt={`Аватар ${teacherProfile.full_name}`}
+              backButtonLabel="Назад к профилю"
+              onBack={onBackToProfile}
+              onChange={onTeacherProfileChange}
+              onSave={onSaveTeacherProfile}
+              onSubmit={onSubmitTeacherProfile}
+            />
+          );
+        })() : (
           <TeacherProfileCard profile={teacherProfile} onEdit={onEditProfile} />
         )}
       </div>

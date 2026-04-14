@@ -1,9 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, LogOut, UserRound } from 'lucide-react';
+import { ArrowLeft, LogOut, PencilLine, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
@@ -27,15 +26,29 @@ import {
   type TeacherStudentMessage,
   type TeacherStudentMessagesResponse,
 } from '@/lib/teacherStudentMessagesApi';
+import {
+  GENDER_OPTIONS,
+  ProfileEditForm,
+  type ProfileEditFieldConfig,
+  type ProfileEditReadOnlyField,
+} from '@/components/profile/ProfileEditForm';
 
-type StudentDashboardSection = 'profile' | 'materials' | 'tests' | 'edit-profile' | 'messages';
+type StudentDashboardSection = 'profile' | 'materials' | 'tests' | 'messages';
+type StudentProfileViewMode = 'view' | 'edit';
 
 interface StudentProfileFormState {
-  fullName: string;
-  birthDate: string;
+  full_name: string;
+  birth_date: string;
   gender: string;
   quote: string;
 }
+
+const STUDENT_PROFILE_EDIT_FIELDS: ProfileEditFieldConfig[] = [
+  { key: 'full_name', label: 'ФИО', type: 'text', placeholder: 'Введите полное имя' },
+  { key: 'birth_date', label: 'Дата рождения', type: 'date' },
+  { key: 'gender', label: 'Пол', type: 'select', options: GENDER_OPTIONS },
+  { key: 'quote', label: 'Цитата', type: 'textarea', colSpan: 2, placeholder: 'Добавьте цитату по желанию' },
+];
 
 const ONBOARDING_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> = [
   { id: 'profile', label: 'Мой профиль' },
@@ -45,7 +58,6 @@ const REGULAR_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> 
   { id: 'messages', label: 'Сообщения' },
   { id: 'materials', label: 'Учебные материалы' },
   { id: 'tests', label: 'Мои тесты' },
-  { id: 'edit-profile', label: 'Редактирование профиля' },
 ];
 
 type StudentMessagesViewState =
@@ -81,8 +93,8 @@ function buildFormState(profile: {
   quote: string | null;
 }): StudentProfileFormState {
   return {
-    fullName: profile.full_name ?? '',
-    birthDate: profile.birth_date ?? '',
+    full_name: profile.full_name ?? '',
+    birth_date: profile.birth_date ?? '',
     gender: profile.gender ?? '',
     quote: profile.quote ?? '',
   };
@@ -102,13 +114,7 @@ function formatMessageDate(value: string): string {
   }).format(parsedDate);
 }
 
-function ModerationBanner({
-  status,
-  variant,
-}: {
-  status: string;
-  variant: 'onboarding' | 'regular';
-}) {
+function getStudentModerationBannerText(status: string, variant: 'onboarding' | 'regular'): string {
   const isRegular = variant === 'regular';
   const isSubmitted = status === 'submitted' || status === 'in_review';
   const needsCompletion = isRegular ? status === 'revision_requested' : status === 'needs_completion';
@@ -126,27 +132,34 @@ function ModerationBanner({
     ? 'Последняя версия изменений профиля подтверждена администратором.'
     : 'Профиль подтверждён администратором. Дополнительные шаги будут доступны на следующих этапах.';
 
-  return (
-    <div
-      className={`rounded-[24px] border px-5 py-4 text-base leading-relaxed shadow-[0_10px_30px_rgba(221,156,130,0.08)] sm:px-6 sm:text-lg ${
-        isApproved
-          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
-          : needsCompletion
-            ? 'border-rose-200 bg-rose-50/90 text-rose-700'
-            : isSubmitted
-          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-700'
-          : 'border-orange-200 bg-orange-50/95 text-stone-600'
-      }`}
-    >
-      {isApproved
-        ? approvedMessage
-        : needsCompletion
-          ? needsCompletionMessage
-          : isSubmitted
-            ? submittedMessage
-            : draftMessage}
-    </div>
-  );
+  if (isApproved) {
+    return approvedMessage;
+  }
+  if (needsCompletion) {
+    return needsCompletionMessage;
+  }
+  if (isSubmitted) {
+    return submittedMessage;
+  }
+
+  return draftMessage;
+}
+
+function getStudentModerationBannerTone(
+  status: string,
+  variant: 'onboarding' | 'regular',
+): 'neutral' | 'success' | 'warning' {
+  const isRegular = variant === 'regular';
+
+  if (status === 'approved' || status === 'submitted' || status === 'in_review') {
+    return 'success';
+  }
+
+  if ((isRegular && status === 'revision_requested') || (!isRegular && status === 'needs_completion')) {
+    return 'warning';
+  }
+
+  return 'neutral';
 }
 
 function ProfileInfoRow({
@@ -164,197 +177,71 @@ function ProfileInfoRow({
   );
 }
 
-function StudentProfileEditCard({
-  avatarUrl,
-  displayFullName,
-  gradeLabel,
-  enrollmentDate,
-  isReadOnly,
-  form,
-  onChange,
-  onSave,
-  onSubmit,
-  isSaving,
-  isSubmitting,
-  statusMessage,
-  statusType,
+function StudentProfileCard({
+  profile,
+  profileEditState,
+  onEdit,
 }: {
-  avatarUrl: string | null;
-  displayFullName: string | null;
-  gradeLabel: string | null;
-  enrollmentDate: string | null;
-  isReadOnly: boolean;
-  form: StudentProfileFormState;
-  onChange: (field: keyof StudentProfileFormState, value: string) => void;
-  onSave: () => void;
-  onSubmit: () => void;
-  isSaving: boolean;
-  isSubmitting: boolean;
-  statusMessage: string | null;
-  statusType: 'error' | 'success';
+  profile: StudentProfile;
+  profileEditState: StudentProfileEditState | null;
+  onEdit: () => void;
 }) {
+  const editStatus = profileEditState?.status ?? 'approved';
+  const statusText = getStudentModerationBannerText(editStatus, 'regular');
+  const statusTone = getStudentModerationBannerTone(editStatus, 'regular');
+  const statusClassName =
+    statusTone === 'success'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : statusTone === 'warning'
+        ? 'border-orange-200 bg-orange-50 text-orange-700'
+        : 'border-stone-200 bg-stone-50 text-stone-600';
+
   return (
-    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+    <section className="mt-6 rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
         <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={`Аватар ученика ${displayFullName ?? 'ученика'}`}
-              width={96}
-              height={96}
-              unoptimized
-              className="h-24 w-24 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
-              <UserRound className="h-14 w-14 text-orange-300" />
-            </div>
-          )}
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
+            <UserRound className="h-14 w-14 text-orange-300" />
+          </div>
         </div>
 
-        <div className="mt-6 w-full max-w-2xl space-y-5 text-left">
-          <div>
-            <label
-              htmlFor="student-full-name"
-              className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-            >
-              ФИО
-            </label>
-            <input
-              id="student-full-name"
-              type="text"
-              value={form.fullName}
-              onChange={(event) => onChange('fullName', event.target.value)}
-              readOnly={isReadOnly}
-              className={`w-full rounded-2xl border px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
-                isReadOnly
-                  ? 'border-orange-100 bg-stone-50 text-stone-500'
-                  : 'border-orange-200 bg-white focus:border-orange-300'
-              }`}
-              placeholder="Введите полное имя"
-            />
-          </div>
+        <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
+          {profile.full_name ?? 'Профиль ученика'}
+        </h2>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="student-birth-date"
-                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-              >
-                Дата рождения
-              </label>
-              <input
-                id="student-birth-date"
-                type="date"
-                value={form.birthDate}
-                onChange={(event) => onChange('birthDate', event.target.value)}
-                readOnly={isReadOnly}
-                className={`w-full rounded-2xl border px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
-                  isReadOnly
-                    ? 'border-orange-100 bg-stone-50 text-stone-500'
-                    : 'border-orange-200 bg-white focus:border-orange-300'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="student-gender"
-                className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-              >
-                Пол
-              </label>
-              <select
-                id="student-gender"
-                value={form.gender}
-                onChange={(event) => onChange('gender', event.target.value)}
-                disabled={isReadOnly}
-                className={`w-full rounded-2xl border px-4 py-3 pr-12 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
-                  isReadOnly
-                    ? 'border-orange-100 bg-stone-50 text-stone-500'
-                    : 'border-orange-200 bg-white focus:border-orange-300'
-                }`}
-              >
-                <option value="">Выберите пол</option>
-                <option value="Мужской">Мужской</option>
-                <option value="Женский">Женский</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="student-quote"
-              className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
-            >
-              Цитата
-            </label>
-            <textarea
-              id="student-quote"
-              value={form.quote}
-              onChange={(event) => onChange('quote', event.target.value)}
-              readOnly={isReadOnly}
-              rows={4}
-              className={`w-full rounded-2xl border px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition sm:text-lg ${
-                isReadOnly
-                  ? 'border-orange-100 bg-stone-50 text-stone-500'
-                  : 'border-orange-200 bg-white focus:border-orange-300'
-              }`}
-              placeholder="Добавьте цитату по желанию"
-            />
-          </div>
-
-          <p className="text-sm text-stone-400 sm:text-base">
-            Загрузка аватара будет доступна позже.
-          </p>
-        </div>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-[1.7rem] lg:leading-relaxed">
+          {profile.quote ?? 'Цитата пока не заполнена'}
+        </p>
 
         <div className="mt-6 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
           <dl className="divide-y divide-orange-100/80">
+            <ProfileInfoRow label="Дата рождения:" value={formatProfileDate(profile.birth_date)} />
+            <ProfileInfoRow label="Пол:" value={profile.gender ?? 'Не указано'} />
             <ProfileInfoRow
               label="Класс обучения:"
-              value={gradeLabel ?? 'Будет назначен после модерации'}
+              value={profile.grade_label ?? 'Будет назначен после модерации'}
             />
             <ProfileInfoRow
               label="Дата поступления:"
-              value={formatProfileDate(enrollmentDate)}
+              value={formatProfileDate(profile.enrollment_date)}
             />
           </dl>
         </div>
 
-        {!isReadOnly ? (
-          <div className="mt-8 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={isSaving || isSubmitting}
-              className="rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving ? 'Сохраняем...' : 'Сохранить изменения'}
-            </button>
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={isSaving || isSubmitting}
-              className="rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting ? 'Отправляем...' : 'Отправить на модерацию'}
-            </button>
-          </div>
-        ) : null}
+        <p className={`mt-6 w-full max-w-2xl rounded-[22px] border px-4 py-3 text-left text-sm sm:text-base ${statusClassName}`}>
+          {statusText}
+        </p>
 
-        {statusMessage ? (
-          <p
-            className={`mt-5 w-full max-w-2xl rounded-2xl border px-4 py-3 text-left text-sm sm:text-base ${
-              statusType === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
+        <div className="mt-6 flex w-full max-w-2xl justify-end">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50"
           >
-            {statusMessage}
-          </p>
-        ) : null}
+            <PencilLine className="h-4 w-4" />
+            Редактировать профиль
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -365,6 +252,7 @@ function StudentSectionContent({
   accessToken,
   profile,
   profileEditState,
+  profileViewMode,
   form,
   onChange,
   onSave,
@@ -376,11 +264,14 @@ function StudentSectionContent({
   messagesViewState,
   onOpenMessage,
   onBackToMessagesList,
+  onEditProfile,
+  onBackToProfile,
 }: {
   activeSection: StudentDashboardSection;
   accessToken: string;
   profile: StudentProfile;
   profileEditState: StudentProfileEditState | null;
+  profileViewMode: StudentProfileViewMode;
   form: StudentProfileFormState;
   onChange: (field: keyof StudentProfileFormState, value: string) => void;
   onSave: () => void;
@@ -392,10 +283,17 @@ function StudentSectionContent({
   messagesViewState: StudentMessagesViewState;
   onOpenMessage: (messageId: string) => void;
   onBackToMessagesList: () => void;
+  onEditProfile: () => void;
+  onBackToProfile: () => void;
 }) {
   const isRegularMode = profile.student_mode === 'regular';
   const regularEditStatus = profileEditState?.status ?? 'approved';
   const regularEditIsReadOnly = ['submitted', 'in_review'].includes(regularEditStatus);
+  const moderationStatus = isRegularMode ? regularEditStatus : profile.profile_status;
+  const readOnlyFields: ProfileEditReadOnlyField[] = [
+    { label: 'Класс обучения:', value: profile.grade_label ?? 'Будет назначен после модерации' },
+    { label: 'Дата поступления:', value: formatProfileDate(profile.enrollment_date) },
+  ];
 
   if (activeSection === 'messages') {
     return (
@@ -430,44 +328,13 @@ function StudentSectionContent({
     );
   }
 
-  if (activeSection === 'profile' && isRegularMode) {
+  if (activeSection === 'profile' && isRegularMode && profileViewMode === 'view') {
     return (
       <>
         <h1 className="text-2xl font-medium tracking-tight text-stone-700 sm:text-3xl lg:text-[2.1rem]">
           Образовательный профиль
         </h1>
-        <section className="mt-6 rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-          <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
-            <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
-                <UserRound className="h-14 w-14 text-orange-300" />
-              </div>
-            </div>
-
-            <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
-              {profile.full_name ?? 'Профиль ученика'}
-            </h2>
-
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-[1.7rem] lg:leading-relaxed">
-              {profile.quote ?? 'Цитата пока не заполнена'}
-            </p>
-
-            <div className="mt-6 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/70 px-4 py-3 text-left sm:px-5 sm:py-4">
-              <dl className="divide-y divide-orange-100/80">
-                <ProfileInfoRow label="Дата рождения:" value={formatProfileDate(profile.birth_date)} />
-                <ProfileInfoRow label="Пол:" value={profile.gender ?? 'Не указано'} />
-                <ProfileInfoRow
-                  label="Класс обучения:"
-                  value={profile.grade_label ?? 'Будет назначен после модерации'}
-                />
-                <ProfileInfoRow
-                  label="Дата поступления:"
-                  value={formatProfileDate(profile.enrollment_date)}
-                />
-              </dl>
-            </div>
-          </div>
-        </section>
+        <StudentProfileCard profile={profile} profileEditState={profileEditState} onEdit={onEditProfile} />
       </>
     );
   }
@@ -478,30 +345,34 @@ function StudentSectionContent({
         {isRegularMode ? 'Редактирование профиля' : 'Образовательный профиль'}
       </h1>
       <div className="mt-6">
-        <ModerationBanner
-          status={isRegularMode ? regularEditStatus : profile.profile_status}
-          variant={isRegularMode ? 'regular' : 'onboarding'}
-        />
-      </div>
-      <div className="mt-6">
-        <StudentProfileEditCard
-          avatarUrl={isRegularMode ? profileEditState?.avatar_url ?? profile.avatar_url : profile.avatar_url}
-          displayFullName={isRegularMode ? profileEditState?.full_name ?? profile.full_name : profile.full_name}
-          gradeLabel={profile.grade_label}
-          enrollmentDate={profile.enrollment_date}
+        <ProfileEditForm
+          fields={STUDENT_PROFILE_EDIT_FIELDS}
+          values={form}
           isReadOnly={
             isRegularMode
               ? regularEditIsReadOnly
               : ['submitted', 'in_review', 'approved'].includes(profile.profile_status)
           }
-          form={form}
-          onChange={onChange}
-          onSave={onSave}
-          onSubmit={onSubmit}
           isSaving={isSaving}
           isSubmitting={isSubmitting}
           statusMessage={statusMessage}
           statusType={statusType}
+          bannerText={getStudentModerationBannerText(
+            moderationStatus,
+            isRegularMode ? 'regular' : 'onboarding',
+          )}
+          bannerTone={getStudentModerationBannerTone(
+            moderationStatus,
+            isRegularMode ? 'regular' : 'onboarding',
+          )}
+          avatarUrl={profileEditState?.avatar_url ?? profile.avatar_url}
+          avatarAlt={`Аватар ${profile.full_name ?? 'ученика'}`}
+          readOnlyFields={readOnlyFields}
+          backButtonLabel="Назад к профилю"
+          onBack={isRegularMode ? onBackToProfile : undefined}
+          onChange={(field, value) => onChange(field as keyof StudentProfileFormState, value)}
+          onSave={onSave}
+          onSubmit={onSubmit}
         />
       </div>
     </>
@@ -751,11 +622,12 @@ export function StudentDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<StudentDashboardSection>('profile');
+  const [profileViewMode, setProfileViewMode] = useState<StudentProfileViewMode>('view');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [form, setForm] = useState<StudentProfileFormState>({
-    fullName: '',
-    birthDate: '',
+    full_name: '',
+    birth_date: '',
     gender: '',
     quote: '',
   });
@@ -799,7 +671,7 @@ export function StudentDashboard() {
           setProfileEditState(editState);
           setForm(buildFormState(editState ?? studentProfile));
           setAccessToken(token);
-          setActiveSection(studentProfile.student_mode === 'regular' ? 'profile' : 'profile');
+          setActiveSection('profile');
           setIsCheckingAuth(false);
         }
       } catch {
@@ -840,8 +712,8 @@ export function StudentDashboard() {
     try {
       if (profile.student_mode === 'regular') {
         const updatedEditState = await updateStudentProfileEditState(token, {
-          full_name: form.fullName,
-          birth_date: form.birthDate || null,
+          full_name: form.full_name,
+          birth_date: form.birth_date || null,
           gender: form.gender,
           quote: form.quote,
         });
@@ -853,8 +725,8 @@ export function StudentDashboard() {
       }
 
       const updatedProfile = await updateStudentProfile(token, {
-        full_name: form.fullName,
-        birth_date: form.birthDate || null,
+        full_name: form.full_name,
+        birth_date: form.birth_date || null,
         gender: form.gender,
         quote: form.quote,
       });
@@ -894,8 +766,8 @@ export function StudentDashboard() {
       }
 
       const savedProfile = await updateStudentProfile(token, {
-        full_name: form.fullName,
-        birth_date: form.birthDate || null,
+        full_name: form.full_name,
+        birth_date: form.birth_date || null,
         gender: form.gender,
         quote: form.quote,
       });
@@ -925,24 +797,28 @@ export function StudentDashboard() {
     const timeoutId = window.setTimeout(() => {
       if (requestedTab === 'materials' && profile.student_mode === 'regular') {
         setActiveSection('materials');
+        setProfileViewMode('view');
         setMessagesViewState({ mode: 'list' });
         return;
       }
 
       if (requestedTab === 'tests' && profile.student_mode === 'regular') {
         setActiveSection('tests');
+        setProfileViewMode('view');
         setMessagesViewState({ mode: 'list' });
         return;
       }
 
       if (requestedTab === 'edit-profile' || requestedTab === 'profile-edit') {
-        setActiveSection(profile.student_mode === 'regular' ? 'edit-profile' : 'profile');
+        setActiveSection('profile');
+        setProfileViewMode(profile.student_mode === 'regular' ? 'edit' : 'view');
         setMessagesViewState({ mode: 'list' });
         return;
       }
 
       if (requestedTab === 'messages' && profile.student_mode === 'regular') {
         setActiveSection('messages');
+        setProfileViewMode('view');
         const requestedMessageId = searchParams.get('messageId');
         setMessagesViewState(
           requestedMessageId ? { mode: 'detail', messageId: requestedMessageId } : { mode: 'list' },
@@ -951,6 +827,7 @@ export function StudentDashboard() {
       }
 
       setActiveSection('profile');
+      setProfileViewMode('view');
       setMessagesViewState({ mode: 'list' });
     }, 0);
 
@@ -961,6 +838,9 @@ export function StudentDashboard() {
 
   const handleSectionChange = (section: StudentDashboardSection) => {
     setActiveSection(section);
+    if (section !== 'profile') {
+      setProfileViewMode('view');
+    }
 
     if (section !== 'messages') {
       setMessagesViewState({ mode: 'list' });
@@ -973,7 +853,7 @@ export function StudentDashboard() {
 
   const menuItems = profile.student_mode === 'regular' ? REGULAR_MENU_ITEMS : ONBOARDING_MENU_ITEMS;
   const headerTitle =
-    activeSection === 'edit-profile'
+    activeSection === 'profile' && profile.student_mode === 'regular' && profileViewMode === 'edit'
       ? 'Редактирование профиля'
       : activeSection === 'messages' && messagesViewState.mode === 'detail'
         ? 'Сообщение'
@@ -1041,6 +921,7 @@ export function StudentDashboard() {
                 accessToken={accessToken}
                 profile={profile}
                 profileEditState={profileEditState}
+                profileViewMode={profileViewMode}
                 form={form}
                 onChange={handleFormChange}
                 onSave={handleSave}
@@ -1052,6 +933,14 @@ export function StudentDashboard() {
                 messagesViewState={messagesViewState}
                 onOpenMessage={(messageId) => setMessagesViewState({ mode: 'detail', messageId })}
                 onBackToMessagesList={() => setMessagesViewState({ mode: 'list' })}
+                onEditProfile={() => {
+                  setProfileViewMode('edit');
+                  setStatusMessage(null);
+                }}
+                onBackToProfile={() => {
+                  setProfileViewMode('view');
+                  setStatusMessage(null);
+                }}
               />
             </section>
           </div>

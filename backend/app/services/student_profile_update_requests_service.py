@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.student_profile import StudentProfile
 from app.models.student_profile_update_request import StudentProfileUpdateRequest
 from app.schemas.student_profile_edit import StudentProfileEditRequest, StudentProfileEditResponse
+from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notification, create_notifications_for_role
 
 
@@ -133,7 +134,7 @@ def save_student_profile_edit_draft(
 
     update_request.full_name = _normalize_text(payload.full_name)
     update_request.birth_date = payload.birth_date
-    update_request.gender = _normalize_text(payload.gender)
+    update_request.gender = normalize_profile_gender(payload.gender)
     update_request.quote = _normalize_text(payload.quote)
     update_request.avatar_url = _normalize_text(payload.avatar_url)
     update_request.status = "draft"

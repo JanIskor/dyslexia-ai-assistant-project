@@ -52,6 +52,10 @@ const getTeacherProfileErrorMessage = (status: number, body: ApiErrorBody | null
     return 'Заполните обязательные поля профиля преподавателя.';
   }
 
+  if (body?.detail === 'Gender must be either Мужской or Женский') {
+    return 'Пол можно выбрать только из значений «Мужской» или «Женский».';
+  }
+
   if (body?.detail === 'Profile changes are read-only during moderation') {
     return 'Изменения профиля сейчас находятся на модерации и временно недоступны для редактирования.';
   }

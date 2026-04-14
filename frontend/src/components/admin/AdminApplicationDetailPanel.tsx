@@ -207,13 +207,11 @@ export function AdminApplicationDetailPanel({
                 />
               </div>
             </div>
-          ) : (
+          ) : !isStudentProfileUpdate && !isTeacherProfileUpdate ? (
             <p className="mt-4 text-sm leading-relaxed text-stone-500 sm:text-base">
-              {isTeacherProfileUpdate
-                ? 'Администратор проверяет предложенные изменения профиля преподавателя и либо подтверждает их, либо отправляет на доработку.'
-                : 'Для обновления профиля администратор проверяет предложенные изменения и либо подтверждает их, либо отправляет на доработку.'}
+              Для этой заявки администратор проверяет данные и принимает решение по профилю.
             </p>
-          )}
+          ) : null}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
             {application.can_edit_admin_fields ? (
