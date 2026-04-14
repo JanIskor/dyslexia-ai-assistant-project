@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: MinIO Storage Foundation + Profile Avatar Uploads
+## Текущая фаза: Admin Directories API Foundation
 
-На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication и унифицированный profile edit UX. Поверх этого добавлен storage layer на базе MinIO и реальные avatar uploads для student и teacher.
+На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX и MinIO storage layer. Поверх этого добавлен backend foundation для admin directories преподавателей и учеников.
 
 ### Tech Stack
 ```
@@ -56,6 +56,7 @@ app/
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
 │   ├── admin_applications.py
+│   ├── admin_directories.py
 │   ├── notifications.py
 │   ├── student_profile_edit.py
 │   ├── student_profile.py
@@ -63,6 +64,7 @@ app/
 │   └── teacher_students.py
 ├── services/       # Бизнес-логика
 │   ├── admin_applications_service.py
+│   ├── admin_directories_service.py
 │   ├── auth_service.py
 │   ├── notifications_service.py
 │   ├── storage_service.py
@@ -222,6 +224,43 @@ lib/
 - единый reusable `ProfileEditForm` используется и для student, и для teacher
 - именно он отвечает за avatar picker, preview, upload loading и fallback icon
 - profile view после upload читает avatar из того же state, что и existing moderation flow, поэтому URL сохраняется после reload
+
+## Admin Directories API Foundation
+
+### Endpoints
+- `GET /api/v1/admin/teachers`
+- `GET /api/v1/admin/teachers/{teacher_id}`
+- `GET /api/v1/admin/students`
+- `GET /api/v1/admin/students/{student_id}`
+
+### Access model
+- endpoints используют existing `get_current_admin`
+- без token возвращают `401`
+- роли `teacher` и `student` получают `403`
+
+### Search model
+- search использует только первое слово `full_name`
+- поиск идёт только по prefix фамилии
+- для этого используется SQL `split_part(..., ' ', 1)`
+
+### Sort model
+- teachers:
+  - `surname_asc`
+  - `surname_desc`
+- students:
+  - `surname_asc`
+  - `surname_desc`
+  - `grade_asc`
+  - `grade_desc`
+
+### Pagination
+- оба list endpoint возвращают:
+  - `items`
+  - `page`
+  - `page_size`
+  - `total`
+  - `total_pages`
+- route layer валидирует границы `page` и `page_size`
 
 ## Notifications Foundation
 

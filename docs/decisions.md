@@ -279,6 +279,37 @@ backend/
 - upload выполняется synchronously в рамках обычного HTTP request;
 - добавление Redis сейчас не даёт ценности и только усложняет инфраструктуру.
 
+## Решения шага 3.2.4.16.1: Admin Directories API Foundation
+
+### Для директорий добавлен отдельный service layer
+- list/detail logic вынесена в `admin_directories_service.py`
+- `admin.py` остался thin routing layer
+- отдельный repository layer не добавлялся, потому что на этом шаге это было бы лишним
+
+### Search повторяет уже согласованную project logic
+- поиск идёт только по первому слову `full_name`
+- используется prefix search
+- это делает поведение одинаковым с ранее согласованной логикой directory-поиска
+
+### Teachers получили только surname sort
+- для teacher directory поддержаны только:
+  - `surname_asc`
+  - `surname_desc`
+- дополнительные sort modes не добавлялись без требования шага
+
+### Students получили surname sort и grade sort
+- grade sort реализован через SQL extraction числа класса и буквы
+- это даёт ожидаемый порядок без пост-обработки в Python
+
+### Pagination оставлена простой
+- используются только `page` и `page_size`
+- response сразу возвращает `total` и `total_pages`
+- этого достаточно для admin directory foundation без cursor-сложности
+
+### Directories показывают confirmed profile data
+- directories не подмешивают pending moderation requests
+- moderation flow остаётся отдельным от directory API
+
 ## Решения шага 3.2.4.10: Notification Routing And Read-Flow Polish
 
 ### Уведомление связано не с frontend-компонентом, а с product target metadata

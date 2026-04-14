@@ -12,6 +12,14 @@ from app.schemas.admin_applications import (
     AdminTeacherAssignmentOptionsResponse,
     AdminApplicationUpdateRequest,
 )
+from app.schemas.admin_directories import (
+    AdminStudentDetailResponse,
+    AdminStudentsListResponse,
+    AdminStudentsSort,
+    AdminTeacherDetailResponse,
+    AdminTeachersListResponse,
+    AdminTeachersSort,
+)
 from app.schemas.auth import UserResponse
 from app.services.admin_applications_service import (
     approve_admin_application,
@@ -22,6 +30,12 @@ from app.services.admin_applications_service import (
     list_admin_applications,
     request_admin_application_changes,
     update_admin_application,
+)
+from app.services.admin_directories_service import (
+    get_admin_student_detail,
+    get_admin_teacher_detail,
+    list_admin_students,
+    list_admin_teachers,
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -54,6 +68,60 @@ def read_admin_teacher_assignment_options(
     db: Session = Depends(get_db),
 ):
     return list_admin_teacher_assignment_options(db, application_id=application_id)
+
+
+@router.get("/teachers", response_model=AdminTeachersListResponse)
+def read_admin_teachers(
+    search: str | None = Query(default=None),
+    sort: AdminTeachersSort = Query(default="surname_asc"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return list_admin_teachers(
+        db,
+        search=search,
+        sort=sort,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/teachers/{teacher_id}", response_model=AdminTeacherDetailResponse)
+def read_admin_teacher_detail(
+    teacher_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return get_admin_teacher_detail(db, teacher_id=teacher_id)
+
+
+@router.get("/students", response_model=AdminStudentsListResponse)
+def read_admin_students(
+    search: str | None = Query(default=None),
+    sort: AdminStudentsSort = Query(default="surname_asc"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return list_admin_students(
+        db,
+        search=search,
+        sort=sort,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/students/{student_id}", response_model=AdminStudentDetailResponse)
+def read_admin_student_detail(
+    student_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return get_admin_student_detail(db, student_id=student_id)
 
 
 @router.get("/applications/{application_id}", response_model=AdminApplicationDetailResponse)
