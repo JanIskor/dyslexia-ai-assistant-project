@@ -6,3 +6,5 @@ alembic
 psycopg[binary]
 passlib[bcrypt]
 python-jose[cryptography]
+boto3
+python-multipart

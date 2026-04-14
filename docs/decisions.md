@@ -238,6 +238,47 @@ backend/
 
 ## Решения шага 3.2.3.1: Frontend Integration Teacher Students
 
+## Решения шага 3.2.4.14: MinIO Storage Foundation
+
+### В качестве storage layer выбран MinIO, а не filesystem upload
+- проекту нужен S3-compatible слой, который позже сможет хранить не только аватарки, но и учебные материалы и другие файлы;
+- локальный filesystem upload слишком сильно привязывал бы backend к одному окружению;
+- MinIO даёт простой локальный dev setup через `docker-compose` без отдельной облачной зависимости.
+
+### В качестве S3 client выбран `boto3`
+- backend уже построен вокруг Python ecosystem и `boto3` хорошо подходит для S3-compatible API;
+- на этом шаге не нужен отдельный abstraction stack поверх клиента;
+- выбран один client library без смешивания с `minio` SDK, чтобы не дублировать способы работы с object storage.
+
+### Upload logic централизована в `storage_service.py`
+- upload/delete/build object name не размазаны по student/teacher сервисам;
+- product-specific сервисы знают только:
+  - какой prefix использовать;
+  - в какой profile/update entity положить `avatar_url`;
+- это упрощает следующий шаг, когда storage будет использоваться не только для аватарок.
+
+### Bucket создаётся на startup backend
+- выбран самый простой MVP-вариант: backend при старте делает `ensure_bucket_exists()`;
+- отдельный infra-init контейнер или management command пока не нужен;
+- это уменьшает количество ручных шагов для локальной разработки.
+
+### Для локального MVP используются прямые object URLs без signed URLs
+- backend сохраняет сразу resolvable MinIO URL;
+- frontend может показывать аватарку сразу после upload и после reload страницы;
+- signed URL flow и сложные ACL сознательно отложены, чтобы не усложнять текущий шаг.
+
+### Avatar upload встроен в существующий moderation flow, а не обходит его
+- для teacher и regular student avatar change идёт в pending update request, а не напрямую в confirmed profile;
+- это сохраняет уже принятый product contract:
+  - confirmed profile остаётся стабильным;
+  - admin подтверждает новую версию профиля целиком;
+- для onboarding student direct profile update сохраняется.
+
+### Redis не добавлялся
+- на этом шаге нет очередей, фоновой обработки, кешей или async post-processing;
+- upload выполняется synchronously в рамках обычного HTTP request;
+- добавление Redis сейчас не даёт ценности и только усложняет инфраструктуру.
+
 ## Решения шага 3.2.4.10: Notification Routing And Read-Flow Polish
 
 ### Уведомление связано не с frontend-компонентом, а с product target metadata

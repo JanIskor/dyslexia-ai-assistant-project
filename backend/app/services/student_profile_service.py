@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 import uuid
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
 from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notifications_for_role
+from app.services.storage_service import build_object_name, delete_object, extract_object_name, upload_image
 
 
 EDITABLE_PROFILE_STATUSES = {"draft", "needs_completion"}
@@ -118,3 +119,36 @@ def submit_student_profile(db: Session, *, profile: StudentProfile) -> StudentPr
     db.commit()
     db.refresh(profile)
     return profile
+
+
+async def upload_student_avatar(
+    db: Session,
+    *,
+    student_user_id,
+    file: UploadFile,
+) -> str:
+    profile = get_or_create_student_profile(db, student_user_id)
+
+    if profile.profile_status not in EDITABLE_PROFILE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Profile is read-only during moderation",
+        )
+
+    next_object_name = build_object_name(
+        prefix="student-avatars",
+        user_id=str(student_user_id),
+        filename=file.filename or "avatar.png",
+    )
+    next_avatar_url = await upload_image(file, next_object_name)
+    previous_object_name = extract_object_name(profile.avatar_url)
+
+    profile.avatar_url = next_avatar_url
+
+    db.commit()
+    db.refresh(profile)
+
+    if previous_object_name is not None:
+        delete_object(previous_object_name)
+
+    return next_avatar_url

@@ -31,6 +31,10 @@ export interface TeacherProfileEditState {
   updated_at: string | null;
 }
 
+interface ProfileAvatarUploadResponse {
+  avatar_url: string;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -62,6 +66,18 @@ const getTeacherProfileErrorMessage = (status: number, body: ApiErrorBody | null
 
   if (body?.detail === 'Profile changes already submitted') {
     return 'Изменения профиля уже отправлены на модерацию.';
+  }
+
+  if (body?.detail === 'Only jpg, jpeg, png and webp files are allowed') {
+    return 'Можно загружать только изображения форматов JPG, JPEG, PNG или WEBP.';
+  }
+
+  if (body?.detail === 'Image size must be 5MB or less') {
+    return 'Размер изображения должен быть не больше 5 МБ.';
+  }
+
+  if (body?.detail === 'Uploaded file is empty') {
+    return 'Не удалось загрузить пустой файл.';
   }
 
   if (status >= 500) {
@@ -168,4 +184,32 @@ export const submitTeacherProfileEditState = async (token: string): Promise<Teac
   }
 
   return parseJson<TeacherProfileEditState>(response);
+};
+
+export const uploadTeacherProfileAvatar = async (token: string, file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(buildApiUrl('/api/v1/teacher/profile/avatar'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getTeacherProfileErrorMessage(response.status, body));
+  }
+
+  const payload = await parseJson<ProfileAvatarUploadResponse>(response);
+  return payload.avatar_url;
 };

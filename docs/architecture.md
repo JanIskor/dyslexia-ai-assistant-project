@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Student Profile Edit Resubmission Flow
+## Текущая фаза: MinIO Storage Foundation + Profile Avatar Uploads
 
-На текущем этапе frontend auth flow, dashboard UI, PostgreSQL schema layer, admin role foundation, teacher students integration, student profile moderation foundation, admin applications list foundation, admin application detail / review foundation, teacher assignment modal foundation, teacher incoming review foundation, in-app notifications, notification routing и teacher → student communication уже реализованы. Поверх этого добавлен flow повторного редактирования student profile через отдельный pending update layer.
+На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication и унифицированный profile edit UX. Поверх этого добавлен storage layer на базе MinIO и реальные avatar uploads для student и teacher.
 
 ### Tech Stack
 ```
@@ -22,6 +22,7 @@ Frontend (Next.js 16 + App Router)
 Backend (FastAPI + SQLAlchemy)
     ↓
     [PostgreSQL database]
+    [MinIO / S3-compatible object storage]
     [Alembic migrations]
     [JWT authentication]
     [Pydantic validation]
@@ -64,8 +65,10 @@ app/
 │   ├── admin_applications_service.py
 │   ├── auth_service.py
 │   ├── notifications_service.py
+│   ├── storage_service.py
 │   ├── student_profile_service.py
 │   ├── student_profile_update_requests_service.py
+│   ├── teacher_profile_update_requests_service.py
 │   ├── teacher_student_messages_service.py
 │   └── teacher_students_service.py
 ├── scripts/        # Локальные utility/seed scripts
@@ -170,6 +173,55 @@ lib/
 - активный профиль не ломается во время модерации
 - student сохраняет доступ к остальным разделам dashboard
 - admin проверяет именно новую предложенную версию профиля
+
+## Storage Foundation
+
+### Infra layer
+- `docker-compose.yml` поднимает:
+  - `postgres`
+  - `pgadmin`
+  - `minio`
+- MinIO использует отдельный persistent volume и локальные порты:
+  - `9000` — S3 API
+  - `9001` — console
+
+### Backend storage layer
+- все file operations централизованы в `app/services/storage_service.py`
+- storage service отвечает за:
+  - `ensure_bucket_exists()`
+  - `build_object_name(...)`
+  - `upload_image(...)`
+  - `delete_object(...)`
+- backend использует `boto3` как единый S3-compatible client
+
+### Bucket lifecycle
+- bucket создаётся через backend startup hook в `app.main`
+- для локального MVP backend также ставит bucket policy на публичное чтение объектов
+- это позволяет сразу использовать сохранённый `avatar_url` без signed URL flow
+
+### Avatar upload integration
+- `POST /api/v1/student/profile/avatar`
+- `POST /api/v1/teacher/profile/avatar`
+
+Оба endpoint:
+- принимают `multipart/form-data`
+- доступны только авторизованному пользователю своей роли
+- валидируют формат и размер файла
+- передают upload в единый storage service
+
+### Persistence model
+- confirmed avatar columns уже существуют в:
+  - `student_profiles.avatar_url`
+  - `teacher_profiles.avatar_url`
+- для regular edit moderation новые avatar URLs пишутся в pending update tables:
+  - `student_profile_update_requests.avatar_url`
+  - `teacher_profile_update_requests.avatar_url`
+- confirmed profile получает новый avatar только после approve moderation flow
+
+### Frontend integration
+- единый reusable `ProfileEditForm` используется и для student, и для teacher
+- именно он отвечает за avatar picker, preview, upload loading и fallback icon
+- profile view после upload читает avatar из того же state, что и existing moderation flow, поэтому URL сохраняется после reload
 
 ## Notifications Foundation
 

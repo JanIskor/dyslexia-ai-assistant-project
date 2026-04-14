@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Save, UserRound } from 'lucide-react';
 
 export const GENDER_OPTIONS = [
@@ -44,6 +45,8 @@ interface ProfileEditFormProps<TValues extends object> {
   avatarUrl?: string | null;
   avatarAlt?: string;
   avatarButtonLabel?: string;
+  isUploadingAvatar?: boolean;
+  onAvatarUpload?: (file: File) => Promise<void>;
 }
 
 function getBannerClassName(tone: ProfileEditBannerTone): string {
@@ -87,7 +90,22 @@ export function ProfileEditForm<TValues extends object>({
   avatarUrl,
   avatarAlt = 'Аватар профиля',
   avatarButtonLabel = 'Сменить аватар',
+  isUploadingAvatar = false,
+  onAvatarUpload,
 }: ProfileEditFormProps<TValues>) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const displayedAvatarUrl = avatarPreviewUrl ?? avatarUrl;
+
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       {onBack ? (
@@ -108,9 +126,9 @@ export function ProfileEditForm<TValues extends object>({
 
         <div className="flex flex-col items-center gap-4 rounded-[24px] border border-orange-100/70 bg-white/75 px-5 py-5 text-center">
           <div className="flex h-28 w-28 items-center justify-center rounded-[28px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-            {avatarUrl ? (
+            {displayedAvatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={avatarAlt} className="h-20 w-20 rounded-full object-cover" />
+              <img src={displayedAvatarUrl} alt={avatarAlt} className="h-20 w-20 rounded-full object-cover" />
             ) : (
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/75">
                 <UserRound className="h-12 w-12 text-orange-300" />
@@ -118,12 +136,53 @@ export function ProfileEditForm<TValues extends object>({
             )}
           </div>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file || !onAvatarUpload) {
+                return;
+              }
+
+              const nextPreviewUrl = URL.createObjectURL(file);
+              setAvatarPreviewUrl((currentValue) => {
+                if (currentValue) {
+                  URL.revokeObjectURL(currentValue);
+                }
+                return nextPreviewUrl;
+              });
+
+              try {
+                await onAvatarUpload(file);
+                setAvatarPreviewUrl((currentValue) => {
+                  if (currentValue) {
+                    URL.revokeObjectURL(currentValue);
+                  }
+                  return null;
+                });
+              } catch {
+                setAvatarPreviewUrl((currentValue) => {
+                  if (currentValue) {
+                    URL.revokeObjectURL(currentValue);
+                  }
+                  return null;
+                });
+              } finally {
+                event.target.value = '';
+              }
+            }}
+          />
+
           <button
             type="button"
-            disabled
-            className="rounded-2xl border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-stone-500 shadow-sm disabled:cursor-not-allowed disabled:opacity-80"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isReadOnly || isUploadingAvatar || !onAvatarUpload}
+            className="rounded-2xl border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-stone-500 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-80"
           >
-            {avatarButtonLabel}
+            {isUploadingAvatar ? 'Загружаем...' : avatarButtonLabel}
           </button>
         </div>
 

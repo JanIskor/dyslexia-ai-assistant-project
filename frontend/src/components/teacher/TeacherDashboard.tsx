@@ -33,6 +33,7 @@ import {
   getTeacherProfile,
   getTeacherProfileEditState,
   submitTeacherProfileEditState,
+  uploadTeacherProfileAvatar,
   updateTeacherProfileEditState,
   type TeacherProfile,
   type TeacherProfileEditState,
@@ -205,9 +206,11 @@ function getTeacherProfileEditStatusMeta(status: string | null) {
 
 function TeacherProfileCard({
   profile,
+  avatarUrlOverride,
   onEdit,
 }: {
   profile: TeacherProfile;
+  avatarUrlOverride?: string | null;
   onEdit: () => void;
 }) {
   const teacherProfileFields: TeacherProfileField[] = [
@@ -223,7 +226,7 @@ function TeacherProfileCard({
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
-        <ProfileAvatar avatarUrl={profile.avatar_url} fullName={profile.full_name} />
+        <ProfileAvatar avatarUrl={avatarUrlOverride ?? profile.avatar_url} fullName={profile.full_name} />
 
         <h2 className="mt-6 max-w-2xl text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
           {profile.full_name}
@@ -1209,11 +1212,13 @@ function TeacherSectionContent({
   onBackToProfile,
   onTeacherProfileChange,
   onSaveTeacherProfile,
+  onSaveTeacherAvatar,
   onSubmitTeacherProfile,
   isSavingTeacherProfile,
   isSubmittingTeacherProfile,
   teacherProfileStatusMessage,
   teacherProfileStatusType,
+  isUploadingTeacherAvatar,
   onOpenStudent,
   onBackToStudentsList,
   onOpenIncomingStudent,
@@ -1231,11 +1236,13 @@ function TeacherSectionContent({
   onBackToProfile: () => void;
   onTeacherProfileChange: (field: keyof TeacherProfileEditFormState, value: string) => void;
   onSaveTeacherProfile: () => void;
+  onSaveTeacherAvatar: (file: File) => Promise<void>;
   onSubmitTeacherProfile: () => void;
   isSavingTeacherProfile: boolean;
   isSubmittingTeacherProfile: boolean;
   teacherProfileStatusMessage: string | null;
   teacherProfileStatusType: 'error' | 'success';
+  isUploadingTeacherAvatar: boolean;
   onOpenStudent: (studentId: string) => void;
   onBackToStudentsList: () => void;
   onOpenIncomingStudent: (studentId: string) => void;
@@ -1299,6 +1306,8 @@ function TeacherSectionContent({
               bannerTone={statusMeta?.tone ?? 'neutral'}
               avatarUrl={teacherProfileFormState.avatar_url}
               avatarAlt={`Аватар ${teacherProfile.full_name}`}
+              isUploadingAvatar={isUploadingTeacherAvatar}
+              onAvatarUpload={async (file) => onSaveTeacherAvatar(file)}
               backButtonLabel="Назад к профилю"
               onBack={onBackToProfile}
               onChange={onTeacherProfileChange}
@@ -1307,7 +1316,11 @@ function TeacherSectionContent({
             />
           );
         })() : (
-          <TeacherProfileCard profile={teacherProfile} onEdit={onEditProfile} />
+          <TeacherProfileCard
+            profile={teacherProfile}
+            avatarUrlOverride={teacherProfileEditState.avatar_url ?? teacherProfile.avatar_url}
+            onEdit={onEditProfile}
+          />
         )}
       </div>
     </>
@@ -1349,6 +1362,7 @@ export function TeacherDashboard() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isSavingTeacherProfile, setIsSavingTeacherProfile] = useState(false);
   const [isSubmittingTeacherProfile, setIsSubmittingTeacherProfile] = useState(false);
+  const [isUploadingTeacherAvatar, setIsUploadingTeacherAvatar] = useState(false);
   const [teacherProfileStatusMessage, setTeacherProfileStatusMessage] = useState<string | null>(null);
   const [teacherProfileStatusType, setTeacherProfileStatusType] = useState<'error' | 'success'>('success');
   const [studentsViewState, setStudentsViewState] = useState<TeacherStudentsViewState>({
@@ -1556,6 +1570,44 @@ export function TeacherDashboard() {
     }
   };
 
+  const handleTeacherAvatarUpload = async (file: File) => {
+    if (!accessToken || !teacherProfileEditState) {
+      return;
+    }
+
+    setIsUploadingTeacherAvatar(true);
+    setTeacherProfileStatusMessage(null);
+
+    try {
+      const avatarUrl = await uploadTeacherProfileAvatar(accessToken, file);
+
+      setTeacherProfileEditState((currentValue) =>
+        currentValue
+          ? {
+              ...currentValue,
+              avatar_url: avatarUrl,
+              status: 'draft',
+              admin_comment: null,
+            }
+          : currentValue,
+      );
+      setTeacherProfileFormState((currentValue) => ({
+        ...currentValue,
+        avatar_url: avatarUrl,
+      }));
+      setTeacherProfileStatusType('success');
+      setTeacherProfileStatusMessage('Аватар успешно загружен.');
+    } catch (error) {
+      setTeacherProfileStatusType('error');
+      setTeacherProfileStatusMessage(
+        error instanceof Error ? error.message : 'Не удалось загрузить аватар.',
+      );
+      throw error;
+    } finally {
+      setIsUploadingTeacherAvatar(false);
+    }
+  };
+
   const handleOpenStudent = (studentId: string) => {
     setStudentsViewState({
       mode: 'detail',
@@ -1649,9 +1701,11 @@ export function TeacherDashboard() {
                 }}
                 onTeacherProfileChange={handleTeacherProfileFormChange}
                 onSaveTeacherProfile={() => void handleTeacherProfileSave()}
+                onSaveTeacherAvatar={(file) => handleTeacherAvatarUpload(file)}
                 onSubmitTeacherProfile={() => void handleTeacherProfileSubmit()}
                 isSavingTeacherProfile={isSavingTeacherProfile}
                 isSubmittingTeacherProfile={isSubmittingTeacherProfile}
+                isUploadingTeacherAvatar={isUploadingTeacherAvatar}
                 teacherProfileStatusMessage={teacherProfileStatusMessage}
                 teacherProfileStatusType={teacherProfileStatusType}
                 studentsViewState={studentsViewState}

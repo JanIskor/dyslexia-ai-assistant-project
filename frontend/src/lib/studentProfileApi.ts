@@ -32,6 +32,10 @@ export interface StudentProfileUpdatePayload {
   quote?: string | null;
 }
 
+interface ProfileAvatarUploadResponse {
+  avatar_url: string;
+}
+
 export type StudentProfileEditStatus =
   | 'draft'
   | 'submitted'
@@ -96,6 +100,18 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
 
   if (detail === 'Could not validate credentials') {
     return 'Не удалось подтвердить авторизацию. Войдите снова.';
+  }
+
+  if (detail === 'Only jpg, jpeg, png and webp files are allowed') {
+    return 'Можно загружать только изображения форматов JPG, JPEG, PNG или WEBP.';
+  }
+
+  if (detail === 'Image size must be 5MB or less') {
+    return 'Размер изображения должен быть не больше 5 МБ.';
+  }
+
+  if (detail === 'Uploaded file is empty') {
+    return 'Не удалось загрузить пустой файл.';
   }
 
   if (status >= 500) {
@@ -175,3 +191,31 @@ export const submitStudentProfileEditState = async (
     method: 'POST',
     body: JSON.stringify({}),
   });
+
+export const uploadStudentProfileAvatar = async (token: string, file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(buildApiUrl('/api/v1/student/profile/avatar'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  const payload = await parseJson<ProfileAvatarUploadResponse>(response);
+  return payload.avatar_url;
+};

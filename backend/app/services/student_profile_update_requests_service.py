@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
@@ -9,6 +9,7 @@ from app.models.student_profile_update_request import StudentProfileUpdateReques
 from app.schemas.student_profile_edit import StudentProfileEditRequest, StudentProfileEditResponse
 from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notification, create_notifications_for_role
+from app.services.storage_service import build_object_name, delete_object, extract_object_name, upload_image
 
 
 EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
@@ -238,3 +239,39 @@ def request_student_profile_update_changes(
     db.commit()
     db.refresh(update_request)
     return _build_edit_response(student_profile=student_profile, update_request=update_request)
+
+
+async def upload_student_profile_edit_avatar(
+    db: Session,
+    *,
+    student_user_id: UUID,
+    file: UploadFile,
+) -> str:
+    profile = _get_student_profile_or_404(db, student_user_id=student_user_id)
+    update_request = _get_or_create_update_request(db, student_profile=profile)
+
+    if update_request.status not in EDITABLE_UPDATE_REQUEST_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Profile changes are read-only during moderation",
+        )
+
+    next_object_name = build_object_name(
+        prefix="student-avatars",
+        user_id=str(student_user_id),
+        filename=file.filename or "avatar.png",
+    )
+    next_avatar_url = await upload_image(file, next_object_name)
+    previous_object_name = extract_object_name(update_request.avatar_url)
+
+    update_request.avatar_url = next_avatar_url
+    update_request.status = "draft"
+    update_request.admin_comment = None
+
+    db.commit()
+    db.refresh(update_request)
+
+    if previous_object_name is not None:
+        delete_object(previous_object_name)
+
+    return next_avatar_url

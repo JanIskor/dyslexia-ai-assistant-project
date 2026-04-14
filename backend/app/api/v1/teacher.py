@@ -2,11 +2,12 @@ from uuid import UUID
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_teacher, get_db
 from app.models.user import User
+from app.schemas.profile_avatar import ProfileAvatarUploadResponse
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
     TeacherIncomingStudentsListResponse,
@@ -20,6 +21,7 @@ from app.services.teacher_profile_update_requests_service import (
     get_teacher_profile_edit_state,
     save_teacher_profile_edit_draft,
     submit_teacher_profile_edit_request,
+    upload_teacher_profile_edit_avatar,
 )
 from app.services.teacher_incoming_students_service import (
     accept_teacher_incoming_student,
@@ -74,6 +76,20 @@ def submit_teacher_profile_edit(
         db,
         teacher_user_id=current_teacher.id,
     )
+
+
+@router.post("/profile/avatar", response_model=ProfileAvatarUploadResponse)
+async def upload_teacher_profile_avatar(
+    file: UploadFile = File(...),
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    avatar_url = await upload_teacher_profile_edit_avatar(
+        db,
+        teacher_user_id=current_teacher.id,
+        file=file,
+    )
+    return ProfileAvatarUploadResponse(avatar_url=avatar_url)
 
 
 @router.get("/students", response_model=TeacherStudentsListResponse)

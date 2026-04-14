@@ -14,6 +14,7 @@ import {
   getStudentProfileEditState,
   submitStudentProfileEditState,
   submitStudentProfile,
+  uploadStudentProfileAvatar,
   type StudentProfileEditState,
   type StudentProfile,
   updateStudentProfileEditState,
@@ -200,9 +201,18 @@ function StudentProfileCard({
     <section className="mt-6 rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
         <div className="flex h-32 w-32 items-center justify-center rounded-[32px] bg-gradient-to-b from-orange-50 via-orange-100 to-orange-50 shadow-inner">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
-            <UserRound className="h-14 w-14 text-orange-300" />
-          </div>
+          {profileEditState?.avatar_url ?? profile.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profileEditState?.avatar_url ?? profile.avatar_url ?? ''}
+              alt={`Аватар ${profile.full_name ?? 'ученика'}`}
+              className="h-24 w-24 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/70">
+              <UserRound className="h-14 w-14 text-orange-300" />
+            </div>
+          )}
         </div>
 
         <h2 className="mt-6 max-w-sm text-2xl font-medium leading-tight text-stone-700 sm:text-3xl lg:text-[2.65rem]">
@@ -256,9 +266,11 @@ function StudentSectionContent({
   form,
   onChange,
   onSave,
+  onSaveAvatar,
   onSubmit,
   isSaving,
   isSubmitting,
+  isUploadingAvatar,
   statusMessage,
   statusType,
   messagesViewState,
@@ -275,9 +287,11 @@ function StudentSectionContent({
   form: StudentProfileFormState;
   onChange: (field: keyof StudentProfileFormState, value: string) => void;
   onSave: () => void;
+  onSaveAvatar: (file: File) => Promise<void>;
   onSubmit: () => void;
   isSaving: boolean;
   isSubmitting: boolean;
+  isUploadingAvatar: boolean;
   statusMessage: string | null;
   statusType: 'error' | 'success';
   messagesViewState: StudentMessagesViewState;
@@ -367,6 +381,8 @@ function StudentSectionContent({
           )}
           avatarUrl={profileEditState?.avatar_url ?? profile.avatar_url}
           avatarAlt={`Аватар ${profile.full_name ?? 'ученика'}`}
+          isUploadingAvatar={isUploadingAvatar}
+          onAvatarUpload={async (file) => onSaveAvatar(file)}
           readOnlyFields={readOnlyFields}
           backButtonLabel="Назад к профилю"
           onBack={isRegularMode ? onBackToProfile : undefined}
@@ -634,6 +650,7 @@ export function StudentDashboard() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'error' | 'success'>('success');
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -788,6 +805,54 @@ export function StudentDashboard() {
     }
   };
 
+  const handleAvatarUpload = async (file: File) => {
+    const token = getAccessToken();
+
+    if (!token || !profile) {
+      router.replace('/login');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setStatusMessage(null);
+
+    try {
+      const avatarUrl = await uploadStudentProfileAvatar(token, file);
+
+      if (profile.student_mode === 'regular') {
+        setProfileEditState((currentValue) =>
+          currentValue
+            ? {
+                ...currentValue,
+                avatar_url: avatarUrl,
+                status: 'draft',
+                admin_comment: null,
+              }
+            : currentValue,
+        );
+      }
+
+      setProfile((currentValue) =>
+        currentValue
+          ? {
+              ...currentValue,
+              avatar_url: profile.student_mode === 'regular' ? currentValue.avatar_url : avatarUrl,
+            }
+          : currentValue,
+      );
+      setStatusType('success');
+      setStatusMessage('Аватар успешно загружен.');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Не удалось загрузить аватар.';
+      setStatusType('error');
+      setStatusMessage(message);
+      throw error;
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   useEffect(() => {
     if (!profile) {
       return;
@@ -925,9 +990,11 @@ export function StudentDashboard() {
                 form={form}
                 onChange={handleFormChange}
                 onSave={handleSave}
+                onSaveAvatar={(file) => handleAvatarUpload(file)}
                 onSubmit={handleSubmitProfile}
                 isSaving={isSaving}
                 isSubmitting={isSubmitting}
+                isUploadingAvatar={isUploadingAvatar}
                 statusMessage={statusMessage}
                 statusType={statusType}
                 messagesViewState={messagesViewState}

@@ -1,10 +1,11 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_student, get_db
 from app.models.user import User
+from app.schemas.profile_avatar import ProfileAvatarUploadResponse
 from app.schemas.student_profile_edit import StudentProfileEditRequest, StudentProfileEditResponse
 from app.schemas.student_profile import StudentProfileResponse, StudentProfileUpdateRequest
 from app.schemas.teacher_student_messages import TeacherStudentMessageItem, TeacherStudentMessagesListResponse
@@ -12,12 +13,14 @@ from app.services.student_profile_service import (
     get_or_create_student_profile,
     get_student_mode,
     submit_student_profile,
+    upload_student_avatar,
     update_student_profile,
 )
 from app.services.student_profile_update_requests_service import (
     get_student_profile_edit_state,
     save_student_profile_edit_draft,
     submit_student_profile_edit_request,
+    upload_student_profile_edit_avatar,
 )
 from app.services.teacher_student_messages_service import (
     get_student_message,
@@ -108,6 +111,30 @@ def submit_student_profile_edit_state(
     db: Session = Depends(get_db),
 ):
     return submit_student_profile_edit_request(db, student_user_id=current_student.id)
+
+
+@router.post("/profile/avatar", response_model=ProfileAvatarUploadResponse)
+async def upload_student_profile_avatar(
+    file: UploadFile = File(...),
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    student_mode = get_student_mode(db, student_user_id=current_student.id)
+
+    if student_mode == "regular":
+        avatar_url = await upload_student_profile_edit_avatar(
+            db,
+            student_user_id=current_student.id,
+            file=file,
+        )
+    else:
+        avatar_url = await upload_student_avatar(
+            db,
+            student_user_id=current_student.id,
+            file=file,
+        )
+
+    return ProfileAvatarUploadResponse(avatar_url=avatar_url)
 
 
 @router.get("/messages", response_model=TeacherStudentMessagesListResponse)
