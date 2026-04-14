@@ -1,6 +1,8 @@
 'use client';
 
 import { ArrowLeft, Check, RefreshCcw, Save, UserRound } from 'lucide-react';
+import { ModerationEntityBadge } from '@/components/admin/ModerationEntityBadge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { AdminApplicationDetail } from '@/lib/adminApplicationsApi';
 import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
 
@@ -88,17 +90,17 @@ export function AdminApplicationDetailPanel({
 
             <h2 className="mt-5 text-2xl font-medium text-stone-700 sm:text-3xl">{application.full_name}</h2>
 
-            <p className="mt-2 text-sm font-medium text-stone-400 sm:text-base">
-              {application.request_kind_label}
-            </p>
+            <ModerationEntityBadge
+              requestKind={application.request_kind}
+              label={application.request_kind_label}
+              className="mt-3"
+            />
 
-            <span
-              className={`mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:text-base ${
-                getAdminApplicationStatusStyle(application.status)
-              }`}
-            >
-              {application.status}
-            </span>
+            <StatusBadge
+              label={application.status}
+              toneClassName={getAdminApplicationStatusStyle(application.status)}
+              className="mt-4"
+            />
           </div>
 
           <dl className="mt-6 divide-y divide-orange-100/80">

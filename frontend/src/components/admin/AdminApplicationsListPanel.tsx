@@ -1,6 +1,8 @@
 'use client';
 
 import { Filter, Search } from 'lucide-react';
+import { ModerationEntityBadge } from '@/components/admin/ModerationEntityBadge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { AdminApplication, AdminApplicationStatusFilterOption } from '@/lib/adminApplicationsApi';
 import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
 
@@ -108,14 +110,12 @@ export function AdminApplicationsListPanel({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {selectedStatuses.map((status) => (
-          <span
+          <StatusBadge
             key={status}
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-              getAdminApplicationStatusStyle(status)
-            }`}
-          >
-            {status}
-          </span>
+            label={status}
+            toneClassName={getAdminApplicationStatusStyle(status)}
+            className="px-3 py-1 text-xs"
+          />
         ))}
       </div>
 
@@ -144,17 +144,17 @@ export function AdminApplicationsListPanel({
                     <span className="block text-base text-stone-700 sm:text-[1.05rem]">
                       {application.full_name}
                     </span>
-                    <span className="mt-1 block text-sm text-stone-400">
-                      {application.request_kind_label}
-                    </span>
+                    <ModerationEntityBadge
+                      requestKind={application.request_kind}
+                      label={application.request_kind_label}
+                      className="mt-2"
+                    />
                   </span>
-                  <span
-                    className={`ml-auto inline-flex shrink-0 items-center justify-center rounded-full px-4 py-2 text-sm font-medium sm:min-w-[168px] sm:text-base ${
-                      getAdminApplicationStatusStyle(application.status)
-                    }`}
-                  >
-                    {application.status}
-                  </span>
+                  <StatusBadge
+                    label={application.status}
+                    toneClassName={getAdminApplicationStatusStyle(application.status)}
+                    className="ml-auto shrink-0 sm:min-w-[168px]"
+                  />
                 </button>
               </li>
             ))}
