@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_teacher, get_db
 from app.models.user import User
+from app.schemas.learning_materials import (
+    LearningMaterialResponse,
+    TeacherLearningMaterialCreateRequest,
+    TeacherLearningMaterialsListResponse,
+)
 from app.schemas.profile_avatar import ProfileAvatarUploadResponse
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
@@ -17,6 +22,11 @@ from app.schemas.teacher_profile import TeacherProfileResponse
 from app.schemas.teacher_student_messages import TeacherStudentMessageCreateRequest, TeacherStudentMessageItem
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_profile_service import get_teacher_profile
+from app.services.learning_materials_service import (
+    create_learning_material,
+    get_teacher_learning_material,
+    list_teacher_learning_materials,
+)
 from app.services.teacher_profile_update_requests_service import (
     get_teacher_profile_edit_state,
     save_teacher_profile_edit_draft,
@@ -33,6 +43,46 @@ from app.services.teacher_student_messages_service import create_teacher_student
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
+
+
+@router.post("/materials", response_model=LearningMaterialResponse)
+def create_teacher_material(
+    payload: TeacherLearningMaterialCreateRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return create_learning_material(
+        db,
+        teacher_user_id=current_teacher.id,
+        payload=payload,
+    )
+
+
+@router.get("/materials", response_model=TeacherLearningMaterialsListResponse)
+def read_teacher_materials(
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return list_teacher_learning_materials(
+        db,
+        teacher_user_id=current_teacher.id,
+    )
+
+
+@router.get("/materials/{material_id}", response_model=LearningMaterialResponse)
+def read_teacher_material_detail(
+    material_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    material = get_teacher_learning_material(
+        db,
+        teacher_user_id=current_teacher.id,
+        material_id=material_id,
+    )
+    if material is None:
+        raise HTTPException(status_code=404, detail="Learning material not found")
+    return material
 
 
 @router.get("/profile", response_model=TeacherProfileResponse)

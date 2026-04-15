@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Admin Directories API Foundation
+## Текущая фаза: Learning Materials Schema Foundation
 
-На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX и MinIO storage layer. Поверх этого добавлен backend foundation для admin directories преподавателей и учеников.
+На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX, MinIO storage layer и admin directories. Поверх этого добавлен backend foundation для учебных материалов преподавателя.
 
 ### Tech Stack
 ```
@@ -47,6 +47,7 @@ app/
 ├── models/         # SQLAlchemy модели
 │   ├── user.py
 │   ├── notification.py
+│   ├── learning_material.py
 │   ├── student_profile.py
 │   ├── student_profile_update_request.py
 │   ├── teacher_profile.py
@@ -55,6 +56,7 @@ app/
 │   └── teacher_student_rejection.py
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
+│   ├── learning_materials.py
 │   ├── admin_applications.py
 │   ├── admin_directories.py
 │   ├── notifications.py
@@ -66,6 +68,7 @@ app/
 │   ├── admin_applications_service.py
 │   ├── admin_directories_service.py
 │   ├── auth_service.py
+│   ├── learning_materials_service.py
 │   ├── notifications_service.py
 │   ├── storage_service.py
 │   ├── student_profile_service.py
@@ -261,6 +264,40 @@ lib/
   - `total`
   - `total_pages`
 - route layer валидирует границы `page` и `page_size`
+
+## Learning Materials Schema Foundation
+
+### Таблица `learning_materials`
+- `id`
+- `teacher_user_id`
+- `title`
+- `original_text`
+- `material_type`
+- `status`
+- `created_at`
+- `updated_at`
+
+### Access model
+- material ownership задаётся через `learning_materials.teacher_user_id`;
+- teacher endpoints используют existing `get_current_teacher`;
+- без token API возвращает `401`;
+- `student` и `admin` получают `403`;
+- teacher не может прочитать материал другого teacher и получает `404`.
+
+### API
+- `POST /api/v1/teacher/materials`
+- `GET /api/v1/teacher/materials`
+- `GET /api/v1/teacher/materials/{material_id}`
+
+### Service-layer structure
+- routes в `app/api/v1/teacher.py` остаются тонкими и только передают управление в service layer;
+- бизнес-логика создания и teacher ownership scope находится в `app/services/learning_materials_service.py`;
+- Pydantic response schemas вынесены в `app/schemas/learning_materials.py`.
+
+### Почему schema оставлена минимальной
+- текущий шаг закладывает только persistence foundation для текстового teacher material;
+- `material_type` и `status` оставлены строками с простыми default values `text` и `draft`;
+- отдельные таблицы под assignment, adapted text, file upload, AI adaptation и RAG не добавляются до следующих этапов.
 
 ## Notifications Foundation
 

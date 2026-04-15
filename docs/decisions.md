@@ -262,6 +262,36 @@ backend/
 - отдельный infra-init контейнер или management command пока не нужен;
 - это уменьшает количество ручных шагов для локальной разработки.
 
+## Решения шага 3.2.5.1: Learning Materials Schema Foundation
+
+### Для foundation добавлена одна таблица `learning_materials`, а не расширенная materials subsystem
+- на этом шаге проекту нужен минимальный persistence layer для teacher-authored materials;
+- таблица содержит только ownership, title, original text, type, status и timestamps;
+- assignment, adapted text, files, versioning и AI metadata намеренно отложены.
+
+### `material_type` и `status` оставлены строковыми полями с простыми default values
+- `material_type = "text"`
+- `status = "draft"`
+- причина: этого достаточно для текущей backend foundation без преждевременного enum/DSL слоя.
+
+### Teacher ownership ограничивается на уровне query logic
+- create endpoint всегда берёт `teacher_user_id` из `current_teacher`;
+- list/detail endpoints фильтруют данные по `teacher_user_id == current_teacher.id`;
+- причина: teacher не должен видеть материалы другого teacher уже на уровне service layer, без дополнительной сложной ACL architecture.
+
+### Teacher materials API намеренно оставлен минимальным
+- добавлены только:
+  - `POST /api/v1/teacher/materials`
+  - `GET /api/v1/teacher/materials`
+  - `GET /api/v1/teacher/materials/{material_id}`
+- search, sort, pagination и bulk operations не добавлялись;
+- причина: это schema foundation шаг, а не полноценный materials management module.
+
+### Student materials access не добавлялся на этом этапе
+- student reading flow требует отдельной продуктовой модели доступа;
+- пока не существует assignment или publication flow, student endpoints были бы преждевременными;
+- причина: сначала нужно стабилизировать teacher-owned source material как базовую сущность.
+
 ### Для локального MVP используются прямые object URLs без signed URLs
 - backend сохраняет сразу resolvable MinIO URL;
 - frontend может показывать аватарку сразу после upload и после reload страницы;

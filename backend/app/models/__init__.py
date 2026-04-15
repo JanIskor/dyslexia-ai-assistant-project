@@ -1,3 +1,4 @@
+from app.models.learning_material import LearningMaterial
 from app.models.notification import Notification
 from app.models.student_profile import StudentProfile
 from app.models.student_profile_update_request import StudentProfileUpdateRequest
@@ -10,6 +11,7 @@ from app.models.user import User
 
 __all__ = [
     "User",
+    "LearningMaterial",
     "Notification",
     "StudentProfile",
     "StudentProfileUpdateRequest",
