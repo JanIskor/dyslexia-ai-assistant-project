@@ -19,6 +19,18 @@ export interface TeacherCreateLearningMaterialPayload {
   original_text: string;
 }
 
+export interface TeacherAssignLearningMaterialPayload {
+  student_user_id: string;
+}
+
+export interface TeacherLearningMaterialAssignment {
+  id: string;
+  student_user_id: string;
+  learning_material_id: string;
+  assigned_by_teacher_user_id: string;
+  created_at: string;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -33,7 +45,15 @@ const getTeacherMaterialsErrorMessage = (
   }
 
   if (status === 404 && typeof body?.detail === 'string') {
+    if (body.detail === 'Student not found') {
+      return 'Ученик не найден.';
+    }
+
     return 'Материал не найден';
+  }
+
+  if (status === 409 && body?.detail === 'Material already assigned to this student') {
+    return 'Этот материал уже назначен выбранному ученику.';
   }
 
   if (status >= 500) {
@@ -105,6 +125,21 @@ export const createTeacherMaterial = async (
     '/api/v1/teacher/materials',
     token,
     'Не удалось создать материал',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const assignTeacherMaterial = async (
+  token: string,
+  materialId: string,
+  payload: TeacherAssignLearningMaterialPayload,
+): Promise<TeacherLearningMaterialAssignment> =>
+  request<TeacherLearningMaterialAssignment>(
+    `/api/v1/teacher/materials/${materialId}/assign`,
+    token,
+    'Не удалось назначить материал',
     {
       method: 'POST',
       body: JSON.stringify(payload),

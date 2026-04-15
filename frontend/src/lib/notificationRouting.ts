@@ -37,6 +37,8 @@ export function getNotificationHref(notification: NotificationItem): string | nu
 
       return `/student?${searchParams.toString()}`;
     }
+    case 'student_materials':
+      return '/student?tab=materials';
     default:
       return null;
   }

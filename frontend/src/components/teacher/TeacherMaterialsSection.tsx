@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, FilePlus2 } from 'lucide-react';
 import {
+  assignTeacherMaterial,
   createTeacherMaterial,
   getTeacherMaterialDetail,
   getTeacherMaterials,
   type TeacherLearningMaterial,
 } from '@/lib/teacherMaterialsApi';
+import { TeacherMaterialAssignmentModal } from '@/components/teacher/TeacherMaterialAssignmentModal';
+import { getTeacherStudents, type TeacherStudentListItem } from '@/lib/teacherStudentsApi';
 
 type TeacherMaterialsViewState =
   | {
@@ -270,9 +273,15 @@ function TeacherMaterialCreateForm({
 function TeacherMaterialDetail({
   material,
   onBack,
+  onOpenAssign,
+  assignmentStatusMessage,
+  assignmentStatusType,
 }: {
   material: TeacherLearningMaterial;
   onBack: () => void;
+  onOpenAssign: () => void;
+  assignmentStatusMessage: string | null;
+  assignmentStatusType: 'error' | 'success';
 }) {
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
@@ -295,7 +304,27 @@ function TeacherMaterialDetail({
               Создано: {formatMaterialDate(material.created_at)}
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={onOpenAssign}
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95"
+          >
+            Назначить ученику
+          </button>
         </div>
+
+        {assignmentStatusMessage ? (
+          <p
+            className={`mt-5 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
+              assignmentStatusType === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {assignmentStatusMessage}
+          </p>
+        ) : null}
 
         <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 sm:px-5 sm:py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Исходный текст</h3>
@@ -325,6 +354,14 @@ export function TeacherMaterialsSection({
   const [isCreatingMaterial, setIsCreatingMaterial] = useState(false);
   const [createStatusMessage, setCreateStatusMessage] = useState<string | null>(null);
   const [createStatusType, setCreateStatusType] = useState<'error' | 'success'>('success');
+  const [teacherStudents, setTeacherStudents] = useState<TeacherStudentListItem[]>([]);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [selectedStudentUserId, setSelectedStudentUserId] = useState<string | null>(null);
+  const [isTeacherStudentsLoading, setIsTeacherStudentsLoading] = useState(false);
+  const [teacherStudentsError, setTeacherStudentsError] = useState<string | null>(null);
+  const [isAssigningMaterial, setIsAssigningMaterial] = useState(false);
+  const [assignmentStatusMessage, setAssignmentStatusMessage] = useState<string | null>(null);
+  const [assignmentStatusType, setAssignmentStatusType] = useState<'error' | 'success'>('success');
 
   useEffect(() => {
     let isMounted = true;
@@ -418,6 +455,44 @@ export function TeacherMaterialsSection({
     setViewState({ mode: 'list' });
     setCreateStatusMessage(null);
     setMaterialDetailError(null);
+    setAssignmentStatusMessage(null);
+  };
+
+  const handleOpenAssignModal = async () => {
+    setIsAssignmentModalOpen(true);
+    setSelectedStudentUserId(null);
+    setTeacherStudentsError(null);
+
+    if (teacherStudents.length > 0) {
+      return;
+    }
+
+    setIsTeacherStudentsLoading(true);
+
+    try {
+      const response = await getTeacherStudents(accessToken, {
+        page: 1,
+        page_size: 100,
+      });
+      setTeacherStudents(response.items);
+    } catch (error) {
+      setTeacherStudents([]);
+      setTeacherStudentsError(
+        error instanceof Error ? error.message : 'Не удалось загрузить учеников',
+      );
+    } finally {
+      setIsTeacherStudentsLoading(false);
+    }
+  };
+
+  const handleCloseAssignmentModal = () => {
+    if (isAssigningMaterial) {
+      return;
+    }
+
+    setIsAssignmentModalOpen(false);
+    setSelectedStudentUserId(null);
+    setTeacherStudentsError(null);
   };
 
   const handleCreateMaterial = async () => {
@@ -442,6 +517,7 @@ export function TeacherMaterialsSection({
       setCreateOriginalText('');
       setCreateStatusType('success');
       setCreateStatusMessage('Материал успешно создан.');
+      setAssignmentStatusMessage(null);
       setViewState({
         mode: 'detail',
         materialId: createdMaterial.id,
@@ -453,6 +529,39 @@ export function TeacherMaterialsSection({
       );
     } finally {
       setIsCreatingMaterial(false);
+    }
+  };
+
+  const handleAssignMaterial = async () => {
+    if (!selectedMaterial || !selectedStudentUserId) {
+      setTeacherStudentsError('Выберите ученика для назначения материала.');
+      return;
+    }
+
+    setIsAssigningMaterial(true);
+    setTeacherStudentsError(null);
+
+    try {
+      await assignTeacherMaterial(accessToken, selectedMaterial.id, {
+        student_user_id: selectedStudentUserId,
+      });
+      const assignedStudent = teacherStudents.find((student) => student.id === selectedStudentUserId);
+      setAssignmentStatusType('success');
+      setAssignmentStatusMessage(
+        assignedStudent
+          ? `Материал назначен ученику ${assignedStudent.full_name}.`
+          : 'Материал успешно назначен ученику.',
+      );
+      setIsAssignmentModalOpen(false);
+      setSelectedStudentUserId(null);
+    } catch (error) {
+      setTeacherStudentsError(
+        error instanceof Error ? error.message : 'Не удалось назначить материал',
+      );
+      setAssignmentStatusType('error');
+      setAssignmentStatusMessage(null);
+    } finally {
+      setIsAssigningMaterial(false);
     }
   };
 
@@ -485,7 +594,28 @@ export function TeacherMaterialsSection({
       return <TeacherMaterialsState message="Не удалось загрузить материал" />;
     }
 
-    return <TeacherMaterialDetail material={selectedMaterial} onBack={handleBackToList} />;
+    return (
+      <>
+        <TeacherMaterialDetail
+          material={selectedMaterial}
+          onBack={handleBackToList}
+          onOpenAssign={() => void handleOpenAssignModal()}
+          assignmentStatusMessage={assignmentStatusMessage}
+          assignmentStatusType={assignmentStatusType}
+        />
+        <TeacherMaterialAssignmentModal
+          isOpen={isAssignmentModalOpen}
+          students={teacherStudents}
+          selectedStudentUserId={selectedStudentUserId}
+          onSelectStudent={setSelectedStudentUserId}
+          onClose={handleCloseAssignmentModal}
+          onSubmit={() => void handleAssignMaterial()}
+          isLoading={isTeacherStudentsLoading}
+          isSubmitting={isAssigningMaterial}
+          errorMessage={teacherStudentsError}
+        />
+      </>
+    );
   }
 
   return (
