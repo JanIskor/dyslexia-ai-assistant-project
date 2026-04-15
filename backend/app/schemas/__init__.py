@@ -4,6 +4,11 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialCreateRequest,
     TeacherLearningMaterialsListResponse,
 )
+from app.schemas.student_learning_materials import (
+    StudentLearningMaterialDetailResponse,
+    StudentLearningMaterialListItem,
+    StudentLearningMaterialsListResponse,
+)
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentListItem
 
 __all__ = [
@@ -15,6 +20,9 @@ __all__ = [
     "TeacherLearningMaterialCreateRequest",
     "LearningMaterialResponse",
     "TeacherLearningMaterialsListResponse",
+    "StudentLearningMaterialListItem",
+    "StudentLearningMaterialsListResponse",
+    "StudentLearningMaterialDetailResponse",
     "TeacherStudentListItem",
     "TeacherStudentDetail",
 ]

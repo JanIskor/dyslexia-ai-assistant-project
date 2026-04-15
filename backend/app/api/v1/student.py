@@ -6,9 +6,17 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_student, get_db
 from app.models.user import User
 from app.schemas.profile_avatar import ProfileAvatarUploadResponse
+from app.schemas.student_learning_materials import (
+    StudentLearningMaterialDetailResponse,
+    StudentLearningMaterialsListResponse,
+)
 from app.schemas.student_profile_edit import StudentProfileEditRequest, StudentProfileEditResponse
 from app.schemas.student_profile import StudentProfileResponse, StudentProfileUpdateRequest
 from app.schemas.teacher_student_messages import TeacherStudentMessageItem, TeacherStudentMessagesListResponse
+from app.services.student_learning_materials_service import (
+    get_student_learning_material,
+    list_student_learning_materials,
+)
 from app.services.student_profile_service import (
     get_or_create_student_profile,
     get_student_mode,
@@ -143,6 +151,30 @@ def read_student_messages(
     db: Session = Depends(get_db),
 ):
     return list_student_messages(db, student_user_id=current_student.id)
+
+
+@router.get("/materials", response_model=StudentLearningMaterialsListResponse)
+def read_student_materials(
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    return list_student_learning_materials(db, student_user_id=current_student.id)
+
+
+@router.get("/materials/{material_id}", response_model=StudentLearningMaterialDetailResponse)
+def read_student_material(
+    material_id: UUID,
+    current_student: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    material = get_student_learning_material(
+        db,
+        student_user_id=current_student.id,
+        material_id=material_id,
+    )
+    if material is None:
+        raise HTTPException(status_code=404, detail="Learning material not found")
+    return material
 
 
 @router.get("/messages/{message_id}", response_model=TeacherStudentMessageItem)
