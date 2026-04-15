@@ -318,6 +318,17 @@ backend/
 - если teacher ещё не создал ни одного материала, UI показывает понятный empty state и CTA `Создать материал`;
 - причина: на этом этапе материалов может не быть вообще, и teacher должен сразу понимать следующий шаг.
 
+## Решение текущей доработки: Teacher-facing materials cleanup
+
+### Technical copy убран из teacher UI
+- из list и create screen удалены служебные пояснения про backend и text draft;
+- причина: teacher-facing экран должен звучать продуктово, а не технически.
+
+### `material_type` и `status` скрыты только на уровне detail UI
+- backend schema, response payloads и foundation fields не менялись;
+- эти поля просто больше не показываются преподавателю в detail panel;
+- причина: internal backend fields не должны перегружать текущий интерфейс без отдельного product scenario.
+
 ### Для локального MVP используются прямые object URLs без signed URLs
 - backend сохраняет сразу resolvable MinIO URL;
 - frontend может показывать аватарку сразу после upload и после reload страницы;

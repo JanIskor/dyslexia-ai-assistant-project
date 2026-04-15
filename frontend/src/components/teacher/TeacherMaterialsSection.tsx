@@ -145,9 +145,6 @@ function TeacherMaterialsList({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Материалы</h2>
-          <p className="mt-3 max-w-3xl text-base leading-relaxed text-stone-500 sm:text-lg">
-            Здесь преподаватель видит свои учебные материалы и может создать новый текстовый материал.
-          </p>
         </div>
 
         <button
@@ -199,9 +196,6 @@ function TeacherMaterialCreateForm({
 
       <div className="mx-auto mt-6 max-w-3xl">
         <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Создать материал</h2>
-        <p className="mt-3 text-base leading-relaxed text-stone-500 sm:text-lg">
-          Укажите название и исходный текст. Backend сохранит материал как текстовый draft.
-        </p>
 
         <div className="mt-6 space-y-5">
           <div>
@@ -301,20 +295,6 @@ function TeacherMaterialDetail({
               Создано: {formatMaterialDate(material.created_at)}
             </p>
           </div>
-          <MaterialStatusBadge status={material.status} />
-        </div>
-
-        <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-4 text-left sm:px-5 sm:py-5">
-          <dl className="divide-y divide-orange-100/80">
-            <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-4">
-              <dt className="text-sm font-medium text-stone-500 sm:text-base">Тип материала:</dt>
-              <dd className="text-sm text-stone-700 sm:text-base sm:text-right">{material.material_type}</dd>
-            </div>
-            <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-4">
-              <dt className="text-sm font-medium text-stone-500 sm:text-base">Статус:</dt>
-              <dd className="text-sm text-stone-700 sm:text-base sm:text-right">{material.status}</dd>
-            </div>
-          </dl>
         </div>
 
         <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 sm:px-5 sm:py-6">
