@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Learning Materials Schema Foundation
+## Текущая фаза: Teacher Materials UI Foundation
 
-На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX, MinIO storage layer и admin directories. Поверх этого добавлен backend foundation для учебных материалов преподавателя.
+На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX, MinIO storage layer, admin directories и backend foundation для learning materials. Поверх этого добавлен teacher-side UI для работы с материалами.
 
 ### Tech Stack
 ```
@@ -122,7 +122,8 @@ components/
 │   ├── AdminDashboard.tsx
 │   └── TeacherAssignmentModal.tsx
 └── teacher/
-    └── TeacherDashboard.tsx
+    ├── TeacherDashboard.tsx
+    └── TeacherMaterialsSection.tsx
 ```
 
 ### Утилиты (src/lib/)
@@ -134,6 +135,7 @@ lib/
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
 ├── notificationsApi.ts # Запросы notifications list/unread/read
+├── teacherMaterialsApi.ts # Teacher materials list/detail/create
 ├── teacherStudentMessagesApi.ts # Teacher send + student read messages
 ├── studentProfileApi.ts # Запросы student self-profile
 ├── teacherStudentsApi.ts # Запросы teacher students list/detail
@@ -298,6 +300,40 @@ lib/
 - текущий шаг закладывает только persistence foundation для текстового teacher material;
 - `material_type` и `status` оставлены строками с простыми default values `text` и `draft`;
 - отдельные таблицы под assignment, adapted text, file upload, AI adaptation и RAG не добавляются до следующих этапов.
+
+## Teacher Materials UI Foundation
+
+### Teacher navigation
+- existing teacher dashboard не переписывается;
+- в sidebar добавлен новый пункт `Материалы`;
+- materials UI встраивается как ещё один section в существующий state-driven dashboard shell.
+
+### Frontend integration
+- данные берутся из existing backend endpoints:
+  - `GET /api/v1/teacher/materials`
+  - `GET /api/v1/teacher/materials/{material_id}`
+  - `POST /api/v1/teacher/materials`
+- для этого добавлен отдельный frontend API client `teacherMaterialsApi.ts`.
+
+### View model
+- materials section использует три локальных режима:
+  - list
+  - create
+  - detail
+- переключение происходит внутри правой части dashboard без полной смены страницы.
+
+### UI composition
+- список материалов показывает teacher-owned cards с preview текста;
+- create flow открывает простую form panel с `title` и `original_text`;
+- detail panel показывает полные данные материала;
+- если материалов нет, отображается empty state с CTA на создание.
+
+### Что намеренно не добавлялось
+- student-side materials UI;
+- editing/deleting;
+- assignment flow;
+- rich text editor;
+- AI-specific controls.
 
 ## Notifications Foundation
 

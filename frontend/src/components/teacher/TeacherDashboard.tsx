@@ -8,6 +8,7 @@ import { ArrowLeft, LogOut, PencilLine, Search, Send, SlidersHorizontal, UserRou
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
+import { TeacherMaterialsSection } from '@/components/teacher/TeacherMaterialsSection';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
@@ -41,7 +42,7 @@ import {
 import { sendTeacherStudentMessage } from '@/lib/teacherStudentMessagesApi';
 import { GENDER_OPTIONS, ProfileEditForm, type ProfileEditFieldConfig } from '@/components/profile/ProfileEditForm';
 
-type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'assistant';
+type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'materials' | 'assistant';
 type TeacherProfileViewMode = 'view' | 'edit';
 
 interface TeacherProfileField {
@@ -82,6 +83,7 @@ const TEACHER_MENU_ITEMS: Array<{ id: TeacherDashboardSection; label: string }> 
   { id: 'profile', label: 'Мой профиль' },
   { id: 'students', label: 'Список учеников' },
   { id: 'incoming-students', label: 'Новые ученики' },
+  { id: 'materials', label: 'Материалы' },
   { id: 'assistant', label: 'ИИ-ассистент' },
 ];
 
@@ -1270,6 +1272,10 @@ function TeacherSectionContent({
     );
   }
 
+  if (section === 'materials') {
+    return <TeacherMaterialsSection accessToken={accessToken} />;
+  }
+
   if (section === 'assistant') {
     return (
       <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
@@ -1450,6 +1456,14 @@ export function TeacherDashboard() {
 
       if (requestedTab === 'assistant') {
         setActiveSection('assistant');
+        setProfileViewMode('view');
+        setStudentsViewState({ mode: 'list' });
+        setIncomingStudentsViewState({ mode: 'list' });
+        return;
+      }
+
+      if (requestedTab === 'materials') {
+        setActiveSection('materials');
         setProfileViewMode('view');
         setStudentsViewState({ mode: 'list' });
         setIncomingStudentsViewState({ mode: 'list' });

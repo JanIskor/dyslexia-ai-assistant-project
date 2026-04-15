@@ -292,6 +292,32 @@ backend/
 - пока не существует assignment или publication flow, student endpoints были бы преждевременными;
 - причина: сначала нужно стабилизировать teacher-owned source material как базовую сущность.
 
+## Решения шага 3.2.5.2: Teacher Materials UI Foundation
+
+### Materials UI встроен в существующий `TeacherDashboard`, а не вынесен в отдельную страницу
+- teacher dashboard уже построен как section-based single-page shell;
+- новая вкладка `Материалы` добавлена в existing sidebar navigation;
+- причина: это сохраняет текущий teacher UX и не требует нового routing layer.
+
+### Materials logic вынесена в отдельный section component
+- для материалов добавлен `TeacherMaterialsSection.tsx`, а не ещё больше логики внутрь `TeacherDashboard.tsx`;
+- при этом вся интеграция остаётся локальной для teacher area без новой глобальной архитектуры;
+- причина: dashboard уже крупный, и отдельный section улучшает читаемость без overengineering.
+
+### Для materials создан отдельный frontend API client
+- добавлен `teacherMaterialsApi.ts` с методами list/detail/create;
+- он повторяет уже используемый в проекте паттерн `src/lib/*Api.ts`;
+- причина: teacher materials должны использовать existing backend API без смешивания с unrelated student/admin clients.
+
+### Create/detail flow сделан внутри одной правой панели
+- list, create и detail переключаются через локальный view state;
+- полная смена страницы не используется;
+- причина: это соответствует текущему teacher dashboard UX и ускоряет базовый materials flow.
+
+### Empty state добавлен как first-use entry point
+- если teacher ещё не создал ни одного материала, UI показывает понятный empty state и CTA `Создать материал`;
+- причина: на этом этапе материалов может не быть вообще, и teacher должен сразу понимать следующий шаг.
+
 ### Для локального MVP используются прямые object URLs без signed URLs
 - backend сохраняет сразу resolvable MinIO URL;
 - frontend может показывать аватарку сразу после upload и после reload страницы;
