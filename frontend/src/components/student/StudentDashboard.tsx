@@ -6,6 +6,7 @@ import { ArrowLeft, LogOut, PencilLine, UserRound } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
+import { StudentMaterialsSection } from '@/components/student/StudentMaterialsSection';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
@@ -321,14 +322,7 @@ function StudentSectionContent({
   }
 
   if (activeSection === 'materials') {
-    return (
-      <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Мои учебные материалы</h2>
-        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-          Здесь будут отображаться учебные материалы
-        </p>
-      </section>
-    );
+    return <StudentMaterialsSection accessToken={accessToken} />;
   }
 
   if (activeSection === 'tests') {

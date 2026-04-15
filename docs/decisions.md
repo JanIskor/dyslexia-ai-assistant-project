@@ -329,6 +329,32 @@ backend/
 - эти поля просто больше не показываются преподавателю в detail panel;
 - причина: internal backend fields не должны перегружать текущий интерфейс без отдельного product scenario.
 
+## Решения шага 3.2.5.3: Student Materials Reading Foundation
+
+### Доступ student к materials строится через отдельную relation table
+- добавлена таблица `student_learning_materials`, а не логика "student видит все teacher materials";
+- причина: material assignment должен быть explicit и безопасным уже на foundation-уровне.
+
+### Relation layer хранит отдельного assigner teacher
+- в relation table есть `assigned_by_teacher_user_id`;
+- причина: будущий assignment flow должен знать, кто именно назначил material, без переработки схемы.
+
+### Student endpoints намеренно сведены к read-only list/detail
+- добавлены только:
+  - `GET /api/v1/student/materials`
+  - `GET /api/v1/student/materials/{material_id}`
+- причина: текущий шаг ограничен student reading foundation без teacher assignment UI и без mutation flow.
+
+### Student response schemas возвращают только reading fields
+- list: `id`, `title`, `created_at`
+- detail: `id`, `title`, `original_text`, `created_at`
+- причина: adapted text, progress, metadata и другие product-поля относятся к следующим этапам.
+
+### Student materials UI встроен в existing dashboard shell
+- `StudentDashboard` продолжает работать как section-based single-page UI;
+- для materials добавлен отдельный `StudentMaterialsSection`, а не новый route;
+- причина: это сохраняет уже существующий student UX и не требует новой навигационной архитектуры.
+
 ### Для локального MVP используются прямые object URLs без signed URLs
 - backend сохраняет сразу resolvable MinIO URL;
 - frontend может показывать аватарку сразу после upload и после reload страницы;

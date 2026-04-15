@@ -4,9 +4,9 @@
 
 Проект разрабатывается как современная веб-система для адаптации образовательных текстов к потребностям людей с дислексией.
 
-## Текущая фаза: Teacher Materials UI Foundation
+## Текущая фаза: Student Materials Reading Foundation
 
-На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX, MinIO storage layer, admin directories и backend foundation для learning materials. Поверх этого добавлен teacher-side UI для работы с материалами.
+На текущем этапе уже существуют auth flow, dashboards, PostgreSQL schema layer, admin moderation, teacher assignment, notifications, teacher → student communication, унифицированный profile edit UX, MinIO storage layer, admin directories, backend foundation для learning materials и teacher materials UI. Поверх этого добавлен student-side reading foundation для назначенных материалов.
 
 ### Tech Stack
 ```
@@ -48,6 +48,7 @@ app/
 │   ├── user.py
 │   ├── notification.py
 │   ├── learning_material.py
+│   ├── student_learning_material.py
 │   ├── student_profile.py
 │   ├── student_profile_update_request.py
 │   ├── teacher_profile.py
@@ -57,6 +58,7 @@ app/
 ├── schemas/        # Pydantic схемы
 │   ├── auth.py
 │   ├── learning_materials.py
+│   ├── student_learning_materials.py
 │   ├── admin_applications.py
 │   ├── admin_directories.py
 │   ├── notifications.py
@@ -69,6 +71,7 @@ app/
 │   ├── admin_directories_service.py
 │   ├── auth_service.py
 │   ├── learning_materials_service.py
+│   ├── student_learning_materials_service.py
 │   ├── notifications_service.py
 │   ├── storage_service.py
 │   ├── student_profile_service.py
@@ -115,7 +118,8 @@ components/
 │   ├── NotificationsBell.tsx
 │   └── Footer.tsx
 ├── student/
-│   └── StudentDashboard.tsx
+│   ├── StudentDashboard.tsx
+│   └── StudentMaterialsSection.tsx
 ├── admin/
 │   ├── AdminApplicationDetailPanel.tsx
 │   ├── AdminApplicationsListPanel.tsx
@@ -135,6 +139,7 @@ lib/
 ├── authRedirect.ts # Redirect по роли
 ├── authStorage.ts  # Хранение access token
 ├── notificationsApi.ts # Запросы notifications list/unread/read
+├── studentMaterialsApi.ts # Student materials list/detail
 ├── teacherMaterialsApi.ts # Teacher materials list/detail/create
 ├── teacherStudentMessagesApi.ts # Teacher send + student read messages
 ├── studentProfileApi.ts # Запросы student self-profile
@@ -334,6 +339,43 @@ lib/
 - assignment flow;
 - rich text editor;
 - AI-specific controls.
+
+## Student Materials Reading Foundation
+
+### Access model
+- student доступ к material строится через таблицу `student_learning_materials`;
+- одна строка relation table означает, что конкретный material назначен конкретному student;
+- student endpoints не читают teacher materials напрямую без assignment layer.
+
+### Relation table
+- `student_learning_materials` содержит:
+  - `id`
+  - `student_user_id`
+  - `learning_material_id`
+  - `assigned_by_teacher_user_id`
+  - `created_at`
+
+### Backend API
+- `GET /api/v1/student/materials`
+- `GET /api/v1/student/materials/{material_id}`
+
+### Frontend integration
+- existing `StudentDashboard` не переписывается;
+- вкладка `Учебные материалы` теперь рендерит `StudentMaterialsSection`;
+- отдельный client `studentMaterialsApi.ts` отвечает за list/detail calls.
+
+### Student reading flow
+- student видит только назначенные materials;
+- list показывает `title` и `created_at`;
+- detail показывает `title`, `created_at` и `original_text`;
+- empty state отображается, если assignments отсутствуют.
+
+### Что намеренно не добавлялось
+- teacher assignment UI;
+- adapted text;
+- progress tracking;
+- delivery через messages;
+- file upload и AI-specific flows.
 
 ## Notifications Foundation
 
