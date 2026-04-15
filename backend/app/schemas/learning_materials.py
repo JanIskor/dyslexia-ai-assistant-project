@@ -22,3 +22,15 @@ class LearningMaterialResponse(BaseModel):
 
 class TeacherLearningMaterialsListResponse(BaseModel):
     items: list[LearningMaterialResponse]
+
+
+class TeacherLearningMaterialAssignRequest(BaseModel):
+    student_user_id: UUID
+
+
+class TeacherLearningMaterialAssignmentResponse(BaseModel):
+    id: UUID
+    student_user_id: UUID
+    learning_material_id: UUID
+    assigned_by_teacher_user_id: UUID
+    created_at: datetime

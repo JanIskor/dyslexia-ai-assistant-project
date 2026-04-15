@@ -9,6 +9,8 @@ from app.core.dependencies import get_current_teacher, get_db
 from app.models.user import User
 from app.schemas.learning_materials import (
     LearningMaterialResponse,
+    TeacherLearningMaterialAssignmentResponse,
+    TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
     TeacherLearningMaterialsListResponse,
 )
@@ -23,6 +25,7 @@ from app.schemas.teacher_student_messages import TeacherStudentMessageCreateRequ
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_profile_service import get_teacher_profile
 from app.services.learning_materials_service import (
+    assign_learning_material_to_student,
     create_learning_material,
     get_teacher_learning_material,
     list_teacher_learning_materials,
@@ -83,6 +86,21 @@ def read_teacher_material_detail(
     if material is None:
         raise HTTPException(status_code=404, detail="Learning material not found")
     return material
+
+
+@router.post("/materials/{material_id}/assign", response_model=TeacherLearningMaterialAssignmentResponse)
+def assign_teacher_material_to_student(
+    material_id: UUID,
+    payload: TeacherLearningMaterialAssignRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return assign_learning_material_to_student(
+        db,
+        teacher_user_id=current_teacher.id,
+        material_id=material_id,
+        payload=payload,
+    )
 
 
 @router.get("/profile", response_model=TeacherProfileResponse)

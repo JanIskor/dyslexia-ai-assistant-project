@@ -1,6 +1,8 @@
 from app.schemas.auth import LoginRequest, RegisterRequest, Token, TokenData, UserResponse
 from app.schemas.learning_materials import (
     LearningMaterialResponse,
+    TeacherLearningMaterialAssignmentResponse,
+    TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
     TeacherLearningMaterialsListResponse,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "TeacherLearningMaterialCreateRequest",
     "LearningMaterialResponse",
     "TeacherLearningMaterialsListResponse",
+    "TeacherLearningMaterialAssignRequest",
+    "TeacherLearningMaterialAssignmentResponse",
     "StudentLearningMaterialListItem",
     "StudentLearningMaterialsListResponse",
     "StudentLearningMaterialDetailResponse",
