@@ -55,5 +55,7 @@ docs/project_spec.md
 docs/current_phase.md
 docs/templates/
 docs/modules/
-docs/
+docs/architecture.md
+docs/database_schema.md
+docs/decisions.md
 docs/project_spec.md
