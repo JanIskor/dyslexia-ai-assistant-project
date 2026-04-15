@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
+import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
+import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
@@ -442,20 +444,19 @@ function AdminSectionContent({
   token: string;
   initialApplicationId: string | null;
 }) {
-  const title = section === 'student-applications' ? 'Заявки учеников' : section === 'teachers' ? 'Преподаватели' : 'Ученики';
-
   if (section === 'student-applications') {
     return <ApplicationsPanel token={token} initialApplicationId={initialApplicationId} />;
   }
 
-  return (
-    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.10)]">
-      <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">{title}</h2>
-      <p className="mt-6 max-w-2xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-        Здесь будут отображаться заявки учеников на модерацию
-      </p>
-    </section>
-  );
+  if (section === 'teachers') {
+    return <AdminTeachersDirectoryPanel token={token} />;
+  }
+
+  if (section === 'students') {
+    return <AdminStudentsDirectoryPanel token={token} />;
+  }
+
+  return null;
 }
 
 export function AdminDashboard() {
