@@ -8,6 +8,7 @@ import { ArrowLeft, LogOut, PencilLine, Search, Send, SlidersHorizontal, UserRou
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
+import { TeacherAiAssistantSection } from '@/components/teacher/TeacherAiAssistantSection';
 import { TeacherMaterialsSection } from '@/components/teacher/TeacherMaterialsSection';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
@@ -1277,14 +1278,7 @@ function TeacherSectionContent({
   }
 
   if (section === 'assistant') {
-    return (
-      <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">ИИ-ассистент</h2>
-        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-          Здесь будет интерфейс ИИ-ассистента для адаптации учебных материалов
-        </p>
-      </section>
-    );
+    return <TeacherAiAssistantSection accessToken={accessToken} />;
   }
 
   return (

@@ -1,0 +1,60 @@
+import { buildApiUrl } from '@/lib/apiBaseUrl';
+
+export interface TeacherAiAssistantMessagePayload {
+  message: string;
+}
+
+export interface TeacherAiAssistantMessageResponse {
+  reply: string;
+}
+
+interface ApiErrorBody {
+  detail?: string;
+}
+
+const getErrorMessage = (status: number, body: ApiErrorBody | null, fallbackMessage: string): string => {
+  const detail = body?.detail;
+
+  if (detail === 'Not authenticated' || detail === 'Could not validate credentials') {
+    return 'Не удалось подтвердить авторизацию. Войдите снова.';
+  }
+
+  if (status >= 500) {
+    return 'Ошибка сервера. Попробуйте ещё раз позже.';
+  }
+
+  return fallbackMessage;
+};
+
+async function parseJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+export const sendTeacherAiAssistantMessage = async (
+  token: string,
+  payload: TeacherAiAssistantMessagePayload,
+): Promise<TeacherAiAssistantMessageResponse> => {
+  const response = await fetch(buildApiUrl('/api/v1/teacher/ai-assistant/messages'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body, 'Не удалось получить ответ ассистента.'));
+  }
+
+  return parseJson<TeacherAiAssistantMessageResponse>(response);
+};
