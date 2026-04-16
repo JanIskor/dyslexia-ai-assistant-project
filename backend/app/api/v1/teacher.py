@@ -15,6 +15,10 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialsListResponse,
 )
 from app.schemas.profile_avatar import ProfileAvatarUploadResponse
+from app.schemas.teacher_ai_assistant import (
+    TeacherAiAssistantMessageRequest,
+    TeacherAiAssistantMessageResponse,
+)
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
     TeacherIncomingStudentsListResponse,
@@ -42,10 +46,21 @@ from app.services.teacher_incoming_students_service import (
     list_teacher_incoming_students,
     reject_teacher_incoming_student,
 )
+from app.services.teacher_ai_assistant_service import create_teacher_ai_assistant_reply
 from app.services.teacher_student_messages_service import create_teacher_student_message
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
+
+
+@router.post("/ai-assistant/messages", response_model=TeacherAiAssistantMessageResponse)
+def create_teacher_ai_assistant_message(
+    payload: TeacherAiAssistantMessageRequest,
+    current_teacher: User = Depends(get_current_teacher),
+):
+    _ = current_teacher
+
+    return create_teacher_ai_assistant_reply(payload)
 
 
 @router.post("/materials", response_model=LearningMaterialResponse)

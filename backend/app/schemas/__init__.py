@@ -11,6 +11,10 @@ from app.schemas.student_learning_materials import (
     StudentLearningMaterialListItem,
     StudentLearningMaterialsListResponse,
 )
+from app.schemas.teacher_ai_assistant import (
+    TeacherAiAssistantMessageRequest,
+    TeacherAiAssistantMessageResponse,
+)
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentListItem
 
 __all__ = [
@@ -27,6 +31,8 @@ __all__ = [
     "StudentLearningMaterialListItem",
     "StudentLearningMaterialsListResponse",
     "StudentLearningMaterialDetailResponse",
+    "TeacherAiAssistantMessageRequest",
+    "TeacherAiAssistantMessageResponse",
     "TeacherStudentListItem",
     "TeacherStudentDetail",
 ]
