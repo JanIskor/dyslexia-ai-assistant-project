@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { LoaderCircle, SendHorizontal } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { sendTeacherAiAssistantMessage } from '@/lib/teacherAiAssistantApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
@@ -17,6 +17,29 @@ interface TeacherAiAssistantSectionProps {
 }
 
 const EMPTY_STATE_TEXT = 'Введите текст, который нужно адаптировать';
+const MAX_COMPOSER_HEIGHT_PX = 224;
+
+function TypingIndicator() {
+  return (
+    <div
+      data-testid="teacher-ai-assistant-loading"
+      className="inline-flex items-center gap-2 rounded-[24px] border border-orange-100 bg-orange-50/80 px-4 py-3 text-stone-500 shadow-sm"
+      aria-label="Ассистент печатает"
+    >
+      <div className="flex items-center gap-1.5" data-testid="teacher-ai-assistant-typing-dots">
+        {[0, 1, 2].map((index) => (
+          <span
+            // Staggered pulse keeps the typing state visible without adding noisy motion.
+            key={index}
+            className="h-2.5 w-2.5 rounded-full bg-orange-300/90 animate-pulse"
+            style={{ animationDelay: `${index * 180}ms`, animationDuration: '1s' }}
+          />
+        ))}
+      </div>
+      <span className="text-sm sm:text-base">Ассистент печатает...</span>
+    </div>
+  );
+}
 
 export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSectionProps) {
   const [draftMessage, setDraftMessage] = useState('');
@@ -24,6 +47,21 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = '0px';
+
+    const nextHeight = Math.min(textarea.scrollHeight, MAX_COMPOSER_HEIGHT_PX);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > MAX_COMPOSER_HEIGHT_PX ? 'auto' : 'hidden';
+  }, [draftMessage]);
 
   useEffect(() => {
     const viewport = chatViewportRef.current;
@@ -32,7 +70,9 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       return;
     }
 
-    viewport.scrollTop = viewport.scrollHeight;
+    requestAnimationFrame(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    });
   }, [messages, isSubmitting]);
 
   const handleSubmit = async () => {
@@ -77,7 +117,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   return (
     <section
       data-testid="teacher-ai-assistant-section"
-      className="flex min-h-[640px] flex-col rounded-[30px] border border-orange-100/80 bg-white/92 shadow-[0_18px_50px_rgba(221,156,130,0.12)]"
+      className="flex h-[min(760px,calc(100vh-10rem))] min-h-[560px] flex-col overflow-hidden rounded-[30px] border border-orange-100/80 bg-white/92 shadow-[0_18px_50px_rgba(221,156,130,0.12)]"
     >
       <header className="border-b border-orange-100/80 px-5 py-5 sm:px-7">
         <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">ИИ-ассистент</h2>
@@ -89,7 +129,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       <div
         ref={chatViewportRef}
         data-testid="teacher-ai-assistant-chat"
-        className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6"
       >
         {messages.length === 0 ? (
           <div
@@ -124,13 +164,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
 
             {isSubmitting ? (
               <div className="flex justify-start">
-                <div
-                  data-testid="teacher-ai-assistant-loading"
-                  className="inline-flex items-center gap-3 rounded-[24px] border border-orange-100 bg-orange-50/70 px-4 py-3 text-sm text-stone-500 sm:text-base"
-                >
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  <span>Ассистент думает...</span>
-                </div>
+                <TypingIndicator />
               </div>
             ) : null}
           </div>
@@ -146,6 +180,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
 
         <div className="rounded-[26px] border border-orange-100 bg-orange-50/45 p-3 shadow-inner">
           <textarea
+            ref={textareaRef}
             data-testid="teacher-ai-assistant-input"
             value={draftMessage}
             onChange={(event) => setDraftMessage(event.target.value)}
@@ -156,8 +191,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               }
             }}
             placeholder="Вставьте учебный текст для адаптации..."
-            rows={4}
-            className="min-h-[112px] w-full resize-none border-0 bg-transparent px-2 py-1 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base"
+            rows={1}
+            className="max-h-[224px] min-h-[52px] w-full resize-none border-0 bg-transparent px-2 py-3 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base"
           />
 
           <div className="mt-3 flex items-center justify-end">
@@ -166,10 +201,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               onClick={() => void handleSubmit()}
               disabled={isSubmitting || draftMessage.trim().length === 0}
               data-testid="teacher-ai-assistant-submit"
-              className="inline-flex items-center gap-2 rounded-2xl bg-orange-300 px-4 py-3 text-sm font-medium text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 sm:px-5 sm:text-base"
+              aria-label="Отправить сообщение"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-white shadow-[0_10px_24px_rgba(251,146,60,0.28)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 disabled:text-white/75 disabled:shadow-none"
             >
-              {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
-              <span>Отправить</span>
+              <ArrowUp className="h-5 w-5" />
             </button>
           </div>
         </div>
