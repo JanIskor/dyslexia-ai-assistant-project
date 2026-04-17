@@ -123,6 +123,24 @@ async def upload_image(file: UploadFile, object_name: str) -> str:
     return _build_public_object_url(object_name)
 
 
+def upload_file_bytes(*, payload: bytes, object_name: str, content_type: str) -> str:
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty",
+        )
+
+    ensure_bucket_exists()
+    client = _get_s3_client()
+    client.put_object(
+        Bucket=settings.MINIO_BUCKET,
+        Key=object_name,
+        Body=payload,
+        ContentType=content_type,
+    )
+    return _build_public_object_url(object_name)
+
+
 def delete_object(object_name: str) -> None:
     client = _get_s3_client()
     client.delete_object(Bucket=settings.MINIO_BUCKET, Key=object_name)

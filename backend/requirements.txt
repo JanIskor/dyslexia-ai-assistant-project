@@ -8,3 +8,5 @@ passlib[bcrypt]
 python-jose[cryptography]
 boto3
 python-multipart
+pypdf
+python-docx

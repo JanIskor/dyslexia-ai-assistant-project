@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -21,6 +21,7 @@ from app.schemas.admin_directories import (
     AdminTeachersSort,
 )
 from app.schemas.auth import UserResponse
+from app.schemas.knowledge_documents import KnowledgeDocumentResponse, KnowledgeDocumentsListResponse
 from app.services.admin_applications_service import (
     approve_admin_application,
     assign_teacher_to_application,
@@ -37,6 +38,11 @@ from app.services.admin_directories_service import (
     list_admin_students,
     list_admin_teachers,
 )
+from app.services.knowledge_base_service import (
+    get_knowledge_document,
+    list_knowledge_documents,
+    upload_knowledge_document,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -44,6 +50,41 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/access-check", response_model=UserResponse)
 def read_admin_access_check(current_admin: User = Depends(get_current_admin)):
     return UserResponse.model_validate(current_admin)
+
+
+@router.post("/knowledge-base/documents", response_model=KnowledgeDocumentResponse)
+def create_knowledge_document(
+    file: UploadFile = File(...),
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return upload_knowledge_document(
+        db,
+        uploaded_by_user_id=current_admin.id,
+        file=file,
+    )
+
+
+@router.get("/knowledge-base/documents", response_model=KnowledgeDocumentsListResponse)
+def read_knowledge_documents(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return list_knowledge_documents(db)
+
+
+@router.get("/knowledge-base/documents/{document_id}", response_model=KnowledgeDocumentResponse)
+def read_knowledge_document_detail(
+    document_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    document = get_knowledge_document(db, document_id=document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
+    return document
 
 
 @router.get("/applications", response_model=AdminApplicationsListResponse)
