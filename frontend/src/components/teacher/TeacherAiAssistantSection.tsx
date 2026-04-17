@@ -5,6 +5,7 @@ import { ArrowUp, ChevronDown, LoaderCircle, Plus, X } from 'lucide-react';
 import {
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
+  type TeacherAiAssistantMode,
 } from '@/lib/teacherAiAssistantApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
@@ -23,14 +24,16 @@ interface TeacherAiAssistantSectionProps {
 const EMPTY_STATE_TEXT = 'Введите текст, который нужно адаптировать';
 const MAX_COMPOSER_HEIGHT_PX = 224;
 
-const ADAPTATION_MODES = [
-  'Упростить текст',
-  'Сделать пошаговым',
-  'Выделить главное',
-] as const;
+const ADAPTATION_MODES: ReadonlyArray<{
+  value: TeacherAiAssistantMode;
+  label: string;
+}> = [
+  { value: 'basic_simplify', label: 'Упростить текст' },
+  { value: 'structured_explanation', label: 'Сделать пошаговым' },
+  { value: 'key_points_focus', label: 'Выделить главное' },
+];
 
-type AdaptationMode = (typeof ADAPTATION_MODES)[number];
-type ComposerActionMenu = 'materials' | 'files' | 'mode' | null;
+type ComposerActionMenu = 'actions' | 'mode' | null;
 
 function SaveMaterialModal({
   isOpen,
@@ -180,7 +183,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSavingMaterial, setIsSavingMaterial] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<AdaptationMode>('Упростить текст');
+  const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('basic_simplify');
   const [openComposerMenu, setOpenComposerMenu] = useState<ComposerActionMenu>(null);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -262,6 +265,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     try {
       const response = await sendTeacherAiAssistantMessage(accessToken, {
         message: trimmedMessage,
+        mode: selectedMode,
       });
 
       const assistantMessage: TeacherAiAssistantMessage = {
@@ -350,10 +354,14 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setOpenComposerMenu((currentMenu) => (currentMenu === menu ? null : menu));
   };
 
-  const handleSelectMode = (mode: AdaptationMode) => {
+  const handleSelectMode = (mode: TeacherAiAssistantMode) => {
     setSelectedMode(mode);
     setOpenComposerMenu(null);
   };
+
+  const selectedModeLabel =
+    ADAPTATION_MODES.find((modeOption) => modeOption.value === selectedMode)?.label ??
+    'Упростить текст';
 
   return (
     <>
@@ -472,49 +480,36 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => toggleComposerMenu('materials')}
-                    data-testid="teacher-ai-assistant-materials-action"
-                    aria-label="Добавить готовый материал"
-                    aria-expanded={openComposerMenu === 'materials'}
+                    onClick={() => toggleComposerMenu('actions')}
+                    data-testid="teacher-ai-assistant-actions-trigger"
+                    aria-label="Открыть действия ассистента"
+                    aria-expanded={openComposerMenu === 'actions'}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-white text-stone-500 shadow-sm transition hover:bg-orange-50"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
 
-                  {openComposerMenu === 'materials' ? (
+                  {openComposerMenu === 'actions' ? (
                     <div
-                      data-testid="teacher-ai-assistant-materials-menu"
-                      className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-64 rounded-[24px] border border-orange-100/90 bg-white p-4 text-sm text-stone-600 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
+                      data-testid="teacher-ai-assistant-actions-menu"
+                      className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-56 rounded-[24px] border border-orange-100/90 bg-white p-2 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
                     >
-                      <p className="font-medium text-stone-700">Добавить материал</p>
-                      <p className="mt-1 leading-5 text-stone-500">
-                        Скоро здесь можно будет выбрать уже созданный учебный материал.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => toggleComposerMenu('files')}
-                    data-testid="teacher-ai-assistant-files-action"
-                    aria-label="Загрузить файл"
-                    aria-expanded={openComposerMenu === 'files'}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-white text-stone-500 shadow-sm transition hover:bg-orange-50"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-
-                  {openComposerMenu === 'files' ? (
-                    <div
-                      data-testid="teacher-ai-assistant-files-menu"
-                      className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-64 rounded-[24px] border border-orange-100/90 bg-white p-4 text-sm text-stone-600 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
-                    >
-                      <p className="font-medium text-stone-700">Загрузка файла</p>
-                      <p className="mt-1 leading-5 text-stone-500">
-                        Скоро здесь можно будет прикреплять файлы для адаптации.
-                      </p>
+                      <button
+                        type="button"
+                        data-testid="teacher-ai-assistant-action-material"
+                        className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
+                      >
+                        <span>Материал</span>
+                        <span className="text-xs text-stone-400">Скоро</span>
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="teacher-ai-assistant-action-file"
+                        className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
+                      >
+                        <span>Файл</span>
+                        <span className="text-xs text-stone-400">Скоро</span>
+                      </button>
                     </div>
                   ) : null}
                 </div>
@@ -527,7 +522,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                     aria-expanded={openComposerMenu === 'mode'}
                     className="inline-flex max-w-full items-center gap-2 rounded-full border border-stone-300 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-200"
                   >
-                    <span className="truncate">{selectedMode}</span>
+                    <span className="truncate">{selectedModeLabel}</span>
                     <ChevronDown
                       className={`h-4 w-4 shrink-0 transition ${openComposerMenu === 'mode' ? 'rotate-180' : ''}`}
                     />
@@ -539,21 +534,21 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                       className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-60 rounded-[24px] border border-orange-100/90 bg-white p-2 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
                     >
                       {ADAPTATION_MODES.map((mode) => {
-                        const isSelected = mode === selectedMode;
+                        const isSelected = mode.value === selectedMode;
 
                         return (
                           <button
-                            key={mode}
+                            key={mode.value}
                             type="button"
-                            onClick={() => handleSelectMode(mode)}
-                            data-testid={`teacher-ai-assistant-mode-option-${mode}`}
+                            onClick={() => handleSelectMode(mode.value)}
+                            data-testid={`teacher-ai-assistant-mode-option-${mode.value}`}
                             className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm transition ${
                               isSelected
                                 ? 'bg-orange-50 text-orange-700'
                                 : 'text-stone-600 hover:bg-orange-50/70'
                             }`}
                           >
-                            <span>{mode}</span>
+                            <span>{mode.label}</span>
                             {isSelected ? (
                               <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-orange-600">
                                 Активно

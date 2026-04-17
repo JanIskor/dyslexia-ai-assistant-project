@@ -53,54 +53,48 @@ test('teacher ai assistant returns real adapted text', async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('teacher ai assistant composer shows future actions and adaptation mode selector', async ({ page }) => {
+test('teacher ai assistant composer shows one plus menu and sends selected mode', async ({ page }) => {
   await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    const requestBody = route.request().postDataJSON();
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        reply: 'Тестовый ответ для проверки composer UX.',
+        reply: `Mode received: ${requestBody.mode}`,
       }),
     });
   });
 
   await loginAsTeacher(page);
 
-  const materialsActionButton = page.getByTestId('teacher-ai-assistant-materials-action');
-  const filesActionButton = page.getByTestId('teacher-ai-assistant-files-action');
+  const actionsButton = page.getByTestId('teacher-ai-assistant-actions-trigger');
   const modeButton = page.getByTestId('teacher-ai-assistant-mode-button');
 
-  await expect(materialsActionButton).toBeVisible();
-  await expect(filesActionButton).toBeVisible();
+  await expect(actionsButton).toBeVisible();
   await expect(modeButton).toContainText('Упростить текст');
 
-  await materialsActionButton.click();
-  await expect(page.getByTestId('teacher-ai-assistant-materials-menu')).toContainText(
-    'Скоро здесь можно будет выбрать уже созданный учебный материал.',
-  );
-
-  await filesActionButton.click();
-  await expect(page.getByTestId('teacher-ai-assistant-files-menu')).toContainText(
-    'Скоро здесь можно будет прикреплять файлы для адаптации.',
-  );
+  await actionsButton.click();
+  await expect(page.getByTestId('teacher-ai-assistant-actions-menu')).toBeVisible();
+  await expect(page.getByTestId('teacher-ai-assistant-action-material')).toContainText('Материал');
+  await expect(page.getByTestId('teacher-ai-assistant-action-file')).toContainText('Файл');
 
   await modeButton.click();
   await expect(page.getByTestId('teacher-ai-assistant-mode-menu')).toBeVisible();
-  await page.getByTestId('teacher-ai-assistant-mode-option-Сделать пошаговым').click();
+  await page.getByTestId('teacher-ai-assistant-mode-option-structured_explanation').click();
   await expect(modeButton).toContainText('Сделать пошаговым');
 
   await page.getByTestId('teacher-ai-assistant-input').fill('Проверка отправки после смены режима');
   await page.getByTestId('teacher-ai-assistant-submit').click();
 
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
-    'Тестовый ответ для проверки composer UX.',
+    'Mode received: structured_explanation',
   );
 
   console.log(
     JSON.stringify({
-      scenario: 'composer-ux-polish',
-      materialsActionVisible: await materialsActionButton.isVisible(),
-      filesActionVisible: await filesActionButton.isVisible(),
+      scenario: 'composer-mode-contract',
+      actionsButtonVisible: await actionsButton.isVisible(),
       selectedMode: await modeButton.textContent(),
       assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
     }),

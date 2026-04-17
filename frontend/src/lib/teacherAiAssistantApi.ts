@@ -1,8 +1,14 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 import type { TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
+export type TeacherAiAssistantMode =
+  | 'basic_simplify'
+  | 'structured_explanation'
+  | 'key_points_focus';
+
 export interface TeacherAiAssistantMessagePayload {
   message: string;
+  mode: TeacherAiAssistantMode;
 }
 
 export interface TeacherAiAssistantMessageResponse {
