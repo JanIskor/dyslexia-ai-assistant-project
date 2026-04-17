@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config import settings
+from app.services.adaptation_prompt_builder import AdaptationMode, build_adaptation_system_prompt
 
 
 class LlmServiceError(Exception):
@@ -26,6 +27,7 @@ class LlmProvider(Protocol):
 @dataclass
 class PlainTextAdaptationRequest:
     source_text: str
+    mode: AdaptationMode
 
 
 @dataclass
@@ -42,7 +44,7 @@ class LlmService:
     def adapt_plain_text(self, request: PlainTextAdaptationRequest) -> PlainTextAdaptationResult:
         adapted_text = self._provider.adapt_plain_text(
             source_text=request.source_text,
-            system_prompt=_build_plain_text_adaptation_prompt(),
+            system_prompt=build_adaptation_system_prompt(request.mode),
         )
 
         return PlainTextAdaptationResult(
@@ -68,19 +70,6 @@ def get_llm_service() -> LlmService:
     raise LlmProviderConfigurationError(
         f"Неподдерживаемый LLM_PROVIDER: {settings.LLM_PROVIDER}."
     )
-
-
-def _build_plain_text_adaptation_prompt() -> str:
-    return (
-        "Ты помогаешь адаптировать учебный текст для обучающегося с дислексией. "
-        "Сохраняй исходный смысл и учебную точность. "
-        "Упрощай длинные предложения, делай структуру понятнее, выделяй главное, "
-        "не придумывай факты и не добавляй информацию, которой нет в исходном тексте. "
-        "Пиши ясно, спокойно, учебно и простым русским языком. "
-        "Верни только готовый адаптированный текст без пояснений от себя."
-    )
-
-
 def _get_active_model_name() -> str:
     provider_name = settings.LLM_PROVIDER.strip().lower()
 

@@ -17,7 +17,10 @@ def create_teacher_ai_assistant_reply(
     payload: TeacherAiAssistantMessageRequest,
 ) -> TeacherAiAssistantMessageResponse:
     adaptation_result = get_llm_service().adapt_plain_text(
-        PlainTextAdaptationRequest(source_text=payload.message.strip())
+        PlainTextAdaptationRequest(
+            source_text=payload.message.strip(),
+            mode=payload.mode,
+        )
     )
 
     return TeacherAiAssistantMessageResponse(

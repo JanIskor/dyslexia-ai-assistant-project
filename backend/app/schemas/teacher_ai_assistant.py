@@ -3,10 +3,12 @@ from typing import Annotated
 from pydantic import BaseModel, StringConstraints
 
 from app.schemas.learning_materials import LearningMaterialResponse
+from app.services.adaptation_prompt_builder import DEFAULT_ADAPTATION_MODE, AdaptationMode
 
 
 class TeacherAiAssistantMessageRequest(BaseModel):
-    message: str
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    mode: AdaptationMode = DEFAULT_ADAPTATION_MODE
 
 
 class TeacherAiAssistantMessageResponse(BaseModel):
