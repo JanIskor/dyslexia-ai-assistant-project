@@ -18,6 +18,8 @@ from app.schemas.profile_avatar import ProfileAvatarUploadResponse
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
     TeacherAiAssistantMessageResponse,
+    TeacherAiAssistantSaveMaterialRequest,
+    TeacherAiAssistantSaveMaterialResponse,
 )
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
@@ -46,7 +48,10 @@ from app.services.teacher_incoming_students_service import (
     list_teacher_incoming_students,
     reject_teacher_incoming_student,
 )
-from app.services.teacher_ai_assistant_service import create_teacher_ai_assistant_reply
+from app.services.teacher_ai_assistant_service import (
+    create_teacher_ai_assistant_reply,
+    save_teacher_ai_assistant_material,
+)
 from app.services.llm_service import LlmProviderConfigurationError, LlmProviderRequestError
 from app.services.teacher_student_messages_service import create_teacher_student_message
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
@@ -67,6 +72,19 @@ def create_teacher_ai_assistant_message(
         raise HTTPException(status_code=503, detail=str(error)) from error
     except LlmProviderRequestError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+
+
+@router.post("/ai-assistant/save-material", response_model=TeacherAiAssistantSaveMaterialResponse)
+def save_teacher_ai_assistant_material_endpoint(
+    payload: TeacherAiAssistantSaveMaterialRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return save_teacher_ai_assistant_material(
+        db,
+        teacher_user_id=current_teacher.id,
+        payload=payload,
+    )
 
 
 @router.post("/materials", response_model=LearningMaterialResponse)
