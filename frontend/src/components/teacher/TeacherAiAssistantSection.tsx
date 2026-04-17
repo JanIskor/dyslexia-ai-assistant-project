@@ -173,7 +173,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
 
       <div className="border-t border-orange-100/80 bg-white/95 px-4 py-4 sm:px-6">
         {errorMessage ? (
-          <p className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <p
+            data-testid="teacher-ai-assistant-error"
+            className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          >
             {errorMessage}
           </p>
         ) : null}

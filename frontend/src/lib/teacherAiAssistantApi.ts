@@ -19,6 +19,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null, fallbackMess
     return 'Не удалось подтвердить авторизацию. Войдите снова.';
   }
 
+  if ((status === 502 || status === 503) && typeof detail === 'string' && detail.trim()) {
+    return detail;
+  }
+
   if (status >= 500) {
     return 'Ошибка сервера. Попробуйте ещё раз позже.';
   }
