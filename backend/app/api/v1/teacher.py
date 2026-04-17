@@ -47,6 +47,7 @@ from app.services.teacher_incoming_students_service import (
     reject_teacher_incoming_student,
 )
 from app.services.teacher_ai_assistant_service import create_teacher_ai_assistant_reply
+from app.services.llm_service import LlmProviderConfigurationError, LlmProviderRequestError
 from app.services.teacher_student_messages_service import create_teacher_student_message
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
@@ -60,7 +61,12 @@ def create_teacher_ai_assistant_message(
 ):
     _ = current_teacher
 
-    return create_teacher_ai_assistant_reply(payload)
+    try:
+        return create_teacher_ai_assistant_reply(payload)
+    except LlmProviderConfigurationError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except LlmProviderRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @router.post("/materials", response_model=LearningMaterialResponse)

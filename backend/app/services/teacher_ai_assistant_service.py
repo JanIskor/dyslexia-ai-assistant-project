@@ -1,3 +1,4 @@
+from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
     TeacherAiAssistantMessageResponse,
@@ -7,8 +8,10 @@ from app.schemas.teacher_ai_assistant import (
 def create_teacher_ai_assistant_reply(
     payload: TeacherAiAssistantMessageRequest,
 ) -> TeacherAiAssistantMessageResponse:
-    _ = payload
+    adaptation_result = get_llm_service().adapt_plain_text(
+        PlainTextAdaptationRequest(source_text=payload.message.strip())
+    )
 
     return TeacherAiAssistantMessageResponse(
-        reply="Это тестовый ответ ИИ-ассистента. Здесь позже будет адаптированный текст."
+        reply=adaptation_result.adapted_text
     )

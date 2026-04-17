@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = "minioadmin"
     MINIO_BUCKET: str = "dyslexia-media"
     MINIO_SECURE: bool = False
+    LLM_PROVIDER: str = "gigachat"
+    GIGACHAT_AUTH_KEY: str | None = None
+    GIGACHAT_SCOPE: str = "GIGACHAT_API_PERS"
+    GIGACHAT_MODEL: str = "GigaChat-2"
+    GIGACHAT_BASE_URL: str = "https://gigachat.devices.sberbank.ru/api/v1"
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
