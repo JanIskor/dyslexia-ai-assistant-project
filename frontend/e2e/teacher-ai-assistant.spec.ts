@@ -53,6 +53,62 @@ test('teacher ai assistant returns real adapted text', async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('teacher ai assistant composer shows future actions and adaptation mode selector', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: 'Тестовый ответ для проверки composer UX.',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  const materialsActionButton = page.getByTestId('teacher-ai-assistant-materials-action');
+  const filesActionButton = page.getByTestId('teacher-ai-assistant-files-action');
+  const modeButton = page.getByTestId('teacher-ai-assistant-mode-button');
+
+  await expect(materialsActionButton).toBeVisible();
+  await expect(filesActionButton).toBeVisible();
+  await expect(modeButton).toContainText('Упростить текст');
+
+  await materialsActionButton.click();
+  await expect(page.getByTestId('teacher-ai-assistant-materials-menu')).toContainText(
+    'Скоро здесь можно будет выбрать уже созданный учебный материал.',
+  );
+
+  await filesActionButton.click();
+  await expect(page.getByTestId('teacher-ai-assistant-files-menu')).toContainText(
+    'Скоро здесь можно будет прикреплять файлы для адаптации.',
+  );
+
+  await modeButton.click();
+  await expect(page.getByTestId('teacher-ai-assistant-mode-menu')).toBeVisible();
+  await page.getByTestId('teacher-ai-assistant-mode-option-Сделать пошаговым').click();
+  await expect(modeButton).toContainText('Сделать пошаговым');
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Проверка отправки после смены режима');
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
+    'Тестовый ответ для проверки composer UX.',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'composer-ux-polish',
+      materialsActionVisible: await materialsActionButton.isVisible(),
+      filesActionVisible: await filesActionButton.isVisible(),
+      selectedMode: await modeButton.textContent(),
+      assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('teacher ai assistant shows backend error in UI', async ({ page }) => {
   await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
     await page.waitForTimeout(400);
