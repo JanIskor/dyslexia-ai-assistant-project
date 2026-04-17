@@ -1,4 +1,5 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
+import type { TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 export interface TeacherAiAssistantMessagePayload {
   message: string;
@@ -6,6 +7,12 @@ export interface TeacherAiAssistantMessagePayload {
 
 export interface TeacherAiAssistantMessageResponse {
   reply: string;
+}
+
+export interface TeacherAiAssistantSaveMaterialPayload {
+  title: string;
+  original_text: string;
+  adapted_text: string;
 }
 
 interface ApiErrorBody {
@@ -61,4 +68,35 @@ export const sendTeacherAiAssistantMessage = async (
   }
 
   return parseJson<TeacherAiAssistantMessageResponse>(response);
+};
+
+export const saveTeacherAiAssistantMaterial = async (
+  token: string,
+  payload: TeacherAiAssistantSaveMaterialPayload,
+): Promise<TeacherLearningMaterial> => {
+  const response = await fetch(buildApiUrl('/api/v1/teacher/ai-assistant/save-material'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(
+      getErrorMessage(response.status, body, 'Не удалось сохранить материал из ответа ассистента.'),
+    );
+  }
+
+  return parseJson<TeacherLearningMaterial>(response);
 };

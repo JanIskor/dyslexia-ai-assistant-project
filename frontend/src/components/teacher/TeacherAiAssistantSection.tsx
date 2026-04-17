@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
-import { sendTeacherAiAssistantMessage } from '@/lib/teacherAiAssistantApi';
+import { ArrowUp, LoaderCircle, X } from 'lucide-react';
+import {
+  saveTeacherAiAssistantMaterial,
+  sendTeacherAiAssistantMessage,
+} from '@/lib/teacherAiAssistantApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
 
@@ -10,6 +13,7 @@ interface TeacherAiAssistantMessage {
   id: string;
   role: TeacherAiAssistantMessageRole;
   content: string;
+  sourceText?: string;
 }
 
 interface TeacherAiAssistantSectionProps {
@@ -18,6 +22,121 @@ interface TeacherAiAssistantSectionProps {
 
 const EMPTY_STATE_TEXT = 'Введите текст, который нужно адаптировать';
 const MAX_COMPOSER_HEIGHT_PX = 224;
+
+function SaveMaterialModal({
+  isOpen,
+  title,
+  onTitleChange,
+  onClose,
+  onSubmit,
+  isSubmitting,
+  errorMessage,
+}: {
+  isOpen: boolean;
+  title: string;
+  onTitleChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  errorMessage: string | null;
+}) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-stone-950/20 px-4 py-6 backdrop-blur-[2px] sm:px-6 sm:py-8">
+      <div className="w-full max-w-xl rounded-[32px] border border-orange-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,247,242,0.96))] shadow-[0_20px_60px_rgba(150,92,46,0.18)]">
+        <div className="border-b border-orange-100/70 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">
+                Сохранить как материал
+              </h2>
+              <p className="mt-2 text-sm text-stone-500 sm:text-base">
+                Укажите название, и ответ ассистента будет сохранён в черновики материалов.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              aria-label="Закрыть modal сохранения материала"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-orange-100 bg-white text-stone-500 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 py-5 sm:px-7 sm:py-6">
+          <label
+            htmlFor="teacher-ai-save-material-title"
+            className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+          >
+            Название
+          </label>
+          <input
+            id="teacher-ai-save-material-title"
+            data-testid="teacher-ai-save-material-title"
+            type="text"
+            value={title}
+            onChange={(event) => onTitleChange(event.target.value)}
+            disabled={isSubmitting}
+            placeholder="Введите название материала"
+            className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:opacity-60 sm:text-lg"
+          />
+
+          {errorMessage ? (
+            <p
+              data-testid="teacher-ai-save-material-error"
+              className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:text-base"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="border-t border-orange-100/70 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={isSubmitting || title.trim().length === 0}
+              data-testid="teacher-ai-save-material-submit"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? 'Сохраняем...' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TypingIndicator() {
   return (
@@ -46,6 +165,12 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [messages, setMessages] = useState<TeacherAiAssistantMessage[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [materialTitle, setMaterialTitle] = useState('');
+  const [selectedAssistantMessageId, setSelectedAssistantMessageId] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isSavingMaterial, setIsSavingMaterial] = useState(false);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -91,6 +216,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setMessages((currentMessages) => [...currentMessages, userMessage]);
     setDraftMessage('');
     setErrorMessage(null);
+    setSaveSuccessMessage(null);
     setIsSubmitting(true);
 
     try {
@@ -102,6 +228,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.reply,
+        sourceText: trimmedMessage,
       };
 
       setMessages((currentMessages) => [...currentMessages, assistantMessage]);
@@ -114,104 +241,205 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     }
   };
 
+  const selectedAssistantMessage =
+    selectedAssistantMessageId === null
+      ? null
+      : messages.find((message) => message.id === selectedAssistantMessageId && message.role === 'assistant') ??
+        null;
+
+  const handleOpenSaveModal = (message: TeacherAiAssistantMessage) => {
+    setSelectedAssistantMessageId(message.id);
+    setMaterialTitle('');
+    setSaveErrorMessage(null);
+    setSaveSuccessMessage(null);
+    setIsSaveModalOpen(true);
+  };
+
+  const handleCloseSaveModal = () => {
+    if (isSavingMaterial) {
+      return;
+    }
+
+    setIsSaveModalOpen(false);
+    setSelectedAssistantMessageId(null);
+    setMaterialTitle('');
+    setSaveErrorMessage(null);
+  };
+
+  const handleSaveMaterial = async () => {
+    if (!selectedAssistantMessage) {
+      setSaveErrorMessage('Не удалось определить ответ ассистента для сохранения.');
+      return;
+    }
+
+    if (!selectedAssistantMessage.sourceText?.trim()) {
+      setSaveErrorMessage('Не удалось определить исходный текст для сохранения материала.');
+      return;
+    }
+
+    if (!materialTitle.trim()) {
+      setSaveErrorMessage('Введите название материала.');
+      return;
+    }
+
+    setIsSavingMaterial(true);
+    setSaveErrorMessage(null);
+
+    try {
+      await saveTeacherAiAssistantMaterial(accessToken, {
+        title: materialTitle,
+        original_text: selectedAssistantMessage.sourceText,
+        adapted_text: selectedAssistantMessage.content,
+      });
+
+      setIsSaveModalOpen(false);
+      setSelectedAssistantMessageId(null);
+      setMaterialTitle('');
+      setSaveSuccessMessage('Материал сохранён. Он доступен во вкладке "Материалы".');
+      window.alert('Материал сохранён.');
+    } catch (error) {
+      setSaveErrorMessage(
+        error instanceof Error ? error.message : 'Не удалось сохранить материал из ответа ассистента.',
+      );
+    } finally {
+      setIsSavingMaterial(false);
+    }
+  };
+
   return (
-    <section
-      data-testid="teacher-ai-assistant-section"
-      className="flex h-[min(760px,calc(100vh-10rem))] min-h-[560px] flex-col overflow-hidden rounded-[30px] border border-orange-100/80 bg-white/92 shadow-[0_18px_50px_rgba(221,156,130,0.12)]"
-    >
-      <header className="border-b border-orange-100/80 px-5 py-5 sm:px-7">
-        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">ИИ-ассистент</h2>
-        <p className="mt-2 text-sm text-stone-500 sm:text-base">
-          Вставьте учебный текст и получите ответ в формате диалога.
-        </p>
-      </header>
-
-      <div
-        ref={chatViewportRef}
-        data-testid="teacher-ai-assistant-chat"
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6"
+    <>
+      <section
+        data-testid="teacher-ai-assistant-section"
+        className="flex h-[min(760px,calc(100vh-10rem))] min-h-[560px] flex-col overflow-hidden rounded-[30px] border border-orange-100/80 bg-white/92 shadow-[0_18px_50px_rgba(221,156,130,0.12)]"
       >
-        {messages.length === 0 ? (
-          <div
-            data-testid="teacher-ai-assistant-empty-state"
-            className="flex h-full min-h-[320px] items-center justify-center rounded-[24px] border border-dashed border-orange-200 bg-orange-50/40 px-6 text-center text-base text-stone-500 sm:text-lg"
-          >
-            {EMPTY_STATE_TEXT}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message) => {
-              const isUserMessage = message.role === 'user';
-
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isUserMessage ? 'justify-end' : 'justify-start'}`}
-                >
-                  <article
-                    data-testid={`teacher-ai-assistant-message-${message.role}`}
-                    className={`max-w-[85%] rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm sm:px-5 sm:py-4 sm:text-base ${
-                      isUserMessage
-                        ? 'bg-orange-300 text-white'
-                        : 'border border-orange-100 bg-orange-50/70 text-stone-700'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                  </article>
-                </div>
-              );
-            })}
-
-            {isSubmitting ? (
-              <div className="flex justify-start">
-                <TypingIndicator />
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-orange-100/80 bg-white/95 px-4 py-4 sm:px-6">
-        {errorMessage ? (
-          <p
-            data-testid="teacher-ai-assistant-error"
-            className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
-          >
-            {errorMessage}
+        <header className="border-b border-orange-100/80 px-5 py-5 sm:px-7">
+          <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">ИИ-ассистент</h2>
+          <p className="mt-2 text-sm text-stone-500 sm:text-base">
+            Вставьте учебный текст и получите ответ в формате диалога.
           </p>
-        ) : null}
+        </header>
 
-        <div className="rounded-[26px] border border-orange-100 bg-orange-50/45 p-3 shadow-inner">
-          <textarea
-            ref={textareaRef}
-            data-testid="teacher-ai-assistant-input"
-            value={draftMessage}
-            onChange={(event) => setDraftMessage(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void handleSubmit();
-              }
-            }}
-            placeholder="Вставьте учебный текст для адаптации..."
-            rows={1}
-            className="max-h-[224px] min-h-[52px] w-full resize-none border-0 bg-transparent px-2 py-3 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base"
-          />
-
-          <div className="mt-3 flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={isSubmitting || draftMessage.trim().length === 0}
-              data-testid="teacher-ai-assistant-submit"
-              aria-label="Отправить сообщение"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-white shadow-[0_10px_24px_rgba(251,146,60,0.28)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 disabled:text-white/75 disabled:shadow-none"
+        <div
+          ref={chatViewportRef}
+          data-testid="teacher-ai-assistant-chat"
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6"
+        >
+          {messages.length === 0 ? (
+            <div
+              data-testid="teacher-ai-assistant-empty-state"
+              className="flex h-full min-h-[320px] items-center justify-center rounded-[24px] border border-dashed border-orange-200 bg-orange-50/40 px-6 text-center text-base text-stone-500 sm:text-lg"
             >
-              <ArrowUp className="h-5 w-5" />
-            </button>
+              {EMPTY_STATE_TEXT}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message) => {
+                const isUserMessage = message.role === 'user';
+                const isSaveButtonDisabled = isSavingMaterial || isSubmitting;
+
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex ${isUserMessage ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[85%] ${isUserMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <article
+                        data-testid={`teacher-ai-assistant-message-${message.role}`}
+                        className={`w-full rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm sm:px-5 sm:py-4 sm:text-base ${
+                          isUserMessage
+                            ? 'bg-orange-300 text-white'
+                            : 'border border-orange-100 bg-orange-50/70 text-stone-700'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      </article>
+
+                      {message.role === 'assistant' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSaveModal(message)}
+                          disabled={isSaveButtonDisabled}
+                          data-testid="teacher-ai-assistant-save-material-trigger"
+                          className="mt-2 inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Сохранить как материал
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isSubmitting ? (
+                <div className="flex justify-start">
+                  <TypingIndicator />
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-orange-100/80 bg-white/95 px-4 py-4 sm:px-6">
+          {errorMessage ? (
+            <p
+              data-testid="teacher-ai-assistant-error"
+              className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+
+          {saveSuccessMessage ? (
+            <p
+              data-testid="teacher-ai-assistant-save-material-success"
+              className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+            >
+              {saveSuccessMessage}
+            </p>
+          ) : null}
+
+          <div className="rounded-[26px] border border-orange-100 bg-orange-50/45 p-3 shadow-inner">
+            <textarea
+              ref={textareaRef}
+              data-testid="teacher-ai-assistant-input"
+              value={draftMessage}
+              onChange={(event) => setDraftMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleSubmit();
+                }
+              }}
+              placeholder="Вставьте учебный текст для адаптации..."
+              rows={1}
+              className="max-h-[224px] min-h-[52px] w-full resize-none border-0 bg-transparent px-2 py-3 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base"
+            />
+
+            <div className="mt-3 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => void handleSubmit()}
+                disabled={isSubmitting || draftMessage.trim().length === 0}
+                data-testid="teacher-ai-assistant-submit"
+                aria-label="Отправить сообщение"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-white shadow-[0_10px_24px_rgba(251,146,60,0.28)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 disabled:text-white/75 disabled:shadow-none"
+              >
+                <ArrowUp className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <SaveMaterialModal
+        isOpen={isSaveModalOpen}
+        title={materialTitle}
+        onTitleChange={setMaterialTitle}
+        onClose={handleCloseSaveModal}
+        onSubmit={() => void handleSaveMaterial()}
+        isSubmitting={isSavingMaterial}
+        errorMessage={saveErrorMessage}
+      />
+    </>
   );
 }

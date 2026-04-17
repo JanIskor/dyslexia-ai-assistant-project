@@ -91,3 +91,111 @@ test('teacher ai assistant shows backend error in UI', async ({ page }) => {
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
+
+test('teacher can save assistant reply as material', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: 'Короткий и понятный адаптированный текст для ученика.',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/save-material', async (route) => {
+    const requestBody = route.request().postDataJSON();
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: '55555555-5555-5555-5555-555555555555',
+        title: requestBody.title,
+        original_text: requestBody.adapted_text,
+        material_type: 'text',
+        status: 'draft',
+        created_at: '2026-04-17T10:00:00Z',
+        updated_at: '2026-04-17T10:00:00Z',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Исходный текст для адаптации');
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
+    'Короткий и понятный адаптированный текст для ученика.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-save-material-trigger').first().click();
+  await page.getByTestId('teacher-ai-save-material-title').fill('Материал из ИИ');
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toBe('Материал сохранён.');
+    await dialog.accept();
+  });
+  await page.getByTestId('teacher-ai-save-material-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-save-material-success')).toContainText(
+    'Материал сохранён. Он доступен во вкладке "Материалы".',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'save-material-success',
+      saveSuccessBanner: await page
+        .getByTestId('teacher-ai-assistant-save-material-success')
+        .textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant shows save material error', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: 'Ответ ассистента для проверки ошибки сохранения.',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/save-material', async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        detail: 'Save material failed',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Текст для ошибки сохранения');
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toBeVisible();
+
+  await page.getByTestId('teacher-ai-assistant-save-material-trigger').first().click();
+  await page.getByTestId('teacher-ai-save-material-title').fill('Материал с ошибкой');
+  await page.getByTestId('teacher-ai-save-material-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-save-material-error')).toContainText(
+    'Ошибка сервера. Попробуйте ещё раз позже.',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'save-material-error',
+      saveError: await page.getByTestId('teacher-ai-save-material-error').textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
