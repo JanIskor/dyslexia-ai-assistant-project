@@ -21,7 +21,11 @@ from app.schemas.admin_directories import (
     AdminTeachersSort,
 )
 from app.schemas.auth import UserResponse
-from app.schemas.knowledge_documents import KnowledgeDocumentResponse, KnowledgeDocumentsListResponse
+from app.schemas.knowledge_documents import (
+    KnowledgeDocumentChunksListResponse,
+    KnowledgeDocumentResponse,
+    KnowledgeDocumentsListResponse,
+)
 from app.services.admin_applications_service import (
     approve_admin_application,
     assign_teacher_to_application,
@@ -40,6 +44,7 @@ from app.services.admin_directories_service import (
 )
 from app.services.knowledge_base_service import (
     get_knowledge_document,
+    get_knowledge_document_chunks,
     list_knowledge_documents,
     upload_knowledge_document,
 )
@@ -85,6 +90,22 @@ def read_knowledge_document_detail(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
     return document
+
+
+@router.get(
+    "/knowledge-base/documents/{document_id}/chunks",
+    response_model=KnowledgeDocumentChunksListResponse,
+)
+def read_knowledge_document_chunks(
+    document_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    chunks = get_knowledge_document_chunks(db, document_id=document_id)
+    if chunks is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
+    return chunks
 
 
 @router.get("/applications", response_model=AdminApplicationsListResponse)

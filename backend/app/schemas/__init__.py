@@ -6,7 +6,12 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialCreateRequest,
     TeacherLearningMaterialsListResponse,
 )
-from app.schemas.knowledge_documents import KnowledgeDocumentResponse, KnowledgeDocumentsListResponse
+from app.schemas.knowledge_documents import (
+    KnowledgeDocumentChunkResponse,
+    KnowledgeDocumentChunksListResponse,
+    KnowledgeDocumentResponse,
+    KnowledgeDocumentsListResponse,
+)
 from app.schemas.student_learning_materials import (
     StudentLearningMaterialDetailResponse,
     StudentLearningMaterialListItem,
@@ -29,6 +34,8 @@ __all__ = [
     "TeacherLearningMaterialsListResponse",
     "KnowledgeDocumentResponse",
     "KnowledgeDocumentsListResponse",
+    "KnowledgeDocumentChunkResponse",
+    "KnowledgeDocumentChunksListResponse",
     "TeacherLearningMaterialAssignRequest",
     "TeacherLearningMaterialAssignmentResponse",
     "StudentLearningMaterialListItem",

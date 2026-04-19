@@ -7,7 +7,13 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.models.knowledge_document import KnowledgeDocument
-from app.schemas.knowledge_documents import KnowledgeDocumentResponse, KnowledgeDocumentsListResponse
+from app.schemas.knowledge_documents import (
+    KnowledgeDocumentChunkResponse,
+    KnowledgeDocumentChunksListResponse,
+    KnowledgeDocumentResponse,
+    KnowledgeDocumentsListResponse,
+)
+from app.services.knowledge_base_chunking_service import list_chunks_for_document, recreate_chunks_for_document
 from app.services.knowledge_base_parser import extract_text_from_knowledge_file, validate_knowledge_file_type
 from app.services.storage_service import build_object_name, upload_file_bytes
 
@@ -80,7 +86,12 @@ def upload_knowledge_document(
         ) from error
 
     document.extracted_text = extracted_text
-    document.status = "parsed"
+    persisted_chunks = recreate_chunks_for_document(
+        db,
+        document_id=document.id,
+        extracted_text=extracted_text,
+    )
+    document.status = "chunked" if persisted_chunks else "parsed"
     db.commit()
     db.refresh(document)
     return _to_knowledge_document_response(document)
@@ -100,6 +111,30 @@ def get_knowledge_document(db: Session, *, document_id: UUID) -> KnowledgeDocume
     return _to_knowledge_document_response(document)
 
 
+def get_knowledge_document_chunks(
+    db: Session,
+    *,
+    document_id: UUID,
+) -> KnowledgeDocumentChunksListResponse | None:
+    document = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
+    if document is None:
+        return None
+
+    chunks = list_chunks_for_document(db, document_id=document_id)
+    return KnowledgeDocumentChunksListResponse(
+        document_id=document_id,
+        items=[
+            KnowledgeDocumentChunkResponse(
+                id=chunk.id,
+                chunk_index=chunk.chunk_index,
+                content=chunk.content,
+                char_count=chunk.char_count,
+            )
+            for chunk in chunks
+        ],
+    )
+
+
 def _to_knowledge_document_response(document: KnowledgeDocument) -> KnowledgeDocumentResponse:
     return KnowledgeDocumentResponse(
         id=document.id,
@@ -111,6 +146,7 @@ def _to_knowledge_document_response(document: KnowledgeDocument) -> KnowledgeDoc
         uploaded_by_user_id=document.uploaded_by_user_id,
         status=document.status,
         extracted_text=document.extracted_text,
+        chunks_count=len(document.chunks),
         created_at=document.created_at,
         updated_at=document.updated_at,
     )

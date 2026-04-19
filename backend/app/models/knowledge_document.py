@@ -27,3 +27,9 @@ class KnowledgeDocument(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     uploaded_by_user = relationship("User")
+    chunks = relationship(
+        "KnowledgeDocumentChunk",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="KnowledgeDocumentChunk.chunk_index",
+    )

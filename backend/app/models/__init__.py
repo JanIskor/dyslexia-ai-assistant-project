@@ -1,4 +1,5 @@
 from app.models.knowledge_document import KnowledgeDocument
+from app.models.knowledge_document_chunk import KnowledgeDocumentChunk
 from app.models.learning_material import LearningMaterial
 from app.models.notification import Notification
 from app.models.student_learning_material import StudentLearningMaterial
@@ -14,6 +15,7 @@ from app.models.user import User
 __all__ = [
     "User",
     "KnowledgeDocument",
+    "KnowledgeDocumentChunk",
     "LearningMaterial",
     "StudentLearningMaterial",
     "Notification",
