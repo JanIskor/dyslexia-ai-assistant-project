@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, ChevronDown, LoaderCircle, Plus, X } from 'lucide-react';
+import { ArrowUp, BookOpenText, ChevronDown, LoaderCircle, Plus, X } from 'lucide-react';
 import {
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
   type TeacherAiAssistantMode,
+  type TeacherAiAssistantMessageResponse,
 } from '@/lib/teacherAiAssistantApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
@@ -15,6 +16,7 @@ interface TeacherAiAssistantMessage {
   role: TeacherAiAssistantMessageRole;
   content: string;
   sourceText?: string;
+  usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
 interface TeacherAiAssistantSectionProps {
@@ -185,6 +187,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [isSavingMaterial, setIsSavingMaterial] = useState(false);
   const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('basic_simplify');
   const [openComposerMenu, setOpenComposerMenu] = useState<ComposerActionMenu>(null);
+  const [expandedKnowledgeMessageIds, setExpandedKnowledgeMessageIds] = useState<string[]>([]);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerActionsRef = useRef<HTMLDivElement | null>(null);
@@ -273,6 +276,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         role: 'assistant',
         content: response.reply,
         sourceText: trimmedMessage,
+        usedKnowledgeChunks: response.used_knowledge_chunks,
       };
 
       setMessages((currentMessages) => [...currentMessages, assistantMessage]);
@@ -359,6 +363,14 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setOpenComposerMenu(null);
   };
 
+  const toggleKnowledgeUsage = (messageId: string) => {
+    setExpandedKnowledgeMessageIds((currentIds) =>
+      currentIds.includes(messageId)
+        ? currentIds.filter((id) => id !== messageId)
+        : [...currentIds, messageId],
+    );
+  };
+
   const selectedModeLabel =
     ADAPTATION_MODES.find((modeOption) => modeOption.value === selectedMode)?.label ??
     'Упростить текст';
@@ -393,6 +405,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               {messages.map((message) => {
                 const isUserMessage = message.role === 'user';
                 const isSaveButtonDisabled = isSavingMaterial || isSubmitting;
+                const hasKnowledgeUsage = Boolean(message.usedKnowledgeChunks?.length);
+                const isKnowledgeExpanded = expandedKnowledgeMessageIds.includes(message.id);
 
                 return (
                   <div
@@ -412,15 +426,61 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                       </article>
 
                       {message.role === 'assistant' ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenSaveModal(message)}
-                          disabled={isSaveButtonDisabled}
-                          data-testid="teacher-ai-assistant-save-material-trigger"
-                          className="mt-2 inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Сохранить как материал
-                        </button>
+                        <>
+                          {hasKnowledgeUsage ? (
+                            <div
+                              data-testid="teacher-ai-assistant-knowledge-usage"
+                              className="mt-2 w-full rounded-[20px] border border-stone-200/90 bg-stone-50/90 px-3 py-2.5 text-stone-500 shadow-sm"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleKnowledgeUsage(message.id)}
+                                data-testid="teacher-ai-assistant-knowledge-toggle"
+                                aria-expanded={isKnowledgeExpanded}
+                                className="flex w-full items-center justify-between gap-3 text-left text-xs font-medium sm:text-sm"
+                              >
+                                <span className="inline-flex min-w-0 items-center gap-2">
+                                  <BookOpenText className="h-4 w-4 shrink-0 text-stone-400" />
+                                  <span className="truncate">
+                                    Ответ основан на материалах ({message.usedKnowledgeChunks?.length ?? 0})
+                                  </span>
+                                </span>
+                                <ChevronDown
+                                  className={`h-4 w-4 shrink-0 transition ${
+                                    isKnowledgeExpanded ? 'rotate-180' : ''
+                                  }`}
+                                />
+                              </button>
+
+                              {isKnowledgeExpanded ? (
+                                <ul
+                                  data-testid="teacher-ai-assistant-knowledge-list"
+                                  className="mt-2 space-y-1.5 border-t border-stone-200/80 pt-2 text-xs text-stone-500 sm:text-sm"
+                                >
+                                  {message.usedKnowledgeChunks?.map((chunk, index) => (
+                                    <li
+                                      key={`${message.id}-knowledge-${chunk.document_title}-${chunk.chunk_index}-${index}`}
+                                      data-testid="teacher-ai-assistant-knowledge-item"
+                                      className="break-words"
+                                    >
+                                      • {chunk.document_title} — chunk {chunk.chunk_index}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSaveModal(message)}
+                            disabled={isSaveButtonDisabled}
+                            data-testid="teacher-ai-assistant-save-material-trigger"
+                            className="mt-2 inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-white px-4 py-2 text-sm font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Сохранить как материал
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </div>

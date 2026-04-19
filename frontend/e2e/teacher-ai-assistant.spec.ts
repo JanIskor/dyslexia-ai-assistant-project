@@ -103,6 +103,92 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('teacher ai assistant shows rag transparency block when knowledge chunks are used', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: 'Растения превращают солнечный свет, воду и углекислый газ в питание и выделяют кислород.',
+        used_knowledge_chunks: [
+          {
+            document_title: 'photosynthesis',
+            chunk_index: 0,
+          },
+          {
+            document_title: 'formative_feedback',
+            chunk_index: 1,
+          },
+        ],
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Адаптируй текст про фотосинтез');
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+
+  const knowledgeBlock = page.getByTestId('teacher-ai-assistant-knowledge-usage').first();
+  await expect(knowledgeBlock).toContainText('Ответ основан на материалах (2)');
+
+  const knowledgeList = page.getByTestId('teacher-ai-assistant-knowledge-list').first();
+  await expect(knowledgeList).toHaveCount(0);
+
+  await page.getByTestId('teacher-ai-assistant-knowledge-toggle').first().click();
+  await expect(knowledgeList).toBeVisible();
+  await expect(page.getByTestId('teacher-ai-assistant-knowledge-item')).toHaveCount(2);
+  await expect(page.getByTestId('teacher-ai-assistant-knowledge-item').nth(0)).toContainText(
+    'photosynthesis — chunk 0',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-knowledge-item').nth(1)).toContainText(
+    'formative_feedback — chunk 1',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'rag-transparency-visible',
+      transparencyLabel: await knowledgeBlock.textContent(),
+      firstKnowledgeItem: await page.getByTestId('teacher-ai-assistant-knowledge-item').nth(0).textContent(),
+      secondKnowledgeItem: await page.getByTestId('teacher-ai-assistant-knowledge-item').nth(1).textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant hides rag transparency block when no knowledge chunks were used', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: 'Короткий и понятный ответ без обращения к базе знаний.',
+        used_knowledge_chunks: [],
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Обычный запрос без knowledge');
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
+    'Короткий и понятный ответ без обращения к базе знаний.',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-knowledge-usage')).toHaveCount(0);
+
+  console.log(
+    JSON.stringify({
+      scenario: 'rag-transparency-hidden',
+      knowledgeBlocksCount: await page.getByTestId('teacher-ai-assistant-knowledge-usage').count(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('teacher ai assistant shows backend error in UI', async ({ page }) => {
   await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
     await page.waitForTimeout(400);
