@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config import settings
-from app.services.adaptation_prompt_builder import AdaptationMode, build_adaptation_system_prompt
+from app.services.adaptation_prompt_builder import (
+    AdaptationMode,
+    RetrievedKnowledgeChunkPromptContext,
+    build_adaptation_system_prompt,
+)
 
 
 class LlmServiceError(Exception):
@@ -28,6 +32,7 @@ class LlmProvider(Protocol):
 class PlainTextAdaptationRequest:
     source_text: str
     mode: AdaptationMode
+    retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None
 
 
 @dataclass
@@ -44,7 +49,10 @@ class LlmService:
     def adapt_plain_text(self, request: PlainTextAdaptationRequest) -> PlainTextAdaptationResult:
         adapted_text = self._provider.adapt_plain_text(
             source_text=request.source_text,
-            system_prompt=build_adaptation_system_prompt(request.mode),
+            system_prompt=build_adaptation_system_prompt(
+                request.mode,
+                retrieved_chunks=request.retrieved_chunks,
+            ),
         )
 
         return PlainTextAdaptationResult(

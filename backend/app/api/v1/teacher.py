@@ -63,11 +63,12 @@ router = APIRouter(prefix="/teacher", tags=["Teacher"])
 def create_teacher_ai_assistant_message(
     payload: TeacherAiAssistantMessageRequest,
     current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
 ):
     _ = current_teacher
 
     try:
-        return create_teacher_ai_assistant_reply(payload)
+        return create_teacher_ai_assistant_reply(db, payload)
     except LlmProviderConfigurationError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except LlmProviderRequestError as error:

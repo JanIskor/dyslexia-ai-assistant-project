@@ -1,9 +1,17 @@
+from dataclasses import dataclass
 from typing import Final, Literal
 
 
 AdaptationMode = Literal["basic_simplify", "structured_explanation", "key_points_focus"]
 
 DEFAULT_ADAPTATION_MODE: Final[AdaptationMode] = "basic_simplify"
+
+
+@dataclass(frozen=True)
+class RetrievedKnowledgeChunkPromptContext:
+    document_title: str
+    chunk_index: int
+    content: str
 
 BASE_PROMPT: Final[str] = (
     "Ты помогаешь адаптировать учебный текст для обучающегося с дислексией. "
@@ -34,5 +42,32 @@ MODE_PROMPT_BLOCKS: Final[dict[AdaptationMode, str]] = {
 }
 
 
-def build_adaptation_system_prompt(mode: AdaptationMode) -> str:
-    return f"{BASE_PROMPT} {MODE_PROMPT_BLOCKS[mode]}"
+def build_adaptation_system_prompt(
+    mode: AdaptationMode,
+    *,
+    retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None,
+) -> str:
+    prompt = f"{BASE_PROMPT} {MODE_PROMPT_BLOCKS[mode]}"
+
+    if not retrieved_chunks:
+        return prompt
+
+    knowledge_context = "\n\n".join(
+        (
+            f"[Источник: {chunk.document_title}, chunk {chunk.chunk_index}]\n"
+            f"{chunk.content.strip()}"
+        )
+        for chunk in retrieved_chunks
+        if chunk.content.strip()
+    )
+
+    if not knowledge_context:
+        return prompt
+
+    return (
+        f"{prompt} "
+        "Ниже дан дополнительный учебный контекст из базы знаний. "
+        "Используй его только если он реально помогает точнее и полезнее адаптировать ответ на запрос учителя. "
+        "Если контекст не подходит, не ссылайся на него и не притягивай его искусственно.\n\n"
+        f"Контекст из базы знаний:\n{knowledge_context}"
+    )

@@ -10,9 +10,14 @@ class TeacherAiAssistantMessageRequest(BaseModel):
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     mode: AdaptationMode = DEFAULT_ADAPTATION_MODE
 
+class TeacherAiAssistantUsedKnowledgeChunk(BaseModel):
+    document_title: str
+    chunk_index: int
+
 
 class TeacherAiAssistantMessageResponse(BaseModel):
     reply: str
+    used_knowledge_chunks: list[TeacherAiAssistantUsedKnowledgeChunk]
 
 
 class TeacherAiAssistantSaveMaterialRequest(BaseModel):
