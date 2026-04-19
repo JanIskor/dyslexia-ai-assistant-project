@@ -46,6 +46,7 @@ from app.services.knowledge_base_service import (
     get_knowledge_document,
     get_knowledge_document_chunks,
     list_knowledge_documents,
+    reembed_knowledge_document,
     upload_knowledge_document,
 )
 
@@ -106,6 +107,19 @@ def read_knowledge_document_chunks(
     if chunks is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
     return chunks
+
+
+@router.post("/knowledge-base/documents/{document_id}/re-embed", response_model=KnowledgeDocumentResponse)
+def reembed_knowledge_document_endpoint(
+    document_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    document = reembed_knowledge_document(db, document_id=document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
+    return document
 
 
 @router.get("/applications", response_model=AdminApplicationsListResponse)

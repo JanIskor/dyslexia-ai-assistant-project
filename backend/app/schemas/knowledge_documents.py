@@ -15,6 +15,7 @@ class KnowledgeDocumentResponse(BaseModel):
     status: str
     extracted_text: str | None
     chunks_count: int
+    embedded_chunks_count: int
     created_at: datetime
     updated_at: datetime
 
@@ -28,6 +29,7 @@ class KnowledgeDocumentChunkResponse(BaseModel):
     chunk_index: int
     content: str
     char_count: int
+    has_embedding: bool
 
 
 class KnowledgeDocumentChunksListResponse(BaseModel):

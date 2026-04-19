@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     GIGACHAT_BASE_URL: str = "https://gigachat.devices.sberbank.ru/api/v1"
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str | None = None
+    EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSION: int = 384
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
