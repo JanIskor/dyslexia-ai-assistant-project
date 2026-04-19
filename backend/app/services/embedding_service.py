@@ -44,6 +44,7 @@ def embed_chunk(chunk: KnowledgeDocumentChunk) -> bool:
 def embed_chunks_for_document(db: Session, *, document_id: UUID) -> int:
     chunks = (
         db.query(KnowledgeDocumentChunk)
+        .populate_existing()
         .filter(KnowledgeDocumentChunk.document_id == document_id)
         .order_by(KnowledgeDocumentChunk.chunk_index.asc())
         .all()

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class KnowledgeDocumentResponse(BaseModel):
@@ -35,3 +35,24 @@ class KnowledgeDocumentChunkResponse(BaseModel):
 class KnowledgeDocumentChunksListResponse(BaseModel):
     document_id: UUID
     items: list[KnowledgeDocumentChunkResponse]
+
+
+class KnowledgeBaseRetrieveRequest(BaseModel):
+    query: str
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+class KnowledgeBaseRetrievedChunkResponse(BaseModel):
+    id: UUID
+    document_id: UUID
+    document_title: str
+    chunk_index: int
+    content: str
+    distance: float
+    similarity: float
+
+
+class KnowledgeBaseRetrieveResponse(BaseModel):
+    query: str
+    top_k: int
+    items: list[KnowledgeBaseRetrievedChunkResponse]

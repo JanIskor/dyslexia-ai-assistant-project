@@ -7,6 +7,9 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialsListResponse,
 )
 from app.schemas.knowledge_documents import (
+    KnowledgeBaseRetrieveRequest,
+    KnowledgeBaseRetrieveResponse,
+    KnowledgeBaseRetrievedChunkResponse,
     KnowledgeDocumentChunkResponse,
     KnowledgeDocumentChunksListResponse,
     KnowledgeDocumentResponse,
@@ -34,6 +37,9 @@ __all__ = [
     "TeacherLearningMaterialsListResponse",
     "KnowledgeDocumentResponse",
     "KnowledgeDocumentsListResponse",
+    "KnowledgeBaseRetrieveRequest",
+    "KnowledgeBaseRetrieveResponse",
+    "KnowledgeBaseRetrievedChunkResponse",
     "KnowledgeDocumentChunkResponse",
     "KnowledgeDocumentChunksListResponse",
     "TeacherLearningMaterialAssignRequest",

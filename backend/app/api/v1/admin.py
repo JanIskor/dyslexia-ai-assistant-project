@@ -22,6 +22,9 @@ from app.schemas.admin_directories import (
 )
 from app.schemas.auth import UserResponse
 from app.schemas.knowledge_documents import (
+    KnowledgeBaseRetrieveRequest,
+    KnowledgeBaseRetrieveResponse,
+    KnowledgeBaseRetrievedChunkResponse,
     KnowledgeDocumentChunksListResponse,
     KnowledgeDocumentResponse,
     KnowledgeDocumentsListResponse,
@@ -49,6 +52,7 @@ from app.services.knowledge_base_service import (
     reembed_knowledge_document,
     upload_knowledge_document,
 )
+from app.services.retrieval_service import retrieve_relevant_chunks
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -120,6 +124,36 @@ def reembed_knowledge_document_endpoint(
     if document is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
     return document
+
+
+@router.post("/knowledge-base/retrieve", response_model=KnowledgeBaseRetrieveResponse)
+def retrieve_knowledge_base_chunks(
+    payload: KnowledgeBaseRetrieveRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    items = retrieve_relevant_chunks(
+        db,
+        query_text=payload.query,
+        top_k=payload.top_k,
+    )
+    return KnowledgeBaseRetrieveResponse(
+        query=payload.query,
+        top_k=payload.top_k,
+        items=[
+            KnowledgeBaseRetrievedChunkResponse(
+                id=item.id,
+                document_id=item.document_id,
+                document_title=item.document_title,
+                chunk_index=item.chunk_index,
+                content=item.content,
+                distance=item.distance,
+                similarity=item.similarity,
+            )
+            for item in items
+        ],
+    )
 
 
 @router.get("/applications", response_model=AdminApplicationsListResponse)
