@@ -13,6 +13,10 @@ export interface TeacherAiAssistantMessagePayload {
 
 export interface TeacherAiAssistantMessageResponse {
   reply: string;
+  used_knowledge_chunks?: Array<{
+    document_title: string;
+    chunk_index: number;
+  }>;
 }
 
 export interface TeacherAiAssistantSaveMaterialPayload {
