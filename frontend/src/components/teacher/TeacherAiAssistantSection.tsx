@@ -3,6 +3,7 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ArrowUp, BookOpenText, ChevronDown, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import {
+  MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES,
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
   parseTeacherAiAssistantFile,
@@ -32,6 +33,7 @@ interface TeacherAiAssistantSectionProps {
 
 const EMPTY_STATE_TEXT = 'Введите текст, который нужно адаптировать';
 const MAX_COMPOSER_HEIGHT_PX = 224;
+const ACCEPTED_ASSISTANT_FILE_EXTENSIONS = ['pdf', 'docx', 'txt', 'md'] as const;
 
 const ADAPTATION_MODES: ReadonlyArray<{
   value: TeacherAiAssistantMode;
@@ -43,6 +45,33 @@ const ADAPTATION_MODES: ReadonlyArray<{
 ];
 
 type ComposerActionMenu = 'actions' | 'mode' | null;
+
+function formatBytesToMegabytes(bytes: number) {
+  return `${Math.floor(bytes / (1024 * 1024))}MB`;
+}
+
+function getAssistantInputFileExtension(filename: string) {
+  const match = filename.trim().toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match?.[1] ?? '';
+}
+
+function validateAssistantInputFile(file: File): string | null {
+  const extension = getAssistantInputFileExtension(file.name);
+
+  if (!ACCEPTED_ASSISTANT_FILE_EXTENSIONS.includes(extension as (typeof ACCEPTED_ASSISTANT_FILE_EXTENSIONS)[number])) {
+    return 'Поддерживаются только файлы PDF, DOCX, TXT и MD.';
+  }
+
+  if (file.size === 0) {
+    return 'Файл пустой. Выберите документ с текстом.';
+  }
+
+  if (file.size > MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES) {
+    return `Размер файла должен быть не больше ${formatBytesToMegabytes(MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES)}.`;
+  }
+
+  return null;
+}
 
 function SaveMaterialModal({
   isOpen,
@@ -302,6 +331,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [materialSourceError, setMaterialSourceError] = useState<string | null>(null);
   const [availableMaterials, setAvailableMaterials] = useState<TeacherLearningMaterial[]>([]);
   const [isParsingFileSource, setIsParsingFileSource] = useState(false);
+  const activeFileParseRequestIdRef = useRef(0);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerActionsRef = useRef<HTMLDivElement | null>(null);
@@ -364,7 +394,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const handleSubmit = async () => {
     const trimmedMessage = draftMessage.trim();
 
-    if (!trimmedMessage || isSubmitting) {
+    if (!trimmedMessage || isSubmitting || isParsingFileSource) {
       return;
     }
 
@@ -531,6 +561,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   };
 
   const handleOpenFileSource = () => {
+    if (isParsingFileSource) {
+      return;
+    }
+
     setOpenComposerMenu(null);
     fileInputRef.current?.click();
   };
@@ -543,24 +577,44 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       return;
     }
 
+    const validationError = validateAssistantInputFile(selectedFile);
+    if (validationError) {
+      setErrorMessage(validationError);
+      setSaveSuccessMessage(null);
+      return;
+    }
+
+    const requestId = activeFileParseRequestIdRef.current + 1;
+    activeFileParseRequestIdRef.current = requestId;
     setIsParsingFileSource(true);
     setErrorMessage(null);
     setSaveSuccessMessage(null);
 
     try {
       const response = await parseTeacherAiAssistantFile(accessToken, selectedFile);
+      if (activeFileParseRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setDraftMessage(response.extracted_text);
       setCurrentSource({
         kind: 'file',
         label: `Файл: ${response.filename}`,
         filename: response.filename,
       });
+      setOpenComposerMenu(null);
     } catch (error) {
+      if (activeFileParseRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setErrorMessage(
         error instanceof Error ? error.message : 'Не удалось извлечь текст из выбранного файла.',
       );
     } finally {
-      setIsParsingFileSource(false);
+      if (activeFileParseRequestIdRef.current === requestId) {
+        setIsParsingFileSource(false);
+      }
     }
   };
 
@@ -708,6 +762,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
             </p>
           ) : null}
 
+          {isParsingFileSource ? (
+            <p
+              data-testid="teacher-ai-assistant-file-processing"
+              className="mb-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-stone-600"
+            >
+              Файл обрабатывается...
+            </p>
+          ) : null}
+
           <div className="rounded-[26px] border border-orange-100 bg-orange-50/45 p-3 shadow-inner">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2">
               <span
@@ -758,6 +821,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                     data-testid="teacher-ai-assistant-actions-trigger"
                     aria-label="Открыть действия ассистента"
                     aria-expanded={openComposerMenu === 'actions'}
+                    disabled={isParsingFileSource}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-white text-stone-500 shadow-sm transition hover:bg-orange-50"
                   >
                     <Plus className="h-4 w-4" />
@@ -772,6 +836,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                         type="button"
                         onClick={() => void handleOpenMaterialSource()}
                         data-testid="teacher-ai-assistant-action-material"
+                        disabled={isParsingFileSource}
                         className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
                       >
                         <span>Материал</span>
@@ -781,11 +846,12 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                         type="button"
                         onClick={handleOpenFileSource}
                         data-testid="teacher-ai-assistant-action-file"
+                        disabled={isParsingFileSource}
                         className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
                       >
                         <span>Файл</span>
                         <span className="text-xs text-stone-400">
-                          {isParsingFileSource ? 'Загрузка...' : 'Выбрать'}
+                          {isParsingFileSource ? 'Обработка...' : 'Выбрать'}
                         </span>
                       </button>
                     </div>

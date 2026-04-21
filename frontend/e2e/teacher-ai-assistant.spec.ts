@@ -158,6 +158,88 @@ test('teacher ai assistant can use uploaded file as input source', async ({ page
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('teacher ai assistant shows file processing state and blocks send while parsing', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/parse-file', async (route) => {
+    await page.waitForTimeout(600);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        filename: 'delayed-source.md',
+        extracted_text: 'Подготовленный текст после обработки файла.',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-input').fill('Временный текст');
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-file').click();
+  await page.getByTestId('teacher-ai-assistant-file-input').setInputFiles(
+    '/tmp/assistant-input-fixtures/assistant-input.md',
+  );
+
+  await expect(page.getByTestId('teacher-ai-assistant-file-processing')).toContainText(
+    'Файл обрабатывается...',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-submit')).toBeDisabled();
+
+  await expect(page.getByTestId('teacher-ai-assistant-file-processing')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
+    'Файл: delayed-source.md',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
+    'Подготовленный текст после обработки файла.',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'file-processing-state',
+      processingMessageHiddenAfterCompletion:
+        (await page.getByTestId('teacher-ai-assistant-file-processing').count()) === 0,
+      sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant shows file parsing error in UI', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/parse-file', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        detail: 'Parsing failed for the uploaded document.',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-file').click();
+  await page.getByTestId('teacher-ai-assistant-file-input').setInputFiles(
+    '/tmp/assistant-input-fixtures/assistant-input.md',
+  );
+
+  await expect(page.getByTestId('teacher-ai-assistant-error')).toContainText(
+    'Parsing failed for the uploaded document.',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText('Ручной текст');
+
+  console.log(
+    JSON.stringify({
+      scenario: 'file-parsing-error-ui',
+      displayedError: await page.getByTestId('teacher-ai-assistant-error').textContent(),
+      sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('teacher without materials sees assistant material empty state', async ({ page }) => {
   await loginAsTeacher(page, {
     email: 'teacher.empty@example.com',

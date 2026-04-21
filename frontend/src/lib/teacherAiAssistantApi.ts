@@ -30,6 +30,8 @@ export interface TeacherAiAssistantParsedFileResponse {
   extracted_text: string;
 }
 
+export const MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -39,6 +41,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null, fallbackMess
 
   if (detail === 'Not authenticated' || detail === 'Could not validate credentials') {
     return 'Не удалось подтвердить авторизацию. Войдите снова.';
+  }
+
+  if (typeof detail === 'string' && detail.trim() && status < 500) {
+    return detail;
   }
 
   if ((status === 502 || status === 503) && typeof detail === 'string' && detail.trim()) {
