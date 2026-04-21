@@ -1,3 +1,4 @@
+import hashlib
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -7,7 +8,11 @@ from app.models.learning_material import LearningMaterial
 from app.models.student_learning_material import StudentLearningMaterial
 from app.models.teacher_student import TeacherStudent
 from app.schemas.learning_materials import (
+    AdaptationVersionSummary,
+    AdaptedLearningMaterialDetailResponse,
+    AdaptedMaterialSourceInfo,
     LearningMaterialResponse,
+    LearningMaterialKind,
     TeacherLearningMaterialAssignmentResponse,
     TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
@@ -16,18 +21,46 @@ from app.schemas.learning_materials import (
 from app.services.notifications_service import create_notification
 
 
+def _normalize_material_text(text: str | None) -> str:
+    return (text or "").strip()
+
+
+def _build_adaptation_group_key(material: LearningMaterial) -> str | None:
+    if material.adapted_text is None:
+        return None
+
+    source_type = (material.source_type or "manual").strip().lower()
+    if source_type == "material" and material.source_material_id is not None:
+        return f"material:{material.source_material_id}"
+
+    normalized_original_text = _normalize_material_text(material.original_text)
+    fingerprint = hashlib.sha256(normalized_original_text.encode("utf-8")).hexdigest()[:16]
+
+    if source_type == "file":
+        source_filename = (material.source_filename or "uploaded-file").strip().lower()
+        return f"file:{source_filename}:{fingerprint}"
+
+    return f"manual:{fingerprint}"
+
+
+def _get_learning_material_kind(material: LearningMaterial) -> LearningMaterialKind:
+    return "adapted" if material.adapted_text is not None else "draft"
+
+
 def _to_learning_material_response(material: LearningMaterial) -> LearningMaterialResponse:
     return LearningMaterialResponse(
         id=material.id,
         title=material.title,
         original_text=material.original_text,
         adapted_text=material.adapted_text,
+        material_kind=_get_learning_material_kind(material),
         material_type=material.material_type,
         status=material.status,
         source_type=material.source_type,
         source_material_id=material.source_material_id,
         source_filename=material.source_filename,
         adaptation_mode=material.adaptation_mode,
+        adaptation_group_key=_build_adaptation_group_key(material),
         created_at=material.created_at,
         updated_at=material.updated_at,
     )
@@ -61,13 +94,16 @@ def list_teacher_learning_materials(
     db: Session,
     *,
     teacher_user_id: UUID,
+    kind: str = "all",
 ) -> TeacherLearningMaterialsListResponse:
-    materials = (
-        db.query(LearningMaterial)
-        .filter(LearningMaterial.teacher_user_id == teacher_user_id)
-        .order_by(LearningMaterial.created_at.desc())
-        .all()
-    )
+    query = db.query(LearningMaterial).filter(LearningMaterial.teacher_user_id == teacher_user_id)
+
+    if kind == "draft":
+        query = query.filter(LearningMaterial.adapted_text.is_(None))
+    elif kind == "adapted":
+        query = query.filter(LearningMaterial.adapted_text.is_not(None))
+
+    materials = query.order_by(LearningMaterial.created_at.desc()).all()
 
     return TeacherLearningMaterialsListResponse(
         items=[_to_learning_material_response(material) for material in materials]
@@ -93,6 +129,86 @@ def get_teacher_learning_material(
         return None
 
     return _to_learning_material_response(material)
+
+
+def get_teacher_learning_material_compare_ready_detail(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    material_id: UUID,
+) -> AdaptedLearningMaterialDetailResponse | None:
+    material = (
+        db.query(LearningMaterial)
+        .filter(
+            LearningMaterial.id == material_id,
+            LearningMaterial.teacher_user_id == teacher_user_id,
+        )
+        .first()
+    )
+
+    if material is None:
+        return None
+
+    response = _to_learning_material_response(material)
+    if response.material_kind != "adapted":
+        return AdaptedLearningMaterialDetailResponse(
+            **response.model_dump(),
+            source_info=None,
+            available_adaptation_versions=[],
+        )
+
+    adaptation_group_key = response.adaptation_group_key
+    related_versions: list[AdaptationVersionSummary] = []
+
+    if adaptation_group_key is not None:
+        sibling_materials = (
+            db.query(LearningMaterial)
+            .filter(
+                LearningMaterial.teacher_user_id == teacher_user_id,
+                LearningMaterial.adapted_text.is_not(None),
+            )
+            .order_by(LearningMaterial.created_at.desc())
+            .all()
+        )
+
+        related_versions = [
+            AdaptationVersionSummary(
+                id=sibling.id,
+                title=sibling.title,
+                adaptation_mode=sibling.adaptation_mode,
+                created_at=sibling.created_at,
+                updated_at=sibling.updated_at,
+                is_current=sibling.id == material.id,
+            )
+            for sibling in sibling_materials
+            if _build_adaptation_group_key(sibling) == adaptation_group_key
+        ]
+
+    source_material_title: str | None = None
+    if material.source_material_id is not None:
+        source_material = (
+            db.query(LearningMaterial)
+            .filter(
+                LearningMaterial.id == material.source_material_id,
+                LearningMaterial.teacher_user_id == teacher_user_id,
+            )
+            .first()
+        )
+        source_material_title = source_material.title if source_material is not None else None
+
+    source_info = AdaptedMaterialSourceInfo(
+        source_type=material.source_type or "manual",
+        source_material_id=material.source_material_id,
+        source_material_title=source_material_title,
+        source_filename=material.source_filename,
+        adaptation_group_key=adaptation_group_key or f"material:{material.id}",
+    )
+
+    return AdaptedLearningMaterialDetailResponse(
+        **response.model_dump(),
+        source_info=source_info,
+        available_adaptation_versions=related_versions,
+    )
 
 
 def assign_learning_material_to_student(

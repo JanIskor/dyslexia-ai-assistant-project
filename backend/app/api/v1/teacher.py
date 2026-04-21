@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_teacher, get_db
 from app.models.user import User
 from app.schemas.learning_materials import (
+    AdaptedLearningMaterialDetailResponse,
     LearningMaterialResponse,
     TeacherLearningMaterialAssignmentResponse,
     TeacherLearningMaterialAssignRequest,
@@ -34,6 +35,7 @@ from app.services.teacher_profile_service import get_teacher_profile
 from app.services.learning_materials_service import (
     assign_learning_material_to_student,
     create_learning_material,
+    get_teacher_learning_material_compare_ready_detail,
     get_teacher_learning_material,
     list_teacher_learning_materials,
 )
@@ -114,22 +116,24 @@ def create_teacher_material(
 
 @router.get("/materials", response_model=TeacherLearningMaterialsListResponse)
 def read_teacher_materials(
+    kind: Literal["all", "draft", "adapted"] = Query(default="all"),
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
     return list_teacher_learning_materials(
         db,
         teacher_user_id=current_teacher.id,
+        kind=kind,
     )
 
 
-@router.get("/materials/{material_id}", response_model=LearningMaterialResponse)
+@router.get("/materials/{material_id}", response_model=AdaptedLearningMaterialDetailResponse)
 def read_teacher_material_detail(
     material_id: UUID,
     current_teacher: User = Depends(get_current_teacher),
     db: Session = Depends(get_db),
 ):
-    material = get_teacher_learning_material(
+    material = get_teacher_learning_material_compare_ready_detail(
         db,
         teacher_user_id=current_teacher.id,
         material_id=material_id,
