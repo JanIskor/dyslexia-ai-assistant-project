@@ -15,7 +15,7 @@ from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantSaveMaterialResponse,
 )
 from app.services.knowledge_base_parser import extract_text_from_knowledge_file, normalize_extracted_text
-from app.services.learning_materials_service import create_learning_material
+from app.services.learning_materials_service import save_or_update_adapted_learning_material
 from app.services.retrieval_service import retrieve_relevant_chunks
 
 
@@ -68,7 +68,7 @@ def save_teacher_ai_assistant_material(
     teacher_user_id: UUID,
     payload: TeacherAiAssistantSaveMaterialRequest,
 ) -> TeacherAiAssistantSaveMaterialResponse:
-    material = create_learning_material(
+    material, save_action = save_or_update_adapted_learning_material(
         db,
         teacher_user_id=teacher_user_id,
         payload=TeacherLearningMaterialCreateRequest(
@@ -82,7 +82,10 @@ def save_teacher_ai_assistant_material(
         ),
     )
 
-    return TeacherAiAssistantSaveMaterialResponse(**material.model_dump())
+    return TeacherAiAssistantSaveMaterialResponse(
+        **material.model_dump(),
+        save_action=save_action,
+    )
 
 
 def parse_teacher_ai_assistant_input_file(

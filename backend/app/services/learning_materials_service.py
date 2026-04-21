@@ -102,6 +102,29 @@ def _to_learning_material_response(
     )
 
 
+def _get_group_sibling_materials(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    adaptation_group_key: str | None,
+) -> list[LearningMaterial]:
+    if adaptation_group_key is None:
+        return []
+
+    sibling_materials = (
+        db.query(LearningMaterial)
+        .filter(
+            LearningMaterial.teacher_user_id == teacher_user_id,
+            LearningMaterial.adapted_text.is_not(None),
+        )
+        .order_by(LearningMaterial.created_at.asc())
+        .all()
+    )
+    return [
+        sibling for sibling in sibling_materials if _build_adaptation_group_key(sibling) == adaptation_group_key
+    ]
+
+
 def create_learning_material(
     db: Session,
     *,
@@ -127,18 +150,11 @@ def create_learning_material(
         material_group_key = _build_adaptation_group_key(group_probe)
 
         if material_group_key is not None:
-            sibling_materials = (
-                db.query(LearningMaterial)
-                .filter(
-                    LearningMaterial.teacher_user_id == teacher_user_id,
-                    LearningMaterial.adapted_text.is_not(None),
-                )
-                .order_by(LearningMaterial.created_at.asc())
-                .all()
+            grouped_siblings = _get_group_sibling_materials(
+                db,
+                teacher_user_id=teacher_user_id,
+                adaptation_group_key=material_group_key,
             )
-            grouped_siblings = [
-                sibling for sibling in sibling_materials if _build_adaptation_group_key(sibling) == material_group_key
-            ]
             group_title = _get_group_title(grouped_siblings)
             if group_title:
                 normalized_title = group_title
@@ -159,6 +175,85 @@ def create_learning_material(
     db.commit()
     db.refresh(material)
     return _to_learning_material_response(material)
+
+
+def save_or_update_adapted_learning_material(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    payload: TeacherLearningMaterialCreateRequest,
+) -> tuple[LearningMaterialResponse, str]:
+    normalized_source_type = payload.source_type.strip() if payload.source_type else None
+    normalized_source_filename = payload.source_filename.strip() if payload.source_filename else None
+    normalized_original_text = payload.original_text.strip()
+    normalized_title = payload.title.strip()
+    normalized_adapted_text = payload.adapted_text.strip() if payload.adapted_text else None
+
+    if normalized_adapted_text is None:
+        return (
+            create_learning_material(
+                db,
+                teacher_user_id=teacher_user_id,
+                payload=payload,
+            ),
+            "created",
+        )
+
+    group_probe = LearningMaterial(
+        title=normalized_title,
+        original_text=normalized_original_text,
+        adapted_text=normalized_adapted_text,
+        source_type=normalized_source_type,
+        source_material_id=payload.source_material_id,
+        source_filename=normalized_source_filename,
+        adaptation_mode=payload.adaptation_mode,
+    )
+    material_group_key = _build_adaptation_group_key(group_probe)
+    grouped_siblings = _get_group_sibling_materials(
+        db,
+        teacher_user_id=teacher_user_id,
+        adaptation_group_key=material_group_key,
+    )
+
+    existing_version = next(
+        (
+            sibling
+            for sibling in grouped_siblings
+            if sibling.adaptation_mode == payload.adaptation_mode
+        ),
+        None,
+    )
+    if existing_version is not None:
+        existing_version.original_text = normalized_original_text
+        existing_version.adapted_text = normalized_adapted_text
+        existing_version.source_type = normalized_source_type
+        existing_version.source_material_id = payload.source_material_id
+        existing_version.source_filename = normalized_source_filename
+        existing_version.adaptation_mode = payload.adaptation_mode
+        existing_version.title = _get_group_title(grouped_siblings) or existing_version.title
+        db.add(existing_version)
+        db.commit()
+        db.refresh(existing_version)
+        return _to_learning_material_response(existing_version), "updated"
+
+    group_title = _get_group_title(grouped_siblings)
+    created_payload = TeacherLearningMaterialCreateRequest(
+        title=group_title or normalized_title,
+        original_text=normalized_original_text,
+        adapted_text=normalized_adapted_text,
+        source_type=normalized_source_type,
+        source_material_id=payload.source_material_id,
+        source_filename=normalized_source_filename,
+        adaptation_mode=payload.adaptation_mode,
+    )
+    return (
+        create_learning_material(
+            db,
+            teacher_user_id=teacher_user_id,
+            payload=created_payload,
+        ),
+        "created",
+    )
 
 
 def list_teacher_learning_materials(
@@ -268,18 +363,11 @@ def get_teacher_learning_material_compare_ready_detail(
         ]
 
     group_title = _get_group_title(
-        [
-            sibling
-            for sibling in (
-                db.query(LearningMaterial)
-                .filter(
-                    LearningMaterial.teacher_user_id == teacher_user_id,
-                    LearningMaterial.adapted_text.is_not(None),
-                )
-                .all()
-            )
-            if _build_adaptation_group_key(sibling) == adaptation_group_key
-        ]
+        _get_group_sibling_materials(
+            db,
+            teacher_user_id=teacher_user_id,
+            adaptation_group_key=adaptation_group_key,
+        )
     )
 
     source_material_title: str | None = None

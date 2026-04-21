@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, StringConstraints
@@ -33,7 +33,7 @@ class TeacherAiAssistantSaveMaterialRequest(BaseModel):
 
 
 class TeacherAiAssistantSaveMaterialResponse(LearningMaterialResponse):
-    pass
+    save_action: Literal["created", "updated"]
 
 
 class TeacherAiAssistantParsedFileResponse(BaseModel):
