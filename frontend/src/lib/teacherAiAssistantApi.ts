@@ -34,6 +34,10 @@ export interface TeacherAiAssistantParsedFileResponse {
   extracted_text: string;
 }
 
+export interface TeacherAiAssistantSaveMaterialResponse extends TeacherLearningMaterial {
+  save_action: 'created' | 'updated';
+}
+
 export const MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 interface ApiErrorBody {
@@ -98,7 +102,7 @@ export const sendTeacherAiAssistantMessage = async (
 export const saveTeacherAiAssistantMaterial = async (
   token: string,
   payload: TeacherAiAssistantSaveMaterialPayload,
-): Promise<TeacherLearningMaterial> => {
+): Promise<TeacherAiAssistantSaveMaterialResponse> => {
   const response = await fetch(buildApiUrl('/api/v1/teacher/ai-assistant/save-material'), {
     method: 'POST',
     headers: {
@@ -123,7 +127,7 @@ export const saveTeacherAiAssistantMaterial = async (
     );
   }
 
-  return parseJson<TeacherLearningMaterial>(response);
+  return parseJson<TeacherAiAssistantSaveMaterialResponse>(response);
 };
 
 export const parseTeacherAiAssistantFile = async (

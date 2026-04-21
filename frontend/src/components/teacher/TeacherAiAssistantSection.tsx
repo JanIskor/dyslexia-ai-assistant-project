@@ -24,6 +24,12 @@ interface TeacherAiAssistantMessage {
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
+interface TeacherAiAssistantSubmissionSnapshot {
+  sourceKey: string;
+  sourceText: string;
+  adaptationMode: TeacherAiAssistantMode;
+}
+
 type TeacherAiAssistantSource =
   | { kind: 'manual'; label: 'Ручной текст' }
   | { kind: 'material'; label: string; materialId: string }
@@ -47,6 +53,18 @@ const ADAPTATION_MODES: ReadonlyArray<{
 ];
 
 type ComposerActionMenu = 'actions' | 'mode' | null;
+
+function buildAssistantSourceKey(source: TeacherAiAssistantSource): string {
+  if (source.kind === 'material') {
+    return `material:${source.materialId}`;
+  }
+
+  if (source.kind === 'file') {
+    return `file:${source.filename}`;
+  }
+
+  return 'manual';
+}
 
 function formatBytesToMegabytes(bytes: number) {
   return `${Math.floor(bytes / (1024 * 1024))}MB`;
@@ -333,6 +351,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [materialSourceError, setMaterialSourceError] = useState<string | null>(null);
   const [availableMaterials, setAvailableMaterials] = useState<TeacherLearningMaterial[]>([]);
   const [isParsingFileSource, setIsParsingFileSource] = useState(false);
+  const [lastSubmittedSnapshot, setLastSubmittedSnapshot] =
+    useState<TeacherAiAssistantSubmissionSnapshot | null>(null);
   const activeFileParseRequestIdRef = useRef(0);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -396,7 +416,12 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const handleSubmit = async () => {
     const trimmedMessage = draftMessage.trim();
 
-    if (!trimmedMessage || isSubmitting || isParsingFileSource) {
+    if (
+      !trimmedMessage ||
+      isSubmitting ||
+      isParsingFileSource ||
+      isSendDisabled
+    ) {
       return;
     }
 
@@ -407,7 +432,6 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     };
 
     setMessages((currentMessages) => [...currentMessages, userMessage]);
-    setDraftMessage('');
     setErrorMessage(null);
     setSaveSuccessMessage(null);
     setIsSubmitting(true);
@@ -429,6 +453,11 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       };
 
       setMessages((currentMessages) => [...currentMessages, assistantMessage]);
+      setLastSubmittedSnapshot({
+        sourceKey: buildAssistantSourceKey(currentSource),
+        sourceText: trimmedMessage,
+        adaptationMode: selectedMode,
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : 'Не удалось получить ответ ассистента.',
@@ -483,7 +512,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setSaveErrorMessage(null);
 
     try {
-      await saveTeacherAiAssistantMaterial(accessToken, {
+      const response = await saveTeacherAiAssistantMaterial(accessToken, {
         title: materialTitle,
         original_text: selectedAssistantMessage.sourceText,
         adapted_text: selectedAssistantMessage.content,
@@ -502,7 +531,11 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       setIsSaveModalOpen(false);
       setSelectedAssistantMessageId(null);
       setMaterialTitle('');
-      setSaveSuccessMessage('Адаптированный материал добавлен в материалы.');
+      setSaveSuccessMessage(
+        response.save_action === 'updated'
+          ? 'Адаптированная версия обновлена.'
+          : 'Адаптированный материал добавлен в материалы.',
+      );
     } catch (error) {
       setSaveErrorMessage(
         error instanceof Error ? error.message : 'Не удалось сохранить материал из ответа ассистента.',
@@ -634,6 +667,17 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const selectedModeLabel =
     ADAPTATION_MODES.find((modeOption) => modeOption.value === selectedMode)?.label ??
     'Упростить текст';
+  const currentSourceText = draftMessage.trim();
+  const currentSourceKey = buildAssistantSourceKey(currentSource);
+  const isDuplicateSubmissionInSession =
+    lastSubmittedSnapshot?.sourceKey === currentSourceKey &&
+    lastSubmittedSnapshot.sourceText === currentSourceText &&
+    lastSubmittedSnapshot.adaptationMode === selectedMode;
+  const isSendDisabled =
+    isSubmitting ||
+    isParsingFileSource ||
+    currentSourceText.length === 0 ||
+    isDuplicateSubmissionInSession;
 
   return (
     <>
@@ -922,7 +966,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               <button
                 type="button"
                 onClick={() => void handleSubmit()}
-                disabled={isSubmitting || isParsingFileSource || draftMessage.trim().length === 0}
+                disabled={isSendDisabled}
                 data-testid="teacher-ai-assistant-submit"
                 aria-label="Отправить сообщение"
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-white shadow-[0_10px_24px_rgba(251,146,60,0.28)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 disabled:text-white/75 disabled:shadow-none"
