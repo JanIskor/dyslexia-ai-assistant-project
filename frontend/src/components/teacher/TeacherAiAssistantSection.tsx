@@ -540,7 +540,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setIsLoadingMaterials(true);
 
     try {
-      const response = await getTeacherMaterials(accessToken);
+      const response = await getTeacherMaterials(accessToken, { kind: 'draft' });
       setAvailableMaterials(response.items);
     } catch (error) {
       setMaterialSourceError(

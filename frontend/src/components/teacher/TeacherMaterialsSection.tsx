@@ -133,9 +133,11 @@ function TeacherMaterialsTabs({
 
 function TeacherMaterialCard({
   material,
+  showStatusBadge,
   onOpen,
 }: {
   material: TeacherLearningMaterial;
+  showStatusBadge: boolean;
   onOpen: (materialId: string) => void;
 }) {
   const previewText =
@@ -152,7 +154,7 @@ function TeacherMaterialCard({
         <h3 className="text-xl font-medium leading-snug text-stone-700 sm:text-2xl">
           {material.title}
         </h3>
-        <MaterialStatusBadge status={material.status} />
+        {showStatusBadge ? <MaterialStatusBadge status={material.status} /> : null}
       </div>
 
       <p className="mt-4 text-sm leading-relaxed text-stone-500 sm:text-base">
@@ -212,7 +214,12 @@ function TeacherMaterialsList({
     content = (
       <div className="grid gap-5 xl:grid-cols-2">
         {materials.map((material) => (
-          <TeacherMaterialCard key={material.id} material={material} onOpen={onOpenMaterial} />
+          <TeacherMaterialCard
+            key={material.id}
+            material={material}
+            showStatusBadge={activeTab === 'draft'}
+            onOpen={onOpenMaterial}
+          />
         ))}
       </div>
     );

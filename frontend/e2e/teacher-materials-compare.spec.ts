@@ -20,12 +20,18 @@ test('teacher materials shows draft and adapted tabs under materials header', as
   );
   await expect(page.getByText('Assistant Source Material Real')).toBeVisible();
   await expect(page.getByText('Source-aware material 20260421-1')).toHaveCount(0);
+  const draftBadgeCountOnDraftTab = await page.getByText('DRAFT').count();
+  expect(draftBadgeCountOnDraftTab).toBeGreaterThan(0);
+
+  await page.getByTestId('teacher-materials-tab-adapted').click();
+  await expect(page.getByText('DRAFT')).toHaveCount(0);
 
   console.log(
     JSON.stringify({
       scenario: 'materials-tabs-visible',
       draftTabText: await page.getByTestId('teacher-materials-tab-draft').textContent(),
       adaptedTabText: await page.getByTestId('teacher-materials-tab-adapted').textContent(),
+      draftBadgeCountOnDraftTab,
     }),
   );
 });

@@ -77,6 +77,7 @@ test('teacher ai assistant can use existing material as input source', async ({ 
 
   await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
   await page.getByTestId('teacher-ai-assistant-action-material').click();
+  await expect(page.getByText('Source-aware material 20260421-1')).toHaveCount(0);
   await page
     .getByTestId('teacher-ai-assistant-material-option')
     .filter({ hasText: 'Assistant Source Material Real' })
@@ -97,6 +98,7 @@ test('teacher ai assistant can use existing material as input source', async ({ 
   console.log(
     JSON.stringify({
       scenario: 'material-source',
+      adaptedSourceCountInPicker: await page.getByText('Source-aware material 20260421-1').count(),
       sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
       assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
     }),

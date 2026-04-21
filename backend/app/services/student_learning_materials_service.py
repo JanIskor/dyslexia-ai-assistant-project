@@ -62,9 +62,11 @@ def get_student_learning_material(
         return None
 
     assigned_material, material = assignment
+    student_visible_text = material.adapted_text or material.original_text
+
     return StudentLearningMaterialDetailResponse(
         id=material.id,
         title=material.title,
-        original_text=material.original_text,
+        original_text=student_visible_text,
         created_at=assigned_material.created_at,
     )
