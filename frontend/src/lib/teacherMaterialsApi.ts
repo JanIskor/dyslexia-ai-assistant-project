@@ -1,11 +1,18 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 
+import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
+
 export interface TeacherLearningMaterial {
   id: string;
   title: string;
   original_text: string;
+  adapted_text?: string | null;
   material_type: string;
   status: string;
+  source_type?: 'manual' | 'material' | 'file' | null;
+  source_material_id?: string | null;
+  source_filename?: string | null;
+  adaptation_mode?: TeacherAiAssistantMode | null;
   created_at: string;
   updated_at: string;
 }

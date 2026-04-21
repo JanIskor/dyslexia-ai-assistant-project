@@ -10,6 +10,12 @@ async function loginAsTeacher(page: Page) {
 
 test('teacher can save real assistant reply and see it in materials', async ({ page }) => {
   const materialTitle = `AI real save ${Date.now()}`;
+  let dialogShown = false;
+
+  page.on('dialog', async (dialog) => {
+    dialogShown = true;
+    await dialog.dismiss();
+  });
 
   await loginAsTeacher(page);
   await page.getByRole('button', { name: 'ИИ-ассистент' }).click();
@@ -27,16 +33,12 @@ test('teacher can save real assistant reply and see it in materials', async ({ p
 
   await page.getByTestId('teacher-ai-assistant-save-material-trigger').first().click();
   await page.getByTestId('teacher-ai-save-material-title').fill(materialTitle);
-
-  page.once('dialog', async (dialog) => {
-    await dialog.accept();
-  });
-
   await page.getByTestId('teacher-ai-save-material-submit').click();
 
   await expect(page.getByTestId('teacher-ai-assistant-save-material-success')).toContainText(
-    'Материал сохранён. Он доступен во вкладке "Материалы".',
+    'Адаптированный материал добавлен в материалы.',
   );
+  expect(dialogShown).toBe(false);
 
   await page.getByRole('button', { name: 'Материалы' }).click();
   await expect(page.getByText(materialTitle)).toBeVisible({ timeout: 10000 });
@@ -45,6 +47,7 @@ test('teacher can save real assistant reply and see it in materials', async ({ p
     JSON.stringify({
       scenario: 'real-save-material',
       materialTitle,
+      dialogShown,
     }),
   );
 });

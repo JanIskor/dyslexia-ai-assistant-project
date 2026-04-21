@@ -23,6 +23,10 @@ export interface TeacherAiAssistantSaveMaterialPayload {
   title: string;
   original_text: string;
   adapted_text: string;
+  source_type: 'manual' | 'material' | 'file';
+  source_material_id?: string;
+  source_filename?: string;
+  adaptation_mode: TeacherAiAssistantMode;
 }
 
 export interface TeacherAiAssistantParsedFileResponse {

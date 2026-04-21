@@ -19,6 +19,8 @@ interface TeacherAiAssistantMessage {
   role: TeacherAiAssistantMessageRole;
   content: string;
   sourceText?: string;
+  source?: TeacherAiAssistantSource;
+  adaptationMode?: TeacherAiAssistantMode;
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
@@ -421,6 +423,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         role: 'assistant',
         content: response.reply,
         sourceText: trimmedMessage,
+        source: currentSource,
+        adaptationMode: selectedMode,
         usedKnowledgeChunks: response.used_knowledge_chunks,
       };
 
@@ -483,13 +487,22 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         title: materialTitle,
         original_text: selectedAssistantMessage.sourceText,
         adapted_text: selectedAssistantMessage.content,
+        source_type: selectedAssistantMessage.source?.kind ?? 'manual',
+        source_material_id:
+          selectedAssistantMessage.source?.kind === 'material'
+            ? selectedAssistantMessage.source.materialId
+            : undefined,
+        source_filename:
+          selectedAssistantMessage.source?.kind === 'file'
+            ? selectedAssistantMessage.source.filename
+            : undefined,
+        adaptation_mode: selectedAssistantMessage.adaptationMode ?? selectedMode,
       });
 
       setIsSaveModalOpen(false);
       setSelectedAssistantMessageId(null);
       setMaterialTitle('');
-      setSaveSuccessMessage('Материал сохранён. Он доступен во вкладке "Материалы".');
-      window.alert('Материал сохранён.');
+      setSaveSuccessMessage('Адаптированный материал добавлен в материалы.');
     } catch (error) {
       setSaveErrorMessage(
         error instanceof Error ? error.message : 'Не удалось сохранить материал из ответа ассистента.',
