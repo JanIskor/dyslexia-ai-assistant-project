@@ -18,6 +18,25 @@ SUPPORTED_KNOWLEDGE_FILE_TYPES: dict[str, set[str]] = {
 SUPPORTED_KNOWLEDGE_EXTENSIONS: set[str] = {".pdf", ".docx", ".txt", ".md"}
 
 
+def normalize_extracted_text(text: str) -> str:
+    normalized_lines: list[str] = []
+    previous_line_was_blank = False
+
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        line = " ".join(raw_line.split()).strip()
+
+        if not line:
+            if normalized_lines and not previous_line_was_blank:
+                normalized_lines.append("")
+            previous_line_was_blank = True
+            continue
+
+        normalized_lines.append(line)
+        previous_line_was_blank = False
+
+    return "\n".join(normalized_lines).strip()
+
+
 def validate_knowledge_file_type(filename: str, mime_type: str | None) -> tuple[str, str]:
     extension = Path(filename).suffix.lower()
     normalized_mime_type = (mime_type or "").lower().strip() or "application/octet-stream"
@@ -57,7 +76,7 @@ def extract_text_from_knowledge_file(*, filename: str, mime_type: str | None, pa
             detail="Parsing failed for the uploaded document.",
         ) from error
 
-    normalized_text = "\n".join(line.rstrip() for line in extracted_text.splitlines()).strip()
+    normalized_text = normalize_extracted_text(extracted_text)
     if not normalized_text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -86,4 +105,4 @@ def _extract_text_from_docx(payload: bytes) -> str:
 
 
 def _extract_text_from_text(payload: bytes) -> str:
-    return payload.decode("utf-8")
+    return payload.decode("utf-8-sig")

@@ -14,12 +14,12 @@ from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantSaveMaterialRequest,
     TeacherAiAssistantSaveMaterialResponse,
 )
-from app.services.knowledge_base_parser import extract_text_from_knowledge_file
+from app.services.knowledge_base_parser import extract_text_from_knowledge_file, normalize_extracted_text
 from app.services.learning_materials_service import create_learning_material
 from app.services.retrieval_service import retrieve_relevant_chunks
 
 
-MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES = 15 * 1024 * 1024
+MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 
 def create_teacher_ai_assistant_reply(
@@ -95,7 +95,7 @@ def parse_teacher_ai_assistant_input_file(
     if len(payload) > MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=400,
-            detail="Assistant input file size must be 15MB or less.",
+            detail="Assistant input file size must be 5MB or less.",
         )
 
     extracted_text = extract_text_from_knowledge_file(
@@ -103,8 +103,14 @@ def parse_teacher_ai_assistant_input_file(
         mime_type=file.content_type,
         payload=payload,
     )
+    cleaned_text = normalize_extracted_text(extracted_text)
+    if not cleaned_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Empty extracted text. The document does not contain readable text.",
+        )
 
     return TeacherAiAssistantParsedFileResponse(
         filename=filename,
-        extracted_text=extracted_text,
+        extracted_text=cleaned_text,
     )
