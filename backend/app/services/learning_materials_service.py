@@ -21,8 +21,13 @@ def _to_learning_material_response(material: LearningMaterial) -> LearningMateri
         id=material.id,
         title=material.title,
         original_text=material.original_text,
+        adapted_text=material.adapted_text,
         material_type=material.material_type,
         status=material.status,
+        source_type=material.source_type,
+        source_material_id=material.source_material_id,
+        source_filename=material.source_filename,
+        adaptation_mode=material.adaptation_mode,
         created_at=material.created_at,
         updated_at=material.updated_at,
     )
@@ -38,8 +43,13 @@ def create_learning_material(
         teacher_user_id=teacher_user_id,
         title=payload.title.strip(),
         original_text=payload.original_text.strip(),
+        adapted_text=payload.adapted_text.strip() if payload.adapted_text else None,
         material_type="text",
         status="draft",
+        source_type=payload.source_type.strip() if payload.source_type else None,
+        source_material_id=payload.source_material_id,
+        source_filename=payload.source_filename.strip() if payload.source_filename else None,
+        adaptation_mode=payload.adaptation_mode,
     )
     db.add(material)
     db.commit()

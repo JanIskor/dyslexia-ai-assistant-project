@@ -18,8 +18,17 @@ class LearningMaterial(Base):
     )
     title = Column(String, nullable=False)
     original_text = Column(Text, nullable=False)
+    adapted_text = Column(Text, nullable=True)
     material_type = Column(String, nullable=False, default="text", server_default="text")
     status = Column(String, nullable=False, default="draft", server_default="draft")
+    source_type = Column(String, nullable=True)
+    source_material_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("learning_materials.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_filename = Column(String, nullable=True)
+    adaptation_mode = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

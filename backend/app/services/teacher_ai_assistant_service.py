@@ -73,7 +73,12 @@ def save_teacher_ai_assistant_material(
         teacher_user_id=teacher_user_id,
         payload=TeacherLearningMaterialCreateRequest(
             title=payload.title,
-            original_text=payload.adapted_text.strip() or payload.original_text,
+            original_text=payload.original_text,
+            adapted_text=payload.adapted_text,
+            source_type=payload.source_type,
+            source_material_id=payload.source_material_id,
+            source_filename=payload.source_filename,
+            adaptation_mode=payload.adaptation_mode,
         ),
     )
 
