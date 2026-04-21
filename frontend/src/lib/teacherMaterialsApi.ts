@@ -2,17 +2,21 @@ import { buildApiUrl } from '@/lib/apiBaseUrl';
 
 import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
 
+export type TeacherMaterialKind = 'draft' | 'adapted';
+
 export interface TeacherLearningMaterial {
   id: string;
   title: string;
   original_text: string;
   adapted_text?: string | null;
+  material_kind: TeacherMaterialKind;
   material_type: string;
   status: string;
   source_type?: 'manual' | 'material' | 'file' | null;
   source_material_id?: string | null;
   source_filename?: string | null;
   adaptation_mode?: TeacherAiAssistantMode | null;
+  adaptation_group_key?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,9 +25,35 @@ export interface TeacherLearningMaterialsListResponse {
   items: TeacherLearningMaterial[];
 }
 
+export interface TeacherAdaptedMaterialSourceInfo {
+  source_type: 'manual' | 'material' | 'file';
+  source_material_id?: string | null;
+  source_material_title?: string | null;
+  source_filename?: string | null;
+  adaptation_group_key: string;
+}
+
+export interface TeacherAdaptationVersionSummary {
+  id: string;
+  title: string;
+  adaptation_mode?: TeacherAiAssistantMode | null;
+  created_at: string;
+  updated_at: string;
+  is_current: boolean;
+}
+
+export interface TeacherAdaptedMaterialDetail extends TeacherLearningMaterial {
+  source_info?: TeacherAdaptedMaterialSourceInfo | null;
+  available_adaptation_versions: TeacherAdaptationVersionSummary[];
+}
+
 export interface TeacherCreateLearningMaterialPayload {
   title: string;
   original_text: string;
+}
+
+export interface GetTeacherMaterialsOptions {
+  kind?: 'all' | 'draft' | 'adapted';
 }
 
 export interface TeacherAssignLearningMaterialPayload {
@@ -107,9 +137,10 @@ async function request<T>(
 
 export const getTeacherMaterials = async (
   token: string,
+  options?: GetTeacherMaterialsOptions,
 ): Promise<TeacherLearningMaterialsListResponse> =>
   request<TeacherLearningMaterialsListResponse>(
-    '/api/v1/teacher/materials',
+    `/api/v1/teacher/materials${options?.kind ? `?kind=${options.kind}` : ''}`,
     token,
     'Не удалось загрузить материалы',
   );
@@ -117,8 +148,8 @@ export const getTeacherMaterials = async (
 export const getTeacherMaterialDetail = async (
   token: string,
   materialId: string,
-): Promise<TeacherLearningMaterial> =>
-  request<TeacherLearningMaterial>(
+): Promise<TeacherAdaptedMaterialDetail> =>
+  request<TeacherAdaptedMaterialDetail>(
     `/api/v1/teacher/materials/${materialId}`,
     token,
     'Не удалось загрузить материал',
