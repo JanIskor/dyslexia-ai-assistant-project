@@ -81,16 +81,35 @@ test('teacher adapted material opens normal detail before compare mode', async (
   );
 });
 
+test('teacher adapted materials tab shows grouped cards instead of separate version cards', async ({
+  page,
+}) => {
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-materials-tab-adapted').click();
+
+  await expect(page.getByText('Source-aware material 20260421-1')).toBeVisible();
+  await expect(page.getByText('Source-aware material 20260421-2')).toHaveCount(0);
+
+  console.log(
+    JSON.stringify({
+      scenario: 'adapted-list-grouped',
+      groupedTitleVisible: await page.getByText('Source-aware material 20260421-1').isVisible(),
+      secondVersionCards: await page.getByText('Source-aware material 20260421-2').count(),
+    }),
+  );
+});
+
 test('teacher adapted materials compare view switches versions and keeps original text fixed', async ({
   page,
 }) => {
   await loginAsTeacher(page);
 
   await page.getByTestId('teacher-materials-tab-adapted').click();
-  await expect(page.getByText('Source-aware material 20260421-1')).toBeVisible();
-  await expect(page.getByText('Assistant Source Material Real')).toHaveCount(0);
+  await expect(page.getByText('Grouped adaptation sequential first 1776798337')).toBeVisible();
+  await expect(page.getByText('Grouping Source Sequential 1776798337')).toHaveCount(0);
 
-  await page.getByText('Source-aware material 20260421-1').click();
+  await page.getByText('Grouped adaptation sequential first 1776798337').click();
   await page.getByRole('button', { name: 'Сравнить' }).click();
   await expect(page.getByTestId('teacher-adapted-material-compare-view')).toBeVisible();
 
@@ -99,10 +118,10 @@ test('teacher adapted materials compare view switches versions and keeps origina
 
   await page
     .getByTestId('teacher-adapted-material-version-selector')
-    .selectOption({ label: 'Выделить главное' });
+    .selectOption({ label: 'Упростить текст' });
 
   await expect(page.getByTestId('teacher-adapted-material-adapted-text')).toContainText(
-    'Вторая адаптированная версия для того же existing material source.',
+    'Первая последовательная адаптированная версия.',
   );
 
   const switchedOriginalText = await page
@@ -117,7 +136,7 @@ test('teacher adapted materials compare view switches versions and keeps origina
   await page.getByTestId('teacher-adapted-material-compare-back').click();
   await expect(page.getByTestId('teacher-adapted-material-compare-view')).toHaveCount(0);
   await expect(page.getByTestId('teacher-adapted-material-detail-text')).toContainText(
-    'Вторая адаптированная версия для того же existing material source.',
+    'Первая последовательная адаптированная версия.',
   );
 
   console.log(
