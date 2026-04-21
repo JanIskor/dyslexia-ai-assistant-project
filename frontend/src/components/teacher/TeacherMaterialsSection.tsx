@@ -24,6 +24,7 @@ type TeacherMaterialsViewState =
   | {
       mode: 'detail';
       materialId: string;
+      compareMode?: boolean;
     };
 
 type TeacherMaterialsTab = 'draft' | 'adapted';
@@ -354,15 +355,140 @@ function TeacherAdaptedMaterialDetail({
   selectedVersionId,
   onChangeVersion,
   onBack,
-  activeTab,
-  onChangeTab,
+  onCompare,
+  onOpenAssign,
+  assignmentStatusMessage,
+  assignmentStatusType,
 }: {
   material: TeacherAdaptedMaterialDetail;
   selectedVersionId: string;
   onChangeVersion: (materialId: string) => void;
   onBack: () => void;
-  activeTab: TeacherMaterialsTab;
-  onChangeTab: (tab: TeacherMaterialsTab) => void;
+  onCompare: () => void;
+  onOpenAssign: () => void;
+  assignmentStatusMessage: string | null;
+  assignmentStatusType: 'error' | 'success';
+}) {
+  const versionOptions =
+    material.available_adaptation_versions.length > 0
+      ? material.available_adaptation_versions
+      : [
+          {
+            id: material.id,
+            title: material.title,
+            adaptation_mode: material.adaptation_mode ?? null,
+            created_at: material.created_at,
+            updated_at: material.updated_at,
+            is_current: true,
+          } satisfies TeacherAdaptationVersionSummary,
+        ];
+
+  return (
+    <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Назад к списку
+      </button>
+
+      <div className="mx-auto mt-6 flex w-full max-w-4xl flex-col">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">
+              {material.title}
+            </h2>
+            <p className="mt-2 text-sm text-stone-400 sm:text-base">
+              Создано: {formatMaterialDate(material.created_at)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenAssign}
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95"
+          >
+            Назначить ученику
+          </button>
+        </div>
+
+        {assignmentStatusMessage ? (
+          <p
+            className={`mt-5 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
+              assignmentStatusType === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {assignmentStatusMessage}
+          </p>
+        ) : null}
+
+        <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 sm:px-5 sm:py-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Адаптированная версия</h3>
+              <p className="mt-1 text-sm text-stone-500 sm:text-base">
+                Источник: {material.source_info?.source_material_title ?? material.source_info?.source_filename ?? 'Ручной текст'}
+              </p>
+            </div>
+
+            <label className="flex min-w-[15rem] flex-col gap-1 text-sm text-stone-500">
+              <span>Метод адаптации</span>
+              <div className="relative">
+                <select
+                  value={selectedVersionId}
+                  onChange={(event) => onChangeVersion(event.target.value)}
+                  disabled={versionOptions.length <= 1}
+                  data-testid="teacher-adapted-material-version-selector"
+                  className="w-full appearance-none rounded-2xl border border-orange-200 bg-white px-4 py-3 pr-10 text-sm font-medium text-stone-700 shadow-sm outline-none transition focus:border-orange-300 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {versionOptions.map((version) => (
+                    <option key={version.id} value={version.id}>
+                      {getAdaptationModeLabel(version.adaptation_mode)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              </div>
+            </label>
+          </div>
+
+          <div
+            data-testid="teacher-adapted-material-detail-text"
+            className="mt-4 rounded-[18px] border border-orange-100/80 bg-white/90 px-4 py-4 text-base leading-relaxed text-stone-600 sm:text-lg"
+          >
+            <p className="whitespace-pre-wrap">{material.adapted_text}</p>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onCompare}
+              data-testid="teacher-adapted-material-open-compare"
+              className="rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50"
+            >
+              Сравнить
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TeacherAdaptedMaterialCompare({
+  material,
+  selectedVersionId,
+  onChangeVersion,
+  onBack,
+}: {
+  material: TeacherAdaptedMaterialDetail;
+  selectedVersionId: string;
+  onChangeVersion: (materialId: string) => void;
+  onBack: () => void;
 }) {
   const versionOptions =
     material.available_adaptation_versions.length > 0
@@ -386,23 +512,15 @@ function TeacherAdaptedMaterialDetail({
       <button
         type="button"
         onClick={onBack}
+        data-testid="teacher-adapted-material-compare-back"
         className="inline-flex items-center gap-2 rounded-2xl border border-orange-100 bg-white/90 px-4 py-2 text-sm font-medium text-stone-600 shadow-[0_10px_25px_rgba(221,156,130,0.10)] transition hover:bg-orange-50"
       >
         <ArrowLeft className="h-4 w-4" />
-        Назад к списку
+        Назад к материалу
       </button>
 
-      <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">Материалы</h2>
-          <div className="mt-3">
-            <TeacherMaterialsTabs activeTab={activeTab} onChange={onChangeTab} />
-          </div>
-        </div>
-      </div>
-
       <div className="mt-6">
-        <h3 className="text-xl font-medium leading-tight text-stone-700 sm:text-2xl">{material.title}</h3>
+        <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">{material.title}</h2>
         <p className="mt-2 text-sm text-stone-400 sm:text-base">
           Создано: {formatMaterialDate(material.created_at)}
         </p>
@@ -469,19 +587,9 @@ function TeacherAdaptedMaterialDetail({
 function TeacherMaterialDetail({
   material,
   onBack,
-  onOpenAssign,
-  assignmentStatusMessage,
-  assignmentStatusType,
-  activeTab,
-  onChangeTab,
 }: {
   material: TeacherLearningMaterial;
   onBack: () => void;
-  onOpenAssign: () => void;
-  assignmentStatusMessage: string | null;
-  assignmentStatusType: 'error' | 'success';
-  activeTab: TeacherMaterialsTab;
-  onChangeTab: (tab: TeacherMaterialsTab) => void;
 }) {
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
@@ -496,42 +604,11 @@ function TeacherMaterialDetail({
 
       <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col">
         <div>
-          <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Материалы</h2>
-          <div className="mt-3">
-            <TeacherMaterialsTabs activeTab={activeTab} onChange={onChangeTab} />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h3 className="mt-6 text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">
-              {material.title}
-            </h3>
-            <p className="mt-3 text-sm text-stone-400 sm:text-base">
-              Создано: {formatMaterialDate(material.created_at)}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenAssign}
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95"
-          >
-            Назначить ученику
-          </button>
-        </div>
-
-        {assignmentStatusMessage ? (
-          <p
-            className={`mt-5 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
-              assignmentStatusType === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {assignmentStatusMessage}
+          <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">{material.title}</h2>
+          <p className="mt-3 text-sm text-stone-400 sm:text-base">
+            Создано: {formatMaterialDate(material.created_at)}
           </p>
-        ) : null}
+        </div>
 
         <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 sm:px-5 sm:py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Исходный текст</h3>
@@ -668,6 +745,30 @@ export function TeacherMaterialsSection({
     setSelectedMaterial(null);
     setSelectedAdaptationVersionId(null);
     setCompareOriginalText(null);
+  };
+
+  const handleOpenCompareMode = () => {
+    if (viewState.mode !== 'detail') {
+      return;
+    }
+
+    setViewState({
+      mode: 'detail',
+      materialId: viewState.materialId,
+      compareMode: true,
+    });
+  };
+
+  const handleBackToAdaptedDetail = () => {
+    if (viewState.mode !== 'detail') {
+      return;
+    }
+
+    setViewState({
+      mode: 'detail',
+      materialId: viewState.materialId,
+      compareMode: false,
+    });
   };
 
   const handleOpenCreate = () => {
@@ -828,43 +929,50 @@ export function TeacherMaterialsSection({
 
     if (selectedMaterial.material_kind === 'adapted') {
       return (
-        <TeacherAdaptedMaterialDetail
-          material={{
-            ...selectedMaterial,
-            original_text: compareOriginalText ?? selectedMaterial.original_text,
-          }}
-          selectedVersionId={selectedAdaptationVersionId ?? selectedMaterial.id}
-          onChangeVersion={(materialId) => setViewState({ mode: 'detail', materialId })}
-          onBack={handleBackToList}
-          activeTab={activeTab}
-          onChangeTab={handleChangeTab}
-        />
+        <>
+          {viewState.compareMode ? (
+            <TeacherAdaptedMaterialCompare
+              material={{
+                ...selectedMaterial,
+                original_text: compareOriginalText ?? selectedMaterial.original_text,
+              }}
+              selectedVersionId={selectedAdaptationVersionId ?? selectedMaterial.id}
+              onChangeVersion={(materialId) =>
+                setViewState({ mode: 'detail', materialId, compareMode: true })
+              }
+              onBack={handleBackToAdaptedDetail}
+            />
+          ) : (
+            <TeacherAdaptedMaterialDetail
+              material={selectedMaterial}
+              selectedVersionId={selectedAdaptationVersionId ?? selectedMaterial.id}
+              onChangeVersion={(materialId) =>
+                setViewState({ mode: 'detail', materialId, compareMode: false })
+              }
+              onBack={handleBackToList}
+              onCompare={handleOpenCompareMode}
+              onOpenAssign={() => void handleOpenAssignModal()}
+              assignmentStatusMessage={assignmentStatusMessage}
+              assignmentStatusType={assignmentStatusType}
+            />
+          )}
+          <TeacherMaterialAssignmentModal
+            isOpen={isAssignmentModalOpen}
+            students={teacherStudents}
+            selectedStudentUserId={selectedStudentUserId}
+            onSelectStudent={setSelectedStudentUserId}
+            onClose={handleCloseAssignmentModal}
+            onSubmit={() => void handleAssignMaterial()}
+            isLoading={isTeacherStudentsLoading}
+            isSubmitting={isAssigningMaterial}
+            errorMessage={teacherStudentsError}
+          />
+        </>
       );
     }
 
     return (
-      <>
-        <TeacherMaterialDetail
-          material={selectedMaterial}
-          onBack={handleBackToList}
-          onOpenAssign={() => void handleOpenAssignModal()}
-          assignmentStatusMessage={assignmentStatusMessage}
-          assignmentStatusType={assignmentStatusType}
-          activeTab={activeTab}
-          onChangeTab={handleChangeTab}
-        />
-        <TeacherMaterialAssignmentModal
-          isOpen={isAssignmentModalOpen}
-          students={teacherStudents}
-          selectedStudentUserId={selectedStudentUserId}
-          onSelectStudent={setSelectedStudentUserId}
-          onClose={handleCloseAssignmentModal}
-          onSubmit={() => void handleAssignMaterial()}
-          isLoading={isTeacherStudentsLoading}
-          isSubmitting={isAssigningMaterial}
-          errorMessage={teacherStudentsError}
-        />
-      </>
+      <TeacherMaterialDetail material={selectedMaterial} onBack={handleBackToList} />
     );
   }
 
