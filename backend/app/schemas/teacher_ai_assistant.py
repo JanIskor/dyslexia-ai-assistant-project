@@ -28,3 +28,8 @@ class TeacherAiAssistantSaveMaterialRequest(BaseModel):
 
 class TeacherAiAssistantSaveMaterialResponse(LearningMaterialResponse):
     pass
+
+
+class TeacherAiAssistantParsedFileResponse(BaseModel):
+    filename: str
+    extracted_text: str

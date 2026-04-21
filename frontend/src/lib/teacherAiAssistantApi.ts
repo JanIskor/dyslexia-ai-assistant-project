@@ -25,6 +25,11 @@ export interface TeacherAiAssistantSaveMaterialPayload {
   adapted_text: string;
 }
 
+export interface TeacherAiAssistantParsedFileResponse {
+  filename: string;
+  extracted_text: string;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -109,4 +114,37 @@ export const saveTeacherAiAssistantMaterial = async (
   }
 
   return parseJson<TeacherLearningMaterial>(response);
+};
+
+export const parseTeacherAiAssistantFile = async (
+  token: string,
+  file: File,
+): Promise<TeacherAiAssistantParsedFileResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(buildApiUrl('/api/v1/teacher/ai-assistant/parse-file'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(
+      getErrorMessage(response.status, body, 'Не удалось извлечь текст из выбранного файла.'),
+    );
+  }
+
+  return parseJson<TeacherAiAssistantParsedFileResponse>(response);
 };

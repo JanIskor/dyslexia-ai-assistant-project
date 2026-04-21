@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from fastapi import UploadFile
 
 from app.schemas.learning_materials import TeacherLearningMaterialCreateRequest
 from app.services.adaptation_prompt_builder import RetrievedKnowledgeChunkPromptContext
@@ -9,11 +10,16 @@ from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
     TeacherAiAssistantMessageResponse,
+    TeacherAiAssistantParsedFileResponse,
     TeacherAiAssistantSaveMaterialRequest,
     TeacherAiAssistantSaveMaterialResponse,
 )
+from app.services.knowledge_base_parser import extract_text_from_knowledge_file
 from app.services.learning_materials_service import create_learning_material
 from app.services.retrieval_service import retrieve_relevant_chunks
+
+
+MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES = 15 * 1024 * 1024
 
 
 def create_teacher_ai_assistant_reply(
@@ -72,3 +78,33 @@ def save_teacher_ai_assistant_material(
     )
 
     return TeacherAiAssistantSaveMaterialResponse(**material.model_dump())
+
+
+def parse_teacher_ai_assistant_input_file(
+    *,
+    file: UploadFile,
+) -> TeacherAiAssistantParsedFileResponse:
+    filename = (file.filename or "").strip()
+    if not filename:
+        raise HTTPException(status_code=400, detail="Uploaded file must have a filename.")
+
+    payload = file.file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    if len(payload) > MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail="Assistant input file size must be 15MB or less.",
+        )
+
+    extracted_text = extract_text_from_knowledge_file(
+        filename=filename,
+        mime_type=file.content_type,
+        payload=payload,
+    )
+
+    return TeacherAiAssistantParsedFileResponse(
+        filename=filename,
+        extracted_text=extracted_text,
+    )

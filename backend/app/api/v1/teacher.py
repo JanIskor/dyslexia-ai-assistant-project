@@ -18,6 +18,7 @@ from app.schemas.profile_avatar import ProfileAvatarUploadResponse
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
     TeacherAiAssistantMessageResponse,
+    TeacherAiAssistantParsedFileResponse,
     TeacherAiAssistantSaveMaterialRequest,
     TeacherAiAssistantSaveMaterialResponse,
 )
@@ -50,6 +51,7 @@ from app.services.teacher_incoming_students_service import (
 )
 from app.services.teacher_ai_assistant_service import (
     create_teacher_ai_assistant_reply,
+    parse_teacher_ai_assistant_input_file,
     save_teacher_ai_assistant_material,
 )
 from app.services.llm_service import LlmProviderConfigurationError, LlmProviderRequestError
@@ -86,6 +88,15 @@ def save_teacher_ai_assistant_material_endpoint(
         teacher_user_id=current_teacher.id,
         payload=payload,
     )
+
+
+@router.post("/ai-assistant/parse-file", response_model=TeacherAiAssistantParsedFileResponse)
+def parse_teacher_ai_assistant_file_endpoint(
+    file: UploadFile = File(...),
+    current_teacher: User = Depends(get_current_teacher),
+):
+    _ = current_teacher
+    return parse_teacher_ai_assistant_input_file(file=file)
 
 
 @router.post("/materials", response_model=LearningMaterialResponse)

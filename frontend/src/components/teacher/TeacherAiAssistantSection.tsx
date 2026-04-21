@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, BookOpenText, ChevronDown, LoaderCircle, Plus, X } from 'lucide-react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { ArrowUp, BookOpenText, ChevronDown, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import {
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
+  parseTeacherAiAssistantFile,
   type TeacherAiAssistantMode,
   type TeacherAiAssistantMessageResponse,
 } from '@/lib/teacherAiAssistantApi';
+import { getTeacherMaterials, type TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
 
@@ -18,6 +20,11 @@ interface TeacherAiAssistantMessage {
   sourceText?: string;
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
+
+type TeacherAiAssistantSource =
+  | { kind: 'manual'; label: 'Ручной текст' }
+  | { kind: 'material'; label: string; materialId: string }
+  | { kind: 'file'; label: string; filename: string };
 
 interface TeacherAiAssistantSectionProps {
   accessToken: string;
@@ -152,6 +159,104 @@ function SaveMaterialModal({
   );
 }
 
+function MaterialSourceModal({
+  isOpen,
+  materials,
+  isLoading,
+  errorMessage,
+  onClose,
+  onSelect,
+}: {
+  isOpen: boolean;
+  materials: TeacherLearningMaterial[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  onClose: () => void;
+  onSelect: (material: TeacherLearningMaterial) => void;
+}) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-stone-950/20 px-4 py-6 backdrop-blur-[2px] sm:px-6 sm:py-8">
+      <div className="w-full max-w-2xl rounded-[32px] border border-orange-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,247,242,0.96))] shadow-[0_20px_60px_rgba(150,92,46,0.18)]">
+        <div className="border-b border-orange-100/70 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">
+                Выбрать материал
+              </h2>
+              <p className="mt-2 text-sm text-stone-500 sm:text-base">
+                Выберите один из ваших материалов, и его текст станет текущим источником для ассистента.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Закрыть выбор материала"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-orange-100 bg-white text-stone-500 shadow-sm transition hover:bg-orange-50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center rounded-[24px] border border-orange-100 bg-orange-50/60 px-4 py-10 text-stone-500">
+              <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
+              Загружаем материалы...
+            </div>
+          ) : errorMessage ? (
+            <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700 sm:text-base">
+              {errorMessage}
+            </div>
+          ) : materials.length === 0 ? (
+            <div
+              data-testid="teacher-ai-assistant-material-empty-state"
+              className="rounded-[24px] border border-dashed border-orange-200 bg-orange-50/40 px-5 py-10 text-center text-sm text-stone-500 sm:text-base"
+            >
+              У вас пока нет материалов, которые можно использовать как источник текста.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {materials.map((material) => (
+                <button
+                  key={material.id}
+                  type="button"
+                  onClick={() => onSelect(material)}
+                  data-testid="teacher-ai-assistant-material-option"
+                  className="flex w-full flex-col rounded-[22px] border border-orange-100 bg-white px-4 py-4 text-left shadow-sm transition hover:bg-orange-50/60"
+                >
+                  <span className="text-base font-medium text-stone-700">{material.title}</span>
+                  <span className="mt-2 line-clamp-3 text-sm text-stone-500">
+                    {material.original_text}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TypingIndicator() {
   return (
     <div
@@ -177,6 +282,10 @@ function TypingIndicator() {
 export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSectionProps) {
   const [draftMessage, setDraftMessage] = useState('');
   const [messages, setMessages] = useState<TeacherAiAssistantMessage[]>([]);
+  const [currentSource, setCurrentSource] = useState<TeacherAiAssistantSource>({
+    kind: 'manual',
+    label: 'Ручной текст',
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
@@ -188,9 +297,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('basic_simplify');
   const [openComposerMenu, setOpenComposerMenu] = useState<ComposerActionMenu>(null);
   const [expandedKnowledgeMessageIds, setExpandedKnowledgeMessageIds] = useState<string[]>([]);
+  const [isMaterialSourceModalOpen, setIsMaterialSourceModalOpen] = useState(false);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
+  const [materialSourceError, setMaterialSourceError] = useState<string | null>(null);
+  const [availableMaterials, setAvailableMaterials] = useState<TeacherLearningMaterial[]>([]);
+  const [isParsingFileSource, setIsParsingFileSource] = useState(false);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerActionsRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -371,6 +486,84 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     );
   };
 
+  const handleResetSource = () => {
+    setCurrentSource({ kind: 'manual', label: 'Ручной текст' });
+  };
+
+  const handleOpenMaterialSource = async () => {
+    setOpenComposerMenu(null);
+    setMaterialSourceError(null);
+    setIsMaterialSourceModalOpen(true);
+    setIsLoadingMaterials(true);
+
+    try {
+      const response = await getTeacherMaterials(accessToken);
+      setAvailableMaterials(response.items);
+    } catch (error) {
+      setMaterialSourceError(
+        error instanceof Error ? error.message : 'Не удалось загрузить материалы.',
+      );
+    } finally {
+      setIsLoadingMaterials(false);
+    }
+  };
+
+  const handleSelectMaterialSource = (material: TeacherLearningMaterial) => {
+    setDraftMessage(material.original_text);
+    setCurrentSource({
+      kind: 'material',
+      label: `Материал: ${material.title}`,
+      materialId: material.id,
+    });
+    setIsMaterialSourceModalOpen(false);
+    setMaterialSourceError(null);
+    setErrorMessage(null);
+    setSaveSuccessMessage(null);
+  };
+
+  const handleCloseMaterialSourceModal = () => {
+    if (isLoadingMaterials) {
+      return;
+    }
+
+    setIsMaterialSourceModalOpen(false);
+    setMaterialSourceError(null);
+  };
+
+  const handleOpenFileSource = () => {
+    setOpenComposerMenu(null);
+    fileInputRef.current?.click();
+  };
+
+  const handleSelectFileSource = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!selectedFile) {
+      return;
+    }
+
+    setIsParsingFileSource(true);
+    setErrorMessage(null);
+    setSaveSuccessMessage(null);
+
+    try {
+      const response = await parseTeacherAiAssistantFile(accessToken, selectedFile);
+      setDraftMessage(response.extracted_text);
+      setCurrentSource({
+        kind: 'file',
+        label: `Файл: ${response.filename}`,
+        filename: response.filename,
+      });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Не удалось извлечь текст из выбранного файла.',
+      );
+    } finally {
+      setIsParsingFileSource(false);
+    }
+  };
+
   const selectedModeLabel =
     ADAPTATION_MODES.find((modeOption) => modeOption.value === selectedMode)?.label ??
     'Упростить текст';
@@ -516,6 +709,27 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
           ) : null}
 
           <div className="rounded-[26px] border border-orange-100 bg-orange-50/45 p-3 shadow-inner">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2">
+              <span
+                data-testid="teacher-ai-assistant-source-badge"
+                className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 shadow-sm sm:text-sm"
+              >
+                <FileText className="h-4 w-4 text-stone-400" />
+                {currentSource.label}
+              </span>
+
+              {currentSource.kind !== 'manual' ? (
+                <button
+                  type="button"
+                  onClick={handleResetSource}
+                  data-testid="teacher-ai-assistant-source-reset"
+                  className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 shadow-sm transition hover:bg-orange-50 sm:text-sm"
+                >
+                  Переключить на ручной текст
+                </button>
+              ) : null}
+            </div>
+
             <textarea
               ref={textareaRef}
               data-testid="teacher-ai-assistant-input"
@@ -556,19 +770,23 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                     >
                       <button
                         type="button"
+                        onClick={() => void handleOpenMaterialSource()}
                         data-testid="teacher-ai-assistant-action-material"
                         className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
                       >
                         <span>Материал</span>
-                        <span className="text-xs text-stone-400">Скоро</span>
+                        <span className="text-xs text-stone-400">Выбрать</span>
                       </button>
                       <button
                         type="button"
+                        onClick={handleOpenFileSource}
                         data-testid="teacher-ai-assistant-action-file"
                         className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm text-stone-600 transition hover:bg-orange-50/70"
                       >
                         <span>Файл</span>
-                        <span className="text-xs text-stone-400">Скоро</span>
+                        <span className="text-xs text-stone-400">
+                          {isParsingFileSource ? 'Загрузка...' : 'Выбрать'}
+                        </span>
                       </button>
                     </div>
                   ) : null}
@@ -625,7 +843,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               <button
                 type="button"
                 onClick={() => void handleSubmit()}
-                disabled={isSubmitting || draftMessage.trim().length === 0}
+                disabled={isSubmitting || isParsingFileSource || draftMessage.trim().length === 0}
                 data-testid="teacher-ai-assistant-submit"
                 aria-label="Отправить сообщение"
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-orange-300 text-white shadow-[0_10px_24px_rgba(251,146,60,0.28)] transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-200 disabled:text-white/75 disabled:shadow-none"
@@ -637,6 +855,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         </div>
       </section>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.txt,.md"
+        onChange={(event) => void handleSelectFileSource(event)}
+        className="hidden"
+        data-testid="teacher-ai-assistant-file-input"
+      />
+
       <SaveMaterialModal
         isOpen={isSaveModalOpen}
         title={materialTitle}
@@ -645,6 +872,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         onSubmit={() => void handleSaveMaterial()}
         isSubmitting={isSavingMaterial}
         errorMessage={saveErrorMessage}
+      />
+
+      <MaterialSourceModal
+        isOpen={isMaterialSourceModalOpen}
+        materials={availableMaterials}
+        isLoading={isLoadingMaterials}
+        errorMessage={materialSourceError}
+        onClose={handleCloseMaterialSourceModal}
+        onSelect={handleSelectMaterialSource}
       />
     </>
   );

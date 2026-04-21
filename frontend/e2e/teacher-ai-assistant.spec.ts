@@ -1,9 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function loginAsTeacher(page: Page) {
+async function loginAsTeacher(
+  page: Page,
+  credentials: { email: string; password: string } = {
+    email: 'teacher.seed@example.com',
+    password: 'TeacherSeed123!',
+  },
+) {
   await page.goto('http://127.0.0.1:3000/login');
-  await page.getByPlaceholder('example@site.ru').fill('teacher.seed@example.com');
-  await page.getByPlaceholder('Введите пароль').fill('TeacherSeed123!');
+  await page.getByPlaceholder('example@site.ru').fill(credentials.email);
+  await page.getByPlaceholder('Введите пароль').fill(credentials.password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.waitForURL('**/teacher');
   await page.getByRole('button', { name: 'ИИ-ассистент' }).click();
@@ -51,6 +57,126 @@ test('teacher ai assistant returns real adapted text', async ({ page }) => {
   );
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant can use existing material as input source', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    const requestBody = route.request().postDataJSON();
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: `Source received: ${requestBody.message}`,
+        used_knowledge_chunks: [],
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-material').click();
+  await page
+    .getByTestId('teacher-ai-assistant-material-option')
+    .filter({ hasText: 'Assistant Source Material Real' })
+    .click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
+    'Материал: Assistant Source Material Real',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
+    'Текст реального материала для assistant input source. Его нужно подставить в поле ввода.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
+    'Source received: Текст реального материала для assistant input source. Его нужно подставить в поле ввода.',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'material-source',
+      sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+      assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant can use uploaded file as input source', async ({ page }) => {
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    const requestBody = route.request().postDataJSON();
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: `Source received: ${requestBody.message}`,
+        used_knowledge_chunks: [
+          {
+            document_title: 'methodics',
+            chunk_index: 0,
+          },
+        ],
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-file').click();
+  await page.getByTestId('teacher-ai-assistant-file-input').setInputFiles(
+    '/tmp/assistant-input-fixtures/assistant-input.md',
+  );
+
+  await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
+    'Файл: assistant-input.md',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
+    '# Assistant input markdown\n\nУчебный текст из markdown файла.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
+    'Source received: # Assistant input markdown\n\nУчебный текст из markdown файла.',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-knowledge-usage').first()).toContainText(
+    'Ответ основан на материалах (1)',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'file-source',
+      sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+      assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
+    }),
+  );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher without materials sees assistant material empty state', async ({ page }) => {
+  await loginAsTeacher(page, {
+    email: 'teacher.empty@example.com',
+    password: 'TeacherEmpty123!',
+  });
+
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-material').click();
+
+  await expect(page.getByTestId('teacher-ai-assistant-material-empty-state')).toContainText(
+    'У вас пока нет материалов',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'material-empty-state',
+      emptyStateText: await page.getByTestId('teacher-ai-assistant-material-empty-state').textContent(),
+    }),
+  );
 });
 
 test('teacher ai assistant composer shows one plus menu and sends selected mode', async ({ page }) => {
