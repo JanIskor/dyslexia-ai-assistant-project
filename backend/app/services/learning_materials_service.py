@@ -47,10 +47,46 @@ def _get_learning_material_kind(material: LearningMaterial) -> LearningMaterialK
     return "adapted" if material.adapted_text is not None else "draft"
 
 
-def _to_learning_material_response(material: LearningMaterial) -> LearningMaterialResponse:
+def _get_group_title(materials: list[LearningMaterial]) -> str | None:
+    if not materials:
+        return None
+
+    earliest_material = min(materials, key=lambda material: (material.created_at, str(material.id)))
+    return earliest_material.title
+
+
+def _group_adapted_materials_by_key(
+    materials: list[LearningMaterial],
+) -> list[tuple[LearningMaterial, str | None, list[LearningMaterial]]]:
+    grouped_materials: dict[str | None, list[LearningMaterial]] = {}
+
+    for material in materials:
+        group_key = _build_adaptation_group_key(material)
+        grouped_materials.setdefault(group_key, []).append(material)
+
+    grouped_items: list[tuple[LearningMaterial, str | None, list[LearningMaterial]]] = []
+    for group_key, group_materials in grouped_materials.items():
+        representative_material = max(
+            group_materials,
+            key=lambda material: (material.created_at, str(material.id)),
+        )
+        grouped_items.append((representative_material, group_key, group_materials))
+
+    grouped_items.sort(
+        key=lambda item: (item[0].created_at, str(item[0].id)),
+        reverse=True,
+    )
+    return grouped_items
+
+
+def _to_learning_material_response(
+    material: LearningMaterial,
+    *,
+    override_title: str | None = None,
+) -> LearningMaterialResponse:
     return LearningMaterialResponse(
         id=material.id,
-        title=material.title,
+        title=override_title or material.title,
         original_text=material.original_text,
         adapted_text=material.adapted_text,
         material_kind=_get_learning_material_kind(material),
@@ -72,16 +108,51 @@ def create_learning_material(
     teacher_user_id: UUID,
     payload: TeacherLearningMaterialCreateRequest,
 ) -> LearningMaterialResponse:
+    normalized_source_type = payload.source_type.strip() if payload.source_type else None
+    normalized_source_filename = payload.source_filename.strip() if payload.source_filename else None
+    normalized_original_text = payload.original_text.strip()
+    normalized_title = payload.title.strip()
+    normalized_adapted_text = payload.adapted_text.strip() if payload.adapted_text else None
+
+    material_group_key: str | None = None
+    if normalized_adapted_text is not None:
+        group_probe = LearningMaterial(
+            title=normalized_title,
+            original_text=normalized_original_text,
+            adapted_text=normalized_adapted_text,
+            source_type=normalized_source_type,
+            source_material_id=payload.source_material_id,
+            source_filename=normalized_source_filename,
+        )
+        material_group_key = _build_adaptation_group_key(group_probe)
+
+        if material_group_key is not None:
+            sibling_materials = (
+                db.query(LearningMaterial)
+                .filter(
+                    LearningMaterial.teacher_user_id == teacher_user_id,
+                    LearningMaterial.adapted_text.is_not(None),
+                )
+                .order_by(LearningMaterial.created_at.asc())
+                .all()
+            )
+            grouped_siblings = [
+                sibling for sibling in sibling_materials if _build_adaptation_group_key(sibling) == material_group_key
+            ]
+            group_title = _get_group_title(grouped_siblings)
+            if group_title:
+                normalized_title = group_title
+
     material = LearningMaterial(
         teacher_user_id=teacher_user_id,
-        title=payload.title.strip(),
-        original_text=payload.original_text.strip(),
-        adapted_text=payload.adapted_text.strip() if payload.adapted_text else None,
+        title=normalized_title,
+        original_text=normalized_original_text,
+        adapted_text=normalized_adapted_text,
         material_type="text",
         status="draft",
-        source_type=payload.source_type.strip() if payload.source_type else None,
+        source_type=normalized_source_type,
         source_material_id=payload.source_material_id,
-        source_filename=payload.source_filename.strip() if payload.source_filename else None,
+        source_filename=normalized_source_filename,
         adaptation_mode=payload.adaptation_mode,
     )
     db.add(material)
@@ -104,6 +175,18 @@ def list_teacher_learning_materials(
         query = query.filter(LearningMaterial.adapted_text.is_not(None))
 
     materials = query.order_by(LearningMaterial.created_at.desc()).all()
+
+    if kind == "adapted":
+        grouped_materials = _group_adapted_materials_by_key(materials)
+        return TeacherLearningMaterialsListResponse(
+            items=[
+                _to_learning_material_response(
+                    representative_material,
+                    override_title=_get_group_title(group_materials),
+                )
+                for representative_material, _, group_materials in grouped_materials
+            ]
+        )
 
     return TeacherLearningMaterialsListResponse(
         items=[_to_learning_material_response(material) for material in materials]
@@ -184,6 +267,21 @@ def get_teacher_learning_material_compare_ready_detail(
             if _build_adaptation_group_key(sibling) == adaptation_group_key
         ]
 
+    group_title = _get_group_title(
+        [
+            sibling
+            for sibling in (
+                db.query(LearningMaterial)
+                .filter(
+                    LearningMaterial.teacher_user_id == teacher_user_id,
+                    LearningMaterial.adapted_text.is_not(None),
+                )
+                .all()
+            )
+            if _build_adaptation_group_key(sibling) == adaptation_group_key
+        ]
+    )
+
     source_material_title: str | None = None
     if material.source_material_id is not None:
         source_material = (
@@ -205,7 +303,8 @@ def get_teacher_learning_material_compare_ready_detail(
     )
 
     return AdaptedLearningMaterialDetailResponse(
-        **response.model_dump(),
+        **response.model_dump(exclude={"title"}),
+        title=group_title or response.title,
         source_info=source_info,
         available_adaptation_versions=related_versions,
     )
