@@ -502,6 +502,7 @@ test('teacher ai assistant shows backend error in UI', async ({ page }) => {
 test('teacher can save assistant reply as material', async ({ page }) => {
   let dialogShown = false;
   let capturedSavePayload: Record<string, unknown> | null = null;
+  let sourceStatusRequestCount = 0;
 
   page.on('dialog', async (dialog) => {
     dialogShown = true;
@@ -514,6 +515,19 @@ test('teacher can save assistant reply as material', async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify({
         reply: 'Короткий и понятный адаптированный текст для ученика.',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    sourceStatusRequestCount += 1;
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: null,
+        group_title: null,
       }),
     });
   });
@@ -536,7 +550,8 @@ test('teacher can save assistant reply as material', async ({ page }) => {
         source_material_id: requestBody.source_material_id ?? null,
         source_filename: requestBody.source_filename ?? null,
         adaptation_mode: requestBody.adaptation_mode,
-        save_action: 'created',
+        adaptation_group_key: 'manual:test-group',
+        save_type: 'created',
         created_at: '2026-04-17T10:00:00Z',
         updated_at: '2026-04-17T10:00:00Z',
       }),
@@ -553,6 +568,7 @@ test('teacher can save assistant reply as material', async ({ page }) => {
   );
 
   await page.getByTestId('teacher-ai-assistant-save-material-trigger').first().click();
+  await expect(page.getByTestId('teacher-ai-save-material-title')).toBeVisible();
   await page.getByTestId('teacher-ai-save-material-title').fill('Материал из ИИ');
   await page.getByTestId('teacher-ai-save-material-submit').click();
 
@@ -565,6 +581,7 @@ test('teacher can save assistant reply as material', async ({ page }) => {
     JSON.stringify({
       scenario: 'save-material-success',
       dialogShown,
+      sourceStatusRequestCount,
       capturedSavePayload,
       saveSuccessBanner: await page
         .getByTestId('teacher-ai-assistant-save-material-success')
@@ -577,6 +594,7 @@ test('teacher can save assistant reply as material', async ({ page }) => {
   expect(capturedSavePayload?.source_material_id ?? null).toBeNull();
   expect(capturedSavePayload?.source_filename ?? null).toBeNull();
   expect(capturedSavePayload?.adaptation_mode).toBe('basic_simplify');
+  expect(sourceStatusRequestCount).toBe(1);
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
@@ -591,6 +609,17 @@ test('teacher ai assistant sends source-aware save payload for existing material
       body: JSON.stringify({
         reply: 'Адаптированный ответ для existing material source.',
         used_knowledge_chunks: [],
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: null,
+        group_title: null,
       }),
     });
   });
@@ -612,7 +641,8 @@ test('teacher ai assistant sends source-aware save payload for existing material
         source_material_id: capturedSavePayload?.source_material_id,
         source_filename: capturedSavePayload?.source_filename ?? null,
         adaptation_mode: capturedSavePayload?.adaptation_mode,
-        save_action: 'created',
+        adaptation_group_key: 'material:test-group',
+        save_type: 'created',
         created_at: '2026-04-21T12:00:00Z',
         updated_at: '2026-04-21T12:00:00Z',
       }),
@@ -672,6 +702,17 @@ test('teacher ai assistant sends source-aware save payload for uploaded file', a
     });
   });
 
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: null,
+        group_title: null,
+      }),
+    });
+  });
+
   await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/save-material', async (route) => {
     capturedSavePayload = route.request().postDataJSON() as Record<string, unknown>;
 
@@ -689,7 +730,8 @@ test('teacher ai assistant sends source-aware save payload for uploaded file', a
         source_material_id: null,
         source_filename: capturedSavePayload?.source_filename,
         adaptation_mode: capturedSavePayload?.adaptation_mode,
-        save_action: 'created',
+        adaptation_group_key: 'file:test-group',
+        save_type: 'created',
         created_at: '2026-04-21T12:00:00Z',
         updated_at: '2026-04-21T12:00:00Z',
       }),
@@ -769,9 +811,20 @@ test('teacher ai assistant shows update success message when save updates existi
         source_filename: requestBody.source_filename ?? null,
         adaptation_mode: requestBody.adaptation_mode,
         adaptation_group_key: 'material:test-source',
-        save_action: 'updated',
+        save_type: 'updated',
         created_at: '2026-04-21T12:00:00Z',
         updated_at: '2026-04-21T12:30:00Z',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: 'material:test-source',
+        group_title: 'Материал для обновления',
       }),
     });
   });
@@ -785,8 +838,7 @@ test('teacher ai assistant shows update success message when save updates existi
   );
 
   await page.getByTestId('teacher-ai-assistant-save-material-trigger').first().click();
-  await page.getByTestId('teacher-ai-save-material-title').fill('Материал для обновления');
-  await page.getByTestId('teacher-ai-save-material-submit').click();
+  await expect(page.getByTestId('teacher-ai-save-material-title')).toHaveCount(0);
 
   await expect(page.getByTestId('teacher-ai-assistant-save-material-success')).toContainText(
     'Адаптированная версия обновлена.',
@@ -811,6 +863,17 @@ test('teacher ai assistant shows save material error', async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify({
         reply: 'Ответ ассистента для проверки ошибки сохранения.',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: null,
+        group_title: null,
       }),
     });
   });
@@ -846,6 +909,114 @@ test('teacher ai assistant shows save material error', async ({ page }) => {
       saveError: await page.getByTestId('teacher-ai-save-material-error').textContent(),
     }),
   );
+
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('teacher ai assistant skips title modal for existing adaptation group and still creates new mode version', async ({
+  page,
+}) => {
+  const saveRequests: Array<Record<string, unknown>> = [];
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/messages', async (route) => {
+    const requestBody = route.request().postDataJSON();
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        reply: `Новая версия для режима ${requestBody.mode}.`,
+        used_knowledge_chunks: [],
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/source-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        adaptation_group_key: 'material:test-group',
+        group_title: 'Общая группа адаптаций',
+      }),
+    });
+  });
+
+  await page.route('http://127.0.0.1:8000/api/v1/teacher/ai-assistant/save-material', async (route) => {
+    const requestBody = route.request().postDataJSON() as Record<string, unknown>;
+    saveRequests.push(requestBody);
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: saveRequests.length === 1 ? '99999999-9999-9999-9999-999999999991' : '99999999-9999-9999-9999-999999999992',
+        title: 'Общая группа адаптаций',
+        original_text: requestBody.original_text,
+        adapted_text: requestBody.adapted_text,
+        material_type: 'text',
+        status: 'draft',
+        material_kind: 'adapted',
+        source_type: requestBody.source_type,
+        source_material_id: requestBody.source_material_id ?? null,
+        source_filename: requestBody.source_filename ?? null,
+        adaptation_mode: requestBody.adaptation_mode,
+        adaptation_group_key: 'material:test-group',
+        save_type: 'created',
+        created_at: '2026-04-22T10:00:00Z',
+        updated_at: '2026-04-22T10:00:00Z',
+      }),
+    });
+  });
+
+  await loginAsTeacher(page);
+
+  await page.getByTestId('teacher-ai-assistant-actions-trigger').click();
+  await page.getByTestId('teacher-ai-assistant-action-material').click();
+  await page
+    .getByTestId('teacher-ai-assistant-material-option')
+    .filter({ hasText: 'Assistant Source Material Real' })
+    .click();
+
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
+    'Новая версия для режима basic_simplify.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-save-material-trigger').last().click();
+  await expect(page.getByTestId('teacher-ai-save-material-title')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-save-material-success')).toContainText(
+    'Адаптированный материал добавлен в материалы.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-mode-button').click();
+  await page.getByTestId('teacher-ai-assistant-mode-option-structured_explanation').click();
+  await page.getByTestId('teacher-ai-assistant-submit').click();
+  await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
+    'Новая версия для режима structured_explanation.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-save-material-trigger').last().click();
+  await expect(page.getByTestId('teacher-ai-save-material-title')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-save-material-success')).toContainText(
+    'Адаптированный материал добавлен в материалы.',
+  );
+
+  console.log(
+    JSON.stringify({
+      scenario: 'save-material-existing-group-no-modal',
+      saveRequestsCount: saveRequests.length,
+      firstSaveMode: saveRequests[0]?.adaptation_mode,
+      secondSaveMode: saveRequests[1]?.adaptation_mode,
+      modalVisibleAfterSaveClick: await page.getByTestId('teacher-ai-save-material-title').count(),
+    }),
+  );
+
+  expect(saveRequests).toHaveLength(2);
+  expect(saveRequests[0]?.title).toBe('Общая группа адаптаций');
+  expect(saveRequests[1]?.title).toBe('Общая группа адаптаций');
+  expect(saveRequests[0]?.adaptation_mode).toBe('basic_simplify');
+  expect(saveRequests[1]?.adaptation_mode).toBe('structured_explanation');
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

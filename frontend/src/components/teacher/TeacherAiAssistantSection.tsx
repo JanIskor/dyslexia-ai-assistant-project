@@ -4,6 +4,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ArrowUp, BookOpenText, ChevronDown, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import {
   MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES,
+  getTeacherAiAssistantSourceStatus,
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
   parseTeacherAiAssistantFile,
@@ -28,6 +29,11 @@ interface TeacherAiAssistantSubmissionSnapshot {
   sourceKey: string;
   sourceText: string;
   adaptationMode: TeacherAiAssistantMode;
+}
+
+interface TeacherAiAssistantSavedSourceStatus {
+  adaptationGroupKey: string;
+  groupTitle: string;
 }
 
 type TeacherAiAssistantSource =
@@ -353,6 +359,9 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [isParsingFileSource, setIsParsingFileSource] = useState(false);
   const [lastSubmittedSnapshot, setLastSubmittedSnapshot] =
     useState<TeacherAiAssistantSubmissionSnapshot | null>(null);
+  const [savedSourceStatuses, setSavedSourceStatuses] = useState<
+    Record<string, TeacherAiAssistantSavedSourceStatus>
+  >({});
   const activeFileParseRequestIdRef = useRef(0);
   const chatViewportRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -473,12 +482,132 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       : messages.find((message) => message.id === selectedAssistantMessageId && message.role === 'assistant') ??
         null;
 
-  const handleOpenSaveModal = (message: TeacherAiAssistantMessage) => {
-    setSelectedAssistantMessageId(message.id);
-    setMaterialTitle('');
-    setSaveErrorMessage(null);
+  const buildSourceStatusKey = (message: TeacherAiAssistantMessage) => {
+    const sourceKind = message.source?.kind ?? 'manual';
+    const sourceMaterialId = message.source?.kind === 'material' ? message.source.materialId : '';
+    const sourceFilename = message.source?.kind === 'file' ? message.source.filename : '';
+
+    return [
+      sourceKind,
+      sourceMaterialId,
+      sourceFilename,
+      message.sourceText?.trim() ?? '',
+    ].join('::');
+  };
+
+  const cacheSavedSourceStatus = (
+    message: TeacherAiAssistantMessage,
+    adaptationGroupKey: string | null | undefined,
+    groupTitle: string | null | undefined,
+  ) => {
+    if (!adaptationGroupKey || !groupTitle) {
+      return;
+    }
+
+    setSavedSourceStatuses((currentStatuses) => ({
+      ...currentStatuses,
+      [buildSourceStatusKey(message)]: {
+        adaptationGroupKey,
+        groupTitle,
+      },
+    }));
+  };
+
+  const resolveSavedSourceStatus = async (message: TeacherAiAssistantMessage) => {
+    const sourceStatusKey = buildSourceStatusKey(message);
+    const cachedStatus = savedSourceStatuses[sourceStatusKey];
+
+    if (cachedStatus) {
+      return cachedStatus;
+    }
+
+    const response = await getTeacherAiAssistantSourceStatus(accessToken, {
+      original_text: message.sourceText?.trim() ?? '',
+      source_type: message.source?.kind ?? 'manual',
+      source_material_id:
+        message.source?.kind === 'material' ? message.source.materialId : undefined,
+      source_filename:
+        message.source?.kind === 'file' ? message.source.filename : undefined,
+    });
+
+    if (response.adaptation_group_key && response.group_title) {
+      const nextStatus = {
+        adaptationGroupKey: response.adaptation_group_key,
+        groupTitle: response.group_title,
+      };
+      setSavedSourceStatuses((currentStatuses) => ({
+        ...currentStatuses,
+        [sourceStatusKey]: nextStatus,
+      }));
+      return nextStatus;
+    }
+
+    return null;
+  };
+
+  const performSaveMaterial = async (
+    message: TeacherAiAssistantMessage,
+    title: string,
+  ) => {
+    const response = await saveTeacherAiAssistantMaterial(accessToken, {
+      title,
+      original_text: message.sourceText?.trim() ?? '',
+      adapted_text: message.content,
+      source_type: message.source?.kind ?? 'manual',
+      source_material_id:
+        message.source?.kind === 'material'
+          ? message.source.materialId
+          : undefined,
+      source_filename:
+        message.source?.kind === 'file'
+          ? message.source.filename
+          : undefined,
+      adaptation_mode: message.adaptationMode ?? selectedMode,
+    });
+
+    cacheSavedSourceStatus(message, response.adaptation_group_key, response.title);
+    setSaveSuccessMessage(
+      response.save_type === 'updated'
+        ? 'Адаптированная версия обновлена.'
+        : 'Адаптированный материал добавлен в материалы.',
+    );
+
+    return response;
+  };
+
+  const handleOpenSaveModal = async (message: TeacherAiAssistantMessage) => {
+    if (!message.sourceText?.trim()) {
+      setErrorMessage('Не удалось определить исходный текст для сохранения материала.');
+      return;
+    }
+
+    setErrorMessage(null);
     setSaveSuccessMessage(null);
-    setIsSaveModalOpen(true);
+    setSaveErrorMessage(null);
+    setSelectedAssistantMessageId(message.id);
+
+    try {
+      const existingSourceStatus = await resolveSavedSourceStatus(message);
+
+      if (existingSourceStatus?.groupTitle) {
+        setIsSavingMaterial(true);
+        await performSaveMaterial(message, existingSourceStatus.groupTitle);
+        setSelectedAssistantMessageId(null);
+        setMaterialTitle('');
+        setIsSaveModalOpen(false);
+        return;
+      }
+
+      setMaterialTitle('');
+      setIsSaveModalOpen(true);
+    } catch (error) {
+      setSelectedAssistantMessageId(null);
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Не удалось определить сценарий сохранения.',
+      );
+    } finally {
+      setIsSavingMaterial(false);
+    }
   };
 
   const handleCloseSaveModal = () => {
@@ -512,30 +641,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setSaveErrorMessage(null);
 
     try {
-      const response = await saveTeacherAiAssistantMaterial(accessToken, {
-        title: materialTitle,
-        original_text: selectedAssistantMessage.sourceText,
-        adapted_text: selectedAssistantMessage.content,
-        source_type: selectedAssistantMessage.source?.kind ?? 'manual',
-        source_material_id:
-          selectedAssistantMessage.source?.kind === 'material'
-            ? selectedAssistantMessage.source.materialId
-            : undefined,
-        source_filename:
-          selectedAssistantMessage.source?.kind === 'file'
-            ? selectedAssistantMessage.source.filename
-            : undefined,
-        adaptation_mode: selectedAssistantMessage.adaptationMode ?? selectedMode,
-      });
-
+      await performSaveMaterial(selectedAssistantMessage, materialTitle.trim());
       setIsSaveModalOpen(false);
       setSelectedAssistantMessageId(null);
       setMaterialTitle('');
-      setSaveSuccessMessage(
-        response.save_action === 'updated'
-          ? 'Адаптированная версия обновлена.'
-          : 'Адаптированный материал добавлен в материалы.',
-      );
     } catch (error) {
       setSaveErrorMessage(
         error instanceof Error ? error.message : 'Не удалось сохранить материал из ответа ассистента.',

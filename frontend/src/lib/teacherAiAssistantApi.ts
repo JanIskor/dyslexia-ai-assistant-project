@@ -29,13 +29,25 @@ export interface TeacherAiAssistantSaveMaterialPayload {
   adaptation_mode: TeacherAiAssistantMode;
 }
 
+export interface TeacherAiAssistantSourceStatusPayload {
+  original_text: string;
+  source_type: 'manual' | 'material' | 'file';
+  source_material_id?: string;
+  source_filename?: string;
+}
+
 export interface TeacherAiAssistantParsedFileResponse {
   filename: string;
   extracted_text: string;
 }
 
 export interface TeacherAiAssistantSaveMaterialResponse extends TeacherLearningMaterial {
-  save_action: 'created' | 'updated';
+  save_type: 'created' | 'updated';
+}
+
+export interface TeacherAiAssistantSourceStatusResponse {
+  adaptation_group_key?: string | null;
+  group_title?: string | null;
 }
 
 export const MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -128,6 +140,37 @@ export const saveTeacherAiAssistantMaterial = async (
   }
 
   return parseJson<TeacherAiAssistantSaveMaterialResponse>(response);
+};
+
+export const getTeacherAiAssistantSourceStatus = async (
+  token: string,
+  payload: TeacherAiAssistantSourceStatusPayload,
+): Promise<TeacherAiAssistantSourceStatusResponse> => {
+  const response = await fetch(buildApiUrl('/api/v1/teacher/ai-assistant/source-status'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(
+      getErrorMessage(response.status, body, 'Не удалось определить статус сохранения для текущего источника.'),
+    );
+  }
+
+  return parseJson<TeacherAiAssistantSourceStatusResponse>(response);
 };
 
 export const parseTeacherAiAssistantFile = async (
