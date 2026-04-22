@@ -33,7 +33,19 @@ class TeacherAiAssistantSaveMaterialRequest(BaseModel):
 
 
 class TeacherAiAssistantSaveMaterialResponse(LearningMaterialResponse):
-    save_action: Literal["created", "updated"]
+    save_type: Literal["created", "updated"]
+
+
+class TeacherAiAssistantSourceStatusRequest(BaseModel):
+    original_text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    source_type: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    source_material_id: UUID | None = None
+    source_filename: str | None = None
+
+
+class TeacherAiAssistantSourceStatusResponse(BaseModel):
+    adaptation_group_key: str | None = None
+    group_title: str | None = None
 
 
 class TeacherAiAssistantParsedFileResponse(BaseModel):

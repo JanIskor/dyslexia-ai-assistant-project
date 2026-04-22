@@ -22,6 +22,8 @@ from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantParsedFileResponse,
     TeacherAiAssistantSaveMaterialRequest,
     TeacherAiAssistantSaveMaterialResponse,
+    TeacherAiAssistantSourceStatusRequest,
+    TeacherAiAssistantSourceStatusResponse,
 )
 from app.schemas.teacher_incoming_students import (
     TeacherIncomingStudentDetail,
@@ -53,6 +55,7 @@ from app.services.teacher_incoming_students_service import (
 )
 from app.services.teacher_ai_assistant_service import (
     create_teacher_ai_assistant_reply,
+    get_teacher_ai_assistant_source_status,
     parse_teacher_ai_assistant_input_file,
     save_teacher_ai_assistant_material,
 )
@@ -86,6 +89,19 @@ def save_teacher_ai_assistant_material_endpoint(
     db: Session = Depends(get_db),
 ):
     return save_teacher_ai_assistant_material(
+        db,
+        teacher_user_id=current_teacher.id,
+        payload=payload,
+    )
+
+
+@router.post("/ai-assistant/source-status", response_model=TeacherAiAssistantSourceStatusResponse)
+def get_teacher_ai_assistant_source_status_endpoint(
+    payload: TeacherAiAssistantSourceStatusRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return get_teacher_ai_assistant_source_status(
         db,
         teacher_user_id=current_teacher.id,
         payload=payload,

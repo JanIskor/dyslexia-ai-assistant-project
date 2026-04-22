@@ -13,9 +13,14 @@ from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantParsedFileResponse,
     TeacherAiAssistantSaveMaterialRequest,
     TeacherAiAssistantSaveMaterialResponse,
+    TeacherAiAssistantSourceStatusRequest,
+    TeacherAiAssistantSourceStatusResponse,
 )
 from app.services.knowledge_base_parser import extract_text_from_knowledge_file, normalize_extracted_text
-from app.services.learning_materials_service import save_or_update_adapted_learning_material
+from app.services.learning_materials_service import (
+    get_adapted_group_status_for_source,
+    save_or_update_adapted_learning_material,
+)
 from app.services.retrieval_service import retrieve_relevant_chunks
 
 
@@ -68,7 +73,7 @@ def save_teacher_ai_assistant_material(
     teacher_user_id: UUID,
     payload: TeacherAiAssistantSaveMaterialRequest,
 ) -> TeacherAiAssistantSaveMaterialResponse:
-    material, save_action = save_or_update_adapted_learning_material(
+    material, save_type = save_or_update_adapted_learning_material(
         db,
         teacher_user_id=teacher_user_id,
         payload=TeacherLearningMaterialCreateRequest(
@@ -84,7 +89,27 @@ def save_teacher_ai_assistant_material(
 
     return TeacherAiAssistantSaveMaterialResponse(
         **material.model_dump(),
-        save_action=save_action,
+        save_type=save_type,
+    )
+
+
+def get_teacher_ai_assistant_source_status(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    payload: TeacherAiAssistantSourceStatusRequest,
+) -> TeacherAiAssistantSourceStatusResponse:
+    adaptation_group_key, group_title = get_adapted_group_status_for_source(
+        db,
+        teacher_user_id=teacher_user_id,
+        original_text=payload.original_text,
+        source_type=payload.source_type,
+        source_material_id=payload.source_material_id,
+        source_filename=payload.source_filename,
+    )
+    return TeacherAiAssistantSourceStatusResponse(
+        adaptation_group_key=adaptation_group_key if group_title else None,
+        group_title=group_title,
     )
 
 

@@ -125,6 +125,32 @@ def _get_group_sibling_materials(
     ]
 
 
+def get_adapted_group_status_for_source(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    original_text: str,
+    source_type: str,
+    source_material_id: UUID | None = None,
+    source_filename: str | None = None,
+) -> tuple[str | None, str | None]:
+    group_probe = LearningMaterial(
+        title="source-status",
+        original_text=original_text.strip(),
+        adapted_text="status-probe",
+        source_type=source_type.strip(),
+        source_material_id=source_material_id,
+        source_filename=source_filename.strip() if source_filename else None,
+    )
+    adaptation_group_key = _build_adaptation_group_key(group_probe)
+    grouped_siblings = _get_group_sibling_materials(
+        db,
+        teacher_user_id=teacher_user_id,
+        adaptation_group_key=adaptation_group_key,
+    )
+    return adaptation_group_key, _get_group_title(grouped_siblings)
+
+
 def create_learning_material(
     db: Session,
     *,
