@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
+import { AdminKnowledgeBasePanel } from '@/components/admin/AdminKnowledgeBasePanel';
 import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
 import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
@@ -29,12 +30,13 @@ import {
   type AdminTeacherAssignmentOption,
 } from '@/lib/adminApplicationsApi';
 
-type AdminDashboardSection = 'student-applications' | 'teachers' | 'students';
+type AdminDashboardSection = 'student-applications' | 'teachers' | 'students' | 'knowledge-base';
 
 const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
   { id: 'student-applications', label: 'Заявки учеников' },
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'students', label: 'Ученики' },
+  { id: 'knowledge-base', label: 'Правила адаптации' },
 ];
 
 function DashboardSkeleton() {
@@ -456,6 +458,10 @@ function AdminSectionContent({
     return <AdminStudentsDirectoryPanel token={token} />;
   }
 
+  if (section === 'knowledge-base') {
+    return <AdminKnowledgeBasePanel token={token} />;
+  }
+
   return null;
 }
 
@@ -519,6 +525,12 @@ export function AdminDashboard() {
         return;
       }
 
+      if (requestedTab === 'knowledge-base') {
+        setActiveSection('knowledge-base');
+        setInitialApplicationId(null);
+        return;
+      }
+
       setActiveSection('student-applications');
       setInitialApplicationId(requestedApplicationId);
     }, 0);
@@ -571,6 +583,11 @@ export function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => setActiveSection(item.id)}
+                          data-testid={
+                            item.id === 'knowledge-base'
+                              ? 'admin-sidebar-knowledge-base-tab'
+                              : undefined
+                          }
                           className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
                             isActive
                               ? 'bg-white/95 font-medium text-orange-400 shadow-[0_8px_24px_rgba(221,156,130,0.10)]'
