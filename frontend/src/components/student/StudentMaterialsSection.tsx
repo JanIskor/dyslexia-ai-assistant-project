@@ -54,7 +54,15 @@ function StudentMaterialCard({
       onClick={() => onOpen(material.id)}
       className="w-full rounded-[24px] border border-orange-100/80 bg-white/92 px-5 py-5 text-left shadow-[0_18px_40px_rgba(221,156,130,0.10)] transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_22px_45px_rgba(221,156,130,0.14)]"
     >
+      {material.is_adapted ? (
+        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium tracking-[0.02em] text-emerald-700 sm:text-sm">
+          Адаптированный материал
+        </span>
+      ) : null}
       <h3 className="text-lg font-medium text-stone-700 sm:text-xl">{material.title}</h3>
+      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-stone-500 sm:text-base">
+        {material.preview_text}
+      </p>
       <p className="mt-4 text-sm text-stone-400 sm:text-base">{formatMaterialDate(material.created_at)}</p>
     </button>
   );
@@ -80,6 +88,11 @@ function StudentMaterialDetailCard({
 
       <div className="mx-auto mt-6 w-full max-w-3xl rounded-[28px] border border-orange-100/70 bg-white/80 px-5 py-6 sm:px-6 sm:py-7">
         <p className="text-sm text-stone-400 sm:text-base">{formatMaterialDate(material.created_at)}</p>
+        {material.is_adapted ? (
+          <span className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium tracking-[0.02em] text-emerald-700 sm:text-sm">
+            Адаптированный материал
+          </span>
+        ) : null}
         <h2 className="mt-3 text-2xl font-medium text-stone-700 sm:text-3xl">{material.title}</h2>
         <div className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-stone-600 sm:text-lg">
           {material.original_text}

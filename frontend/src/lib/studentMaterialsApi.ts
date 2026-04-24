@@ -3,6 +3,8 @@ import { buildApiUrl } from '@/lib/apiBaseUrl';
 export interface StudentLearningMaterialListItem {
   id: string;
   title: string;
+  preview_text: string;
+  is_adapted: boolean;
   created_at: string;
 }
 
@@ -14,6 +16,7 @@ export interface StudentLearningMaterialDetail {
   id: string;
   title: string;
   original_text: string;
+  is_adapted: boolean;
   created_at: string;
 }
 
