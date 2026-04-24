@@ -36,6 +36,7 @@ def create_teacher_ai_assistant_reply(
             db,
             query_text=payload.message.strip(),
             top_k=3,
+            selected_mode=payload.mode,
         )
     except HTTPException:
         retrieved_chunks = []

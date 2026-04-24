@@ -26,6 +26,8 @@ from app.schemas.knowledge_documents import (
     KnowledgeBaseRetrieveResponse,
     KnowledgeBaseRetrievedChunkResponse,
     KnowledgeDocumentChunksListResponse,
+    KnowledgeDocumentControlsUpdateRequest,
+    KnowledgeDocumentDeleteResponse,
     KnowledgeDocumentResponse,
     KnowledgeDocumentsListResponse,
 )
@@ -46,10 +48,12 @@ from app.services.admin_directories_service import (
     list_admin_teachers,
 )
 from app.services.knowledge_base_service import (
+    delete_knowledge_document,
     get_knowledge_document,
     get_knowledge_document_chunks,
     list_knowledge_documents,
     reembed_knowledge_document,
+    update_knowledge_document_controls,
     upload_knowledge_document,
 )
 from app.services.retrieval_service import retrieve_relevant_chunks
@@ -126,6 +130,37 @@ def reembed_knowledge_document_endpoint(
     return document
 
 
+@router.patch("/knowledge-base/documents/{document_id}", response_model=KnowledgeDocumentResponse)
+def patch_knowledge_document_controls(
+    document_id: UUID,
+    payload: KnowledgeDocumentControlsUpdateRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    document = update_knowledge_document_controls(
+        db,
+        document_id=document_id,
+        payload=payload,
+    )
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
+    return document
+
+
+@router.delete("/knowledge-base/documents/{document_id}", response_model=KnowledgeDocumentDeleteResponse)
+def delete_knowledge_document_endpoint(
+    document_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    result = delete_knowledge_document(db, document_id=document_id)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge document not found")
+    return result
+
+
 @router.post("/knowledge-base/retrieve", response_model=KnowledgeBaseRetrieveResponse)
 def retrieve_knowledge_base_chunks(
     payload: KnowledgeBaseRetrieveRequest,
@@ -137,6 +172,7 @@ def retrieve_knowledge_base_chunks(
         db,
         query_text=payload.query,
         top_k=payload.top_k,
+        selected_mode=payload.adaptation_mode,
     )
     return KnowledgeBaseRetrieveResponse(
         query=payload.query,

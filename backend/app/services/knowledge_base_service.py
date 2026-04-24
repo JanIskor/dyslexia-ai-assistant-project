@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.models.knowledge_document import KnowledgeDocument
 from app.schemas.knowledge_documents import (
     KnowledgeDocumentChunkResponse,
+    KnowledgeDocumentControlsUpdateRequest,
+    KnowledgeDocumentDeleteResponse,
     KnowledgeDocumentChunksListResponse,
     KnowledgeDocumentResponse,
     KnowledgeDocumentsListResponse,
@@ -16,7 +18,7 @@ from app.schemas.knowledge_documents import (
 from app.services.knowledge_base_chunking_service import list_chunks_for_document, recreate_chunks_for_document
 from app.services.embedding_service import EmbeddingServiceError, embed_chunks_for_document
 from app.services.knowledge_base_parser import extract_text_from_knowledge_file, validate_knowledge_file_type
-from app.services.storage_service import build_object_name, upload_file_bytes
+from app.services.storage_service import build_object_name, delete_object, upload_file_bytes
 
 
 MAX_KNOWLEDGE_FILE_SIZE_BYTES = 15 * 1024 * 1024
@@ -64,6 +66,8 @@ def upload_knowledge_document(
         storage_object_key=object_key,
         uploaded_by_user_id=uploaded_by_user_id,
         status="uploaded",
+        use_in_rag=False,
+        adaptation_modes=[],
     )
     db.add(document)
     db.flush()
@@ -180,6 +184,55 @@ def reembed_knowledge_document(
     return _to_knowledge_document_response(document)
 
 
+def update_knowledge_document_controls(
+    db: Session,
+    *,
+    document_id: UUID,
+    payload: KnowledgeDocumentControlsUpdateRequest,
+) -> KnowledgeDocumentResponse | None:
+    document = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
+    if document is None:
+        return None
+
+    if payload.use_in_rag is not None:
+        document.use_in_rag = payload.use_in_rag
+
+    if payload.adaptation_modes is not None:
+        # Store a stable de-duplicated list so retrieval filtering stays predictable.
+        document.adaptation_modes = list(dict.fromkeys(payload.adaptation_modes))
+
+    db.commit()
+    db.refresh(document)
+    return _to_knowledge_document_response(document)
+
+
+def delete_knowledge_document(
+    db: Session,
+    *,
+    document_id: UUID,
+) -> KnowledgeDocumentDeleteResponse | None:
+    document = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
+    if document is None:
+        return None
+
+    storage_object_key = document.storage_object_key
+    db.delete(document)
+    db.commit()
+
+    storage_cleanup_warning: str | None = None
+    try:
+        delete_object(storage_object_key)
+    except Exception:
+        storage_cleanup_warning = (
+            "Документ удалён из базы и retrieval, но удалить исходный файл из storage не удалось."
+        )
+
+    return KnowledgeDocumentDeleteResponse(
+        id=document_id,
+        storage_cleanup_warning=storage_cleanup_warning,
+    )
+
+
 def _to_knowledge_document_response(document: KnowledgeDocument) -> KnowledgeDocumentResponse:
     embedded_chunks_count = sum(1 for chunk in document.chunks if chunk.embedding is not None)
     return KnowledgeDocumentResponse(
@@ -192,6 +245,8 @@ def _to_knowledge_document_response(document: KnowledgeDocument) -> KnowledgeDoc
         uploaded_by_user_id=document.uploaded_by_user_id,
         status=document.status,
         extracted_text=document.extracted_text,
+        use_in_rag=document.use_in_rag,
+        adaptation_modes=list(document.adaptation_modes or []),
         chunks_count=len(document.chunks),
         embedded_chunks_count=embedded_chunks_count,
         created_at=document.created_at,
