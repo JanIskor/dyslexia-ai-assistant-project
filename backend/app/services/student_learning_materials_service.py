@@ -11,6 +11,13 @@ from app.schemas.student_learning_materials import (
 )
 
 
+def _build_student_preview_text(text: str, *, limit: int = 180) -> str:
+    normalized_text = " ".join(text.split())
+    if len(normalized_text) <= limit:
+        return normalized_text
+    return f"{normalized_text[: limit - 1].rstrip()}…"
+
+
 def list_student_learning_materials(
     db: Session,
     *,
@@ -32,6 +39,8 @@ def list_student_learning_materials(
             StudentLearningMaterialListItem(
                 id=material.id,
                 title=material.title,
+                preview_text=_build_student_preview_text(material.adapted_text or material.original_text),
+                is_adapted=material.adapted_text is not None,
                 created_at=assignment.created_at,
             )
             for assignment, material in assignments
@@ -68,5 +77,6 @@ def get_student_learning_material(
         id=material.id,
         title=material.title,
         original_text=student_visible_text,
+        is_adapted=material.adapted_text is not None,
         created_at=assigned_material.created_at,
     )
