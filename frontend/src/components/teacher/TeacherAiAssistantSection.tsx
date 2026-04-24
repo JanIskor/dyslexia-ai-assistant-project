@@ -333,6 +333,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     kind: 'manual',
     label: 'Ручной текст',
   });
+  const [sourcePreviewCollapsed, setSourcePreviewCollapsed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
@@ -665,6 +666,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
 
   const handleResetSource = () => {
     setCurrentSource({ kind: 'manual', label: 'Ручной текст' });
+    setSourcePreviewCollapsed(false);
   };
 
   const handleOpenMaterialSource = async () => {
@@ -692,6 +694,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       label: `Материал: ${material.title}`,
       materialId: material.id,
     });
+    setSourcePreviewCollapsed(true);
     setIsMaterialSourceModalOpen(false);
     setMaterialSourceError(null);
     setErrorMessage(null);
@@ -749,6 +752,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         label: `Файл: ${response.filename}`,
         filename: response.filename,
       });
+      setSourcePreviewCollapsed(true);
       setOpenComposerMenu(null);
     } catch (error) {
       if (activeFileParseRequestIdRef.current !== requestId) {
@@ -770,6 +774,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     'Упростить текст';
   const currentSourceText = draftMessage.trim();
   const currentSourceKey = buildAssistantSourceKey(currentSource);
+  const isCollapsibleSourcePreview = currentSource.kind !== 'manual';
+  const isSourcePreviewCollapsed = isCollapsibleSourcePreview && sourcePreviewCollapsed;
   const isDuplicateSubmissionInSession =
     lastSubmittedSnapshot?.sourceKey === currentSourceKey &&
     lastSubmittedSnapshot.sourceText === currentSourceText &&
@@ -939,33 +945,75 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                 {currentSource.label}
               </span>
 
-              {currentSource.kind !== 'manual' ? (
-                <button
-                  type="button"
-                  onClick={handleResetSource}
-                  data-testid="teacher-ai-assistant-source-reset"
-                  className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 shadow-sm transition hover:bg-orange-50 sm:text-sm"
-                >
-                  Переключить на ручной текст
-                </button>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {isCollapsibleSourcePreview ? (
+                  <button
+                    type="button"
+                    onClick={() => setSourcePreviewCollapsed((currentValue) => !currentValue)}
+                    data-testid="teacher-ai-assistant-source-preview-toggle"
+                    className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 shadow-sm transition hover:bg-orange-50 sm:text-sm"
+                  >
+                    {isSourcePreviewCollapsed ? 'Развернуть' : 'Свернуть'}
+                  </button>
+                ) : null}
+
+                {currentSource.kind !== 'manual' ? (
+                  <button
+                    type="button"
+                    onClick={handleResetSource}
+                    data-testid="teacher-ai-assistant-source-reset"
+                    className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 shadow-sm transition hover:bg-orange-50 sm:text-sm"
+                  >
+                    Ручной текст
+                  </button>
+                ) : null}
+              </div>
             </div>
 
-            <textarea
-              ref={textareaRef}
-              data-testid="teacher-ai-assistant-input"
-              value={draftMessage}
-              onChange={(event) => setDraftMessage(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  void handleSubmit();
-                }
-              }}
-              placeholder="Вставьте учебный текст для адаптации..."
-              rows={1}
-              className="max-h-[224px] min-h-[52px] w-full resize-none border-0 bg-transparent px-2 py-3 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base"
-            />
+            {isSourcePreviewCollapsed ? (
+              <div
+                data-testid="teacher-ai-assistant-source-preview-collapsed"
+                className="mb-1 flex items-center justify-between gap-3 rounded-[22px] border border-orange-100/80 bg-white/90 px-4 py-3 shadow-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-stone-600 sm:text-base">
+                    {currentSource.label}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSourcePreviewCollapsed(false)}
+                  className="shrink-0 text-xs font-semibold text-orange-500 transition hover:text-orange-600 sm:text-sm"
+                >
+                  Развернуть
+                </button>
+              </div>
+            ) : (
+              <div
+                data-testid="teacher-ai-assistant-source-preview-expanded"
+                className={isCollapsibleSourcePreview ? 'rounded-[22px] border border-orange-100/80 bg-white/80 px-2 py-2' : ''}
+              >
+                <textarea
+                  ref={textareaRef}
+                  data-testid="teacher-ai-assistant-input"
+                  value={draftMessage}
+                  onChange={(event) => setDraftMessage(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleSubmit();
+                    }
+                  }}
+                  placeholder="Вставьте учебный текст для адаптации..."
+                  rows={1}
+                  className={`w-full resize-none border-0 bg-transparent px-2 py-3 text-sm leading-6 text-stone-700 outline-none placeholder:text-stone-400 sm:text-base ${
+                    isCollapsibleSourcePreview
+                      ? 'max-h-[196px] min-h-[84px] overflow-y-auto'
+                      : 'max-h-[224px] min-h-[52px]'
+                  }`}
+                />
+              </div>
+            )}
 
             <div className="mt-3 flex items-end justify-between gap-3">
               <div

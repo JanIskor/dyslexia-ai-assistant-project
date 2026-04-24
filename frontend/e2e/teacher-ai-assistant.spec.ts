@@ -86,13 +86,30 @@ test('teacher ai assistant can use existing material as input source', async ({ 
   await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
     'Материал: Assistant Source Material Real',
   );
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-collapsed')).toContainText(
+    'Материал: Assistant Source Material Real',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-expanded')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveCount(0);
+
+  await page.getByTestId('teacher-ai-assistant-source-preview-toggle').click();
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-expanded')).toBeVisible();
   await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
     'Текст реального материала для assistant input source. Его нужно подставить в поле ввода.',
   );
+  await page.getByTestId('teacher-ai-assistant-source-preview-toggle').click();
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-expanded')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveCount(0);
 
   await page.getByTestId('teacher-ai-assistant-submit').click();
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
     'Source received: Текст реального материала для assistant input source. Его нужно подставить в поле ввода.',
+  );
+
+  await page.getByTestId('teacher-ai-assistant-source-reset').click();
+  await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText('Ручной текст');
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
+    'Текст реального материала для assistant input source. Его нужно подставить в поле ввода.',
   );
 
   console.log(
@@ -100,6 +117,8 @@ test('teacher ai assistant can use existing material as input source', async ({ 
       scenario: 'material-source',
       adaptedSourceCountInPicker: await page.getByText('Source-aware material 20260421-1').count(),
       sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+      sourcePreviewCollapsedVisible:
+        (await page.getByTestId('teacher-ai-assistant-source-preview-collapsed').count()) > 0,
       assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
     }),
   );
@@ -137,13 +156,23 @@ test('teacher ai assistant can use uploaded file as input source', async ({ page
   await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
     'Файл: assistant-input.md',
   );
-  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
-    '# Assistant input markdown\n\nУчебный текст из markdown файла.',
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-collapsed')).toContainText(
+    'Файл: assistant-input.md',
   );
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-expanded')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveCount(0);
+
+  await page.getByTestId('teacher-ai-assistant-source-preview-toggle').click();
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
+    '# Текст для адаптации\n\nКлетки растений получают энергию от света и используют её для важных процессов.',
+  );
+  await page.getByTestId('teacher-ai-assistant-source-preview-toggle').click();
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-expanded')).toHaveCount(0);
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveCount(0);
 
   await page.getByTestId('teacher-ai-assistant-submit').click();
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
-    'Source received: # Assistant input markdown\n\nУчебный текст из markdown файла.',
+    'Source received: # Текст для адаптации\n\nКлетки растений получают энергию от света и используют её для важных процессов.',
   );
   await expect(page.getByTestId('teacher-ai-assistant-knowledge-usage').first()).toContainText(
     'Ответ основан на материалах (1)',
@@ -153,6 +182,8 @@ test('teacher ai assistant can use uploaded file as input source', async ({ page
     JSON.stringify({
       scenario: 'file-source',
       sourceBadge: await page.getByTestId('teacher-ai-assistant-source-badge').textContent(),
+      sourcePreviewCollapsedVisible:
+        (await page.getByTestId('teacher-ai-assistant-source-preview-collapsed').count()) > 0,
       assistantReply: await page.getByTestId('teacher-ai-assistant-message-assistant').first().textContent(),
     }),
   );
@@ -191,6 +222,12 @@ test('teacher ai assistant shows file processing state and blocks send while par
   await expect(page.getByTestId('teacher-ai-assistant-source-badge')).toContainText(
     'Файл: delayed-source.md',
   );
+  await expect(page.getByTestId('teacher-ai-assistant-source-preview-collapsed')).toContainText(
+    'Файл: delayed-source.md',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveCount(0);
+
+  await page.getByTestId('teacher-ai-assistant-source-preview-toggle').click();
   await expect(page.getByTestId('teacher-ai-assistant-input')).toHaveValue(
     'Подготовленный текст после обработки файла.',
   );
