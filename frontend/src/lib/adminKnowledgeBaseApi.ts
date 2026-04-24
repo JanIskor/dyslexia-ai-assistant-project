@@ -1,6 +1,7 @@
 'use client';
 
 import { buildApiUrl } from '@/lib/apiBaseUrl';
+import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
 
 export interface KnowledgeDocument {
   id: string;
@@ -12,6 +13,8 @@ export interface KnowledgeDocument {
   uploaded_by_user_id: string;
   status: string;
   extracted_text: string | null;
+  use_in_rag: boolean;
+  adaptation_modes: TeacherAiAssistantMode[];
   chunks_count: number;
   embedded_chunks_count: number;
   created_at: string;
@@ -20,6 +23,12 @@ export interface KnowledgeDocument {
 
 interface KnowledgeDocumentsListResponse {
   items: KnowledgeDocument[];
+}
+
+interface KnowledgeDocumentDeleteResponse {
+  id: string;
+  deleted: boolean;
+  storage_cleanup_warning?: string | null;
 }
 
 interface ApiErrorBody {
@@ -67,6 +76,10 @@ function getErrorMessage(status: number, body: ApiErrorBody | null, fallbackMess
 
   if (detail === 'Knowledge document not found') {
     return 'Документ базы правил не найден.';
+  }
+
+  if (detail === 'Failed to delete knowledge document from storage.') {
+    return 'Документ удалён из базы, но очистить storage не удалось.';
   }
 
   if (status >= 500) {
@@ -148,4 +161,64 @@ export async function uploadKnowledgeDocument(token: string, file: File): Promis
   }
 
   return parseJson<KnowledgeDocument>(response);
+}
+
+export async function updateKnowledgeDocumentControls(
+  token: string,
+  documentId: string,
+  payload: {
+    use_in_rag?: boolean;
+    adaptation_modes?: TeacherAiAssistantMode[];
+  },
+): Promise<KnowledgeDocument> {
+  const response = await fetch(buildApiUrl(`/api/v1/admin/knowledge-base/documents/${documentId}`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body, 'Не удалось обновить настройки документа.'));
+  }
+
+  return parseJson<KnowledgeDocument>(response);
+}
+
+export async function deleteKnowledgeDocument(
+  token: string,
+  documentId: string,
+): Promise<KnowledgeDocumentDeleteResponse> {
+  const response = await fetch(buildApiUrl(`/api/v1/admin/knowledge-base/documents/${documentId}`), {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body, 'Не удалось удалить документ базы правил.'));
+  }
+
+  return parseJson<KnowledgeDocumentDeleteResponse>(response);
 }

@@ -1,14 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { FileText, UploadCloud } from 'lucide-react';
+import { FileText, Trash2, UploadCloud } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
+  deleteKnowledgeDocument,
   getKnowledgeDocumentDetail,
   getKnowledgeDocuments,
+  updateKnowledgeDocumentControls,
   uploadKnowledgeDocument,
   type KnowledgeDocument,
 } from '@/lib/adminKnowledgeBaseApi';
+import { ADAPTATION_MODE_OPTIONS, getAdaptationModeLabel } from '@/lib/adaptationModes';
 
 type MessageTone = 'success' | 'error';
 
@@ -102,6 +105,8 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSavingControls, setIsSavingControls] = useState(false);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<MessageTone>('success');
 
@@ -199,6 +204,15 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
     fileInputRef.current?.click();
   };
 
+  const replaceDocumentInState = (updatedDocument: KnowledgeDocument) => {
+    setDocuments((currentDocuments) =>
+      currentDocuments.map((document) =>
+        document.id === updatedDocument.id ? updatedDocument : document,
+      ),
+    );
+    setSelectedDocument(updatedDocument);
+  };
+
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -226,6 +240,68 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
       );
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleUpdateControls = async (payload: {
+    use_in_rag?: boolean;
+    adaptation_modes?: KnowledgeDocument['adaptation_modes'];
+  }) => {
+    if (!selectedDocument) {
+      return;
+    }
+
+    setIsSavingControls(true);
+    setMessage(null);
+
+    try {
+      const updatedDocument = await updateKnowledgeDocumentControls(token, selectedDocument.id, payload);
+      replaceDocumentInState(updatedDocument);
+      setMessageTone('success');
+      setMessage(`Настройки документа «${updatedDocument.title}» обновлены.`);
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Не удалось обновить настройки документа базы правил.',
+      );
+    } finally {
+      setIsSavingControls(false);
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!selectedDocument) {
+      return;
+    }
+
+    const documentToDelete = selectedDocument;
+    setIsDeletingDocument(true);
+    setMessage(null);
+
+    try {
+      const result = await deleteKnowledgeDocument(token, documentToDelete.id);
+      setDocuments((currentDocuments) =>
+        currentDocuments.filter((document) => document.id !== documentToDelete.id),
+      );
+      setSelectedDocument(null);
+      setSelectedDocumentId((currentSelectedId) =>
+        currentSelectedId === documentToDelete.id ? null : currentSelectedId,
+      );
+      setMessageTone('success');
+      setMessage(
+        result.storage_cleanup_warning
+          ? `${result.storage_cleanup_warning}`
+          : `Документ «${documentToDelete.title}» удалён.`,
+      );
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(
+        error instanceof Error ? error.message : 'Не удалось удалить документ базы правил.',
+      );
+    } finally {
+      setIsDeletingDocument(false);
     }
   };
 
@@ -315,6 +391,23 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
                   </dd>
                 </div>
               </dl>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                    document.use_in_rag
+                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border border-stone-200 bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  {document.use_in_rag ? 'Используется в RAG' : 'Не используется в RAG'}
+                </span>
+                <span className="inline-flex rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-xs font-medium text-stone-600">
+                  {document.adaptation_modes.length === 0
+                    ? 'Все режимы адаптации'
+                    : document.adaptation_modes.map((mode) => getAdaptationModeLabel(mode)).join(', ')}
+                </span>
+              </div>
             </button>
           );
         })}
@@ -401,6 +494,82 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
         </dl>
 
         <div className="mt-6 rounded-[24px] border border-orange-50 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,249,246,0.96))] px-5 py-5">
+          <div className="flex flex-col gap-4 rounded-[22px] border border-orange-100/70 bg-white/80 px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-lg font-semibold text-stone-700">RAG controls</h4>
+                <p className="mt-1 text-sm leading-6 text-stone-500">
+                  Документ может быть загружен и embedded, но участвует в retrieval только если
+                  включён для глобального RAG.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-3 text-sm font-medium text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={selectedDocument.use_in_rag}
+                  disabled={isSavingControls || isDeletingDocument}
+                  onChange={(event) =>
+                    void handleUpdateControls({ use_in_rag: event.target.checked })
+                  }
+                  data-testid="admin-knowledge-base-use-in-rag-toggle"
+                  className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-400"
+                />
+                Использовать в RAG
+              </label>
+            </div>
+
+            <div>
+              <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-stone-400">
+                Режимы адаптации
+              </h5>
+              <p className="mt-2 text-sm leading-6 text-stone-500">
+                Если ничего не выбрано, документ считается общим методическим правилом и доступен
+                для всех режимов.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {ADAPTATION_MODE_OPTIONS.map((option) => {
+                  const isChecked = selectedDocument.adaptation_modes.includes(option.value);
+
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-3 rounded-[18px] border border-orange-100 bg-orange-50/35 px-4 py-3 text-sm font-medium text-stone-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isSavingControls || isDeletingDocument}
+                        onChange={(event) => {
+                          const nextModes = event.target.checked
+                            ? [...selectedDocument.adaptation_modes, option.value]
+                            : selectedDocument.adaptation_modes.filter((mode) => mode !== option.value);
+
+                          void handleUpdateControls({ adaptation_modes: nextModes });
+                        }}
+                        data-testid={`admin-knowledge-base-mode-${option.value}`}
+                        className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-400"
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleDeleteDocument()}
+                disabled={isDeletingDocument || isSavingControls}
+                data-testid="admin-knowledge-base-delete-button"
+                className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isDeletingDocument ? 'Удаление...' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2 text-stone-700">
             <FileText className="h-5 w-5 text-orange-400" />
             <h4 className="text-lg font-semibold">Extracted text preview</h4>

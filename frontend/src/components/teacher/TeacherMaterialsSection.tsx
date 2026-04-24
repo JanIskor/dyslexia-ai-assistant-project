@@ -12,6 +12,7 @@ import {
   type TeacherLearningMaterial,
 } from '@/lib/teacherMaterialsApi';
 import { TeacherMaterialAssignmentModal } from '@/components/teacher/TeacherMaterialAssignmentModal';
+import { getAdaptationModeLabel } from '@/lib/adaptationModes';
 import { getTeacherStudents, type TeacherStudentListItem } from '@/lib/teacherStudentsApi';
 
 type TeacherMaterialsViewState =
@@ -35,12 +36,6 @@ const MATERIAL_DATE_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
   year: 'numeric',
 });
 
-const ADAPTATION_MODE_LABELS: Record<string, string> = {
-  basic_simplify: 'Упростить текст',
-  structured_explanation: 'Сделать пошаговым',
-  key_points_focus: 'Выделить главное',
-};
-
 function formatMaterialDate(value: string): string {
   const parsedDate = new Date(value);
 
@@ -59,14 +54,6 @@ function buildMaterialPreview(text: string): string {
   }
 
   return `${normalizedText.slice(0, 140).trimEnd()}...`;
-}
-
-function getAdaptationModeLabel(mode: string | null | undefined): string {
-  if (!mode) {
-    return 'Версия без режима';
-  }
-
-  return ADAPTATION_MODE_LABELS[mode] ?? mode;
 }
 
 function getMaterialsEmptyStateMessage(tab: TeacherMaterialsTab): string {

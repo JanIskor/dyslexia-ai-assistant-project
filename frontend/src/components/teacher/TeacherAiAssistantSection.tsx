@@ -11,6 +11,7 @@ import {
   type TeacherAiAssistantMode,
   type TeacherAiAssistantMessageResponse,
 } from '@/lib/teacherAiAssistantApi';
+import { ADAPTATION_MODE_OPTIONS } from '@/lib/adaptationModes';
 import { getTeacherMaterials, type TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
@@ -48,15 +49,6 @@ interface TeacherAiAssistantSectionProps {
 const EMPTY_STATE_TEXT = 'Введите текст, который нужно адаптировать';
 const MAX_COMPOSER_HEIGHT_PX = 224;
 const ACCEPTED_ASSISTANT_FILE_EXTENSIONS = ['pdf', 'docx', 'txt', 'md'] as const;
-
-const ADAPTATION_MODES: ReadonlyArray<{
-  value: TeacherAiAssistantMode;
-  label: string;
-}> = [
-  { value: 'basic_simplify', label: 'Упростить текст' },
-  { value: 'structured_explanation', label: 'Сделать пошаговым' },
-  { value: 'key_points_focus', label: 'Выделить главное' },
-];
 
 type ComposerActionMenu = 'actions' | 'mode' | null;
 
@@ -774,7 +766,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   };
 
   const selectedModeLabel =
-    ADAPTATION_MODES.find((modeOption) => modeOption.value === selectedMode)?.label ??
+    ADAPTATION_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.label ??
     'Упростить текст';
   const currentSourceText = draftMessage.trim();
   const currentSourceKey = buildAssistantSourceKey(currentSource);
@@ -1043,7 +1035,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                       data-testid="teacher-ai-assistant-mode-menu"
                       className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-60 rounded-[24px] border border-orange-100/90 bg-white p-2 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
                     >
-                      {ADAPTATION_MODES.map((mode) => {
+                      {ADAPTATION_MODE_OPTIONS.map((mode) => {
                         const isSelected = mode.value === selectedMode;
 
                         return (

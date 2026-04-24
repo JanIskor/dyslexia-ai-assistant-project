@@ -25,7 +25,9 @@ test('admin manages knowledge base documents from dedicated admin tab', async ({
   await expect(sidebarTab).toContainText('Правила адаптации');
   await sidebarTab.click();
 
-  await expect(page.getByTestId('admin-knowledge-base-empty-state')).toBeVisible();
+  const matchingDocumentCards = page
+    .getByTestId('admin-knowledge-base-document-card')
+    .filter({ hasText: 'knowledge-base-methodology' });
 
   await page.getByTestId('admin-knowledge-base-file-input').setInputFiles(supportedFixturePath);
 
@@ -33,13 +35,13 @@ test('admin manages knowledge base documents from dedicated admin tab', async ({
     'загружен в базу правил',
     { timeout: 30000 },
   );
-  await expect(page.getByTestId('admin-knowledge-base-empty-state')).toHaveCount(0);
-  await expect(page.getByTestId('admin-knowledge-base-document-card')).toHaveCount(1);
-  await expect(page.getByTestId('admin-knowledge-base-document-card').first()).toContainText(
+  await expect(matchingDocumentCards.last()).toContainText(
     'knowledge-base-methodology',
   );
+  const countAfterUpload = await matchingDocumentCards.count();
+  expect(countAfterUpload).toBeGreaterThan(0);
 
-  await page.getByTestId('admin-knowledge-base-document-card').first().click();
+  await matchingDocumentCards.last().click();
 
   await expect(page.getByTestId('admin-knowledge-base-detail')).toBeVisible();
   await expect(page.getByTestId('admin-knowledge-base-detail')).toContainText(
@@ -50,9 +52,25 @@ test('admin manages knowledge base documents from dedicated admin tab', async ({
   );
   await expect(page.getByTestId('admin-knowledge-base-status')).toContainText(/Готов для RAG|Разбит на чанки|Текст извлечён|Загружен/);
 
+  const useInRagToggle = page.getByTestId('admin-knowledge-base-use-in-rag-toggle');
+  await useInRagToggle.click();
+  await expect(page.getByTestId('admin-knowledge-base-success')).toContainText(
+    'Настройки документа',
+  );
+
+  const structuredModeCheckbox = page.getByTestId('admin-knowledge-base-mode-structured_explanation');
+  await structuredModeCheckbox.click();
+  await expect(page.getByTestId('admin-knowledge-base-success')).toContainText(
+    'Настройки документа',
+  );
+
   await page.getByTestId('admin-knowledge-base-file-input').setInputFiles(unsupportedFixturePath);
 
   await expect(page.getByTestId('admin-knowledge-base-error')).toContainText(
     'Неподдерживаемый формат файла',
   );
+
+  await page.getByTestId('admin-knowledge-base-delete-button').click();
+  await expect(page.getByTestId('admin-knowledge-base-success')).toContainText('удал');
+  await expect(matchingDocumentCards).toHaveCount(countAfterUpload - 1);
 });
