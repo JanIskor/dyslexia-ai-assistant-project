@@ -5,6 +5,7 @@ from app.models.notification import Notification
 from app.models.student_learning_material import StudentLearningMaterial
 from app.models.student_profile import StudentProfile
 from app.models.student_profile_update_request import StudentProfileUpdateRequest
+from app.models.student_teacher_removal_request import StudentTeacherRemovalRequest
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_profile_update_request import TeacherProfileUpdateRequest
 from app.models.teacher_student_message import TeacherStudentMessage
@@ -21,6 +22,7 @@ __all__ = [
     "Notification",
     "StudentProfile",
     "StudentProfileUpdateRequest",
+    "StudentTeacherRemovalRequest",
     "TeacherProfile",
     "TeacherProfileUpdateRequest",
     "TeacherStudentMessage",

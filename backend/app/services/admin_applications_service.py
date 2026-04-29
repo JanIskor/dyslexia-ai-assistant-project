@@ -68,7 +68,7 @@ VISIBLE_UPDATE_REQUEST_STATUSES = (
 )
 VISIBLE_TEACHER_UPDATE_REQUEST_STATUSES = VISIBLE_UPDATE_REQUEST_STATUSES
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
-ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "teacher_rejected"}
+ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "approved", "teacher_rejected"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
 TEACHER_REVIEW_STATUS_LABELS = {
     "pending": "Ожидает решения преподавателя",

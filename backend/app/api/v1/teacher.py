@@ -34,6 +34,10 @@ from app.schemas.teacher_incoming_students import (
 )
 from app.schemas.teacher_profile_edit import TeacherProfileEditRequest, TeacherProfileEditResponse
 from app.schemas.teacher_profile import TeacherProfileResponse
+from app.schemas.student_teacher_removal_requests import (
+    StudentTeacherRemovalRequestItem,
+    TeacherStudentRemovalRequestCreateRequest,
+)
 from app.schemas.teacher_student_messages import TeacherStudentMessageCreateRequest, TeacherStudentMessageItem
 from app.schemas.teacher_students import TeacherStudentDetail, TeacherStudentsListResponse
 from app.services.teacher_profile_service import get_teacher_profile
@@ -64,6 +68,7 @@ from app.services.teacher_ai_assistant_service import (
     save_teacher_ai_assistant_material,
 )
 from app.services.llm_service import LlmProviderConfigurationError, LlmProviderRequestError
+from app.services.student_teacher_removal_requests_service import create_teacher_student_removal_request
 from app.services.teacher_student_messages_service import create_teacher_student_message
 from app.services.teacher_students_service import get_teacher_student, list_teacher_students
 
@@ -324,6 +329,21 @@ def read_teacher_student(
     if student is None:
         raise HTTPException(status_code=404, detail="Student not found")
     return student
+
+
+@router.post("/students/{student_id}/removal-requests", response_model=StudentTeacherRemovalRequestItem)
+def create_teacher_student_removal_request_endpoint(
+    student_id: UUID,
+    payload: TeacherStudentRemovalRequestCreateRequest,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return create_teacher_student_removal_request(
+        db,
+        teacher_user_id=current_teacher.id,
+        payload=payload,
+        student_user_id=student_id,
+    )
 
 
 @router.post("/students/{student_id}/messages", response_model=TeacherStudentMessageItem)

@@ -31,6 +31,11 @@ from app.schemas.knowledge_documents import (
     KnowledgeDocumentResponse,
     KnowledgeDocumentsListResponse,
 )
+from app.schemas.student_teacher_removal_requests import (
+    AdminStudentRemovalRequestUpdateRequest,
+    StudentTeacherRemovalRequestItem,
+    StudentTeacherRemovalRequestsListResponse,
+)
 from app.services.admin_applications_service import (
     approve_admin_application,
     assign_teacher_to_application,
@@ -57,6 +62,10 @@ from app.services.knowledge_base_service import (
     upload_knowledge_document,
 )
 from app.services.retrieval_service import retrieve_relevant_chunks
+from app.services.student_teacher_removal_requests_service import (
+    list_admin_student_removal_requests,
+    resolve_admin_student_removal_request,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -64,6 +73,30 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/access-check", response_model=UserResponse)
 def read_admin_access_check(current_admin: User = Depends(get_current_admin)):
     return UserResponse.model_validate(current_admin)
+
+
+@router.get("/student-removal-requests", response_model=StudentTeacherRemovalRequestsListResponse)
+def read_admin_student_removal_requests(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return list_admin_student_removal_requests(db)
+
+
+@router.patch("/student-removal-requests/{request_id}", response_model=StudentTeacherRemovalRequestItem)
+def patch_admin_student_removal_request(
+    request_id: UUID,
+    payload: AdminStudentRemovalRequestUpdateRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return resolve_admin_student_removal_request(
+        db,
+        admin_user_id=current_admin.id,
+        request_id=request_id,
+        payload=payload,
+    )
 
 
 @router.post("/knowledge-base/documents", response_model=KnowledgeDocumentResponse)
