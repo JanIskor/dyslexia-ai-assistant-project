@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ChevronDown, FilePlus2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, FilePlus2, Trash2 } from 'lucide-react';
 import {
   assignTeacherMaterial,
   createTeacherMaterial,
+  deleteTeacherMaterial,
   getTeacherMaterialDetail,
   getTeacherMaterials,
   type TeacherAdaptationVersionSummary,
@@ -68,6 +69,71 @@ function TeacherMaterialsState({ message }: { message: string }) {
   return (
     <div className="flex min-h-[18rem] items-center justify-center rounded-[28px] border border-orange-100/80 bg-white/90 px-6 py-10 text-center text-base text-stone-500 shadow-[0_18px_40px_rgba(221,156,130,0.10)] sm:text-lg">
       {message}
+    </div>
+  );
+}
+
+function DeleteMaterialModal({
+  isOpen,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-stone-950/25 px-4 py-6 backdrop-blur-[2px]"
+      data-testid="teacher-material-delete-modal"
+    >
+      <div className="w-full max-w-xl rounded-[30px] border border-orange-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,247,242,0.96))] px-5 py-6 shadow-[0_20px_60px_rgba(150,92,46,0.18)] sm:px-7 sm:py-7">
+        <h3 className="text-2xl font-medium text-stone-700 sm:text-3xl">Удалить материал?</h3>
+        <p className="mt-3 text-sm leading-6 text-stone-500 sm:text-base">
+          Материал исчезнет из вашего списка. Если он уже был назначен ученику, назначенная версия
+          останется доступной ученику.
+        </p>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className="rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            data-testid="teacher-material-delete-confirm"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            {isDeleting ? 'Удаление...' : 'Удалить'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -163,6 +229,8 @@ function TeacherMaterialsList({
   onChangeTab,
   onOpenMaterial,
   onOpenCreate,
+  statusMessage,
+  statusType,
 }: {
   materials: TeacherLearningMaterial[];
   isLoading: boolean;
@@ -171,6 +239,8 @@ function TeacherMaterialsList({
   onChangeTab: (tab: TeacherMaterialsTab) => void;
   onOpenMaterial: (materialId: string) => void;
   onOpenCreate: () => void;
+  statusMessage: string | null;
+  statusType: 'error' | 'success';
 }) {
   let content: React.ReactNode;
 
@@ -235,6 +305,17 @@ function TeacherMaterialsList({
       </div>
 
       <div className="mt-6">{content}</div>
+      {statusMessage ? (
+        <p
+          className={`mt-5 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
+            statusType === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -351,6 +432,7 @@ function TeacherAdaptedMaterialDetail({
   onBack,
   onCompare,
   onOpenAssign,
+  onOpenDelete,
   assignmentStatusMessage,
   assignmentStatusType,
 }: {
@@ -360,6 +442,7 @@ function TeacherAdaptedMaterialDetail({
   onBack: () => void;
   onCompare: () => void;
   onOpenAssign: () => void;
+  onOpenDelete: () => void;
   assignmentStatusMessage: string | null;
   assignmentStatusType: 'error' | 'success';
 }) {
@@ -399,13 +482,24 @@ function TeacherAdaptedMaterialDetail({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenAssign}
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95"
-          >
-            Назначить ученику
-          </button>
+          <div className="flex flex-col gap-3 sm:items-end">
+            <button
+              type="button"
+              onClick={onOpenAssign}
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95"
+            >
+              Назначить ученику
+            </button>
+            <button
+              type="button"
+              onClick={onOpenDelete}
+              data-testid="teacher-material-delete-trigger"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+            >
+              <Trash2 className="h-4 w-4" />
+              Удалить
+            </button>
+          </div>
         </div>
 
         {assignmentStatusMessage ? (
@@ -581,9 +675,11 @@ function TeacherAdaptedMaterialCompare({
 function TeacherMaterialDetail({
   material,
   onBack,
+  onOpenDelete,
 }: {
   material: TeacherLearningMaterial;
   onBack: () => void;
+  onOpenDelete: () => void;
 }) {
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-4 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-6 sm:py-8 lg:px-8 lg:py-10">
@@ -597,11 +693,22 @@ function TeacherMaterialDetail({
       </button>
 
       <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col">
-        <div>
-          <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">{material.title}</h2>
-          <p className="mt-3 text-sm text-stone-400 sm:text-base">
-            Создано: {formatMaterialDate(material.created_at)}
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-medium leading-tight text-stone-700 sm:text-3xl">{material.title}</h2>
+            <p className="mt-3 text-sm text-stone-400 sm:text-base">
+              Создано: {formatMaterialDate(material.created_at)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenDelete}
+            data-testid="teacher-material-delete-trigger"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+          >
+            <Trash2 className="h-4 w-4" />
+            Удалить
+          </button>
         </div>
 
         <div className="mt-6 rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 sm:px-5 sm:py-6">
@@ -635,6 +742,8 @@ export function TeacherMaterialsSection({
   const [isCreatingMaterial, setIsCreatingMaterial] = useState(false);
   const [createStatusMessage, setCreateStatusMessage] = useState<string | null>(null);
   const [createStatusType, setCreateStatusType] = useState<'error' | 'success'>('success');
+  const [materialsStatusMessage, setMaterialsStatusMessage] = useState<string | null>(null);
+  const [materialsStatusType, setMaterialsStatusType] = useState<'error' | 'success'>('success');
   const [teacherStudents, setTeacherStudents] = useState<TeacherStudentListItem[]>([]);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [selectedStudentUserId, setSelectedStudentUserId] = useState<string | null>(null);
@@ -643,6 +752,8 @@ export function TeacherMaterialsSection({
   const [isAssigningMaterial, setIsAssigningMaterial] = useState(false);
   const [assignmentStatusMessage, setAssignmentStatusMessage] = useState<string | null>(null);
   const [assignmentStatusType, setAssignmentStatusType] = useState<'error' | 'success'>('success');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -736,6 +847,7 @@ export function TeacherMaterialsSection({
     setViewState({ mode: 'list' });
     setMaterialDetailError(null);
     setAssignmentStatusMessage(null);
+    setMaterialsStatusMessage(null);
     setSelectedMaterial(null);
     setSelectedAdaptationVersionId(null);
     setCompareOriginalText(null);
@@ -776,6 +888,18 @@ export function TeacherMaterialsSection({
     setCreateStatusMessage(null);
     setMaterialDetailError(null);
     setAssignmentStatusMessage(null);
+  };
+
+  const handleOpenDeleteModal = () => {
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeletingMaterial) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
   };
 
   const handleOpenAssignModal = async () => {
@@ -892,6 +1016,37 @@ export function TeacherMaterialsSection({
     }
   };
 
+  const handleDeleteMaterial = async () => {
+    if (!selectedMaterial) {
+      return;
+    }
+
+    setIsDeletingMaterial(true);
+
+    try {
+      await deleteTeacherMaterial(accessToken, selectedMaterial.id);
+      setMaterials((currentValue) =>
+        currentValue.filter((material) => material.id !== selectedMaterial.id),
+      );
+      setMaterialsStatusType('success');
+      setMaterialsStatusMessage('Материал удалён.');
+      setIsDeleteModalOpen(false);
+      setSelectedMaterial(null);
+      setSelectedAdaptationVersionId(null);
+      setCompareOriginalText(null);
+      setAssignmentStatusMessage(null);
+      setViewState({ mode: 'list' });
+    } catch (error) {
+      setMaterialsStatusType('error');
+      setMaterialsStatusMessage(
+        error instanceof Error ? error.message : 'Не удалось удалить материал',
+      );
+      setIsDeleteModalOpen(false);
+    } finally {
+      setIsDeletingMaterial(false);
+    }
+  };
+
   if (viewState.mode === 'create') {
     return (
       <TeacherMaterialCreateForm
@@ -946,6 +1101,7 @@ export function TeacherMaterialsSection({
               onBack={handleBackToList}
               onCompare={handleOpenCompareMode}
               onOpenAssign={() => void handleOpenAssignModal()}
+              onOpenDelete={handleOpenDeleteModal}
               assignmentStatusMessage={assignmentStatusMessage}
               assignmentStatusType={assignmentStatusType}
             />
@@ -961,12 +1117,30 @@ export function TeacherMaterialsSection({
             isSubmitting={isAssigningMaterial}
             errorMessage={teacherStudentsError}
           />
+          <DeleteMaterialModal
+            isOpen={isDeleteModalOpen}
+            isDeleting={isDeletingMaterial}
+            onClose={handleCloseDeleteModal}
+            onConfirm={() => void handleDeleteMaterial()}
+          />
         </>
       );
     }
 
     return (
-      <TeacherMaterialDetail material={selectedMaterial} onBack={handleBackToList} />
+      <>
+        <TeacherMaterialDetail
+          material={selectedMaterial}
+          onBack={handleBackToList}
+          onOpenDelete={handleOpenDeleteModal}
+        />
+        <DeleteMaterialModal
+          isOpen={isDeleteModalOpen}
+          isDeleting={isDeletingMaterial}
+          onClose={handleCloseDeleteModal}
+          onConfirm={() => void handleDeleteMaterial()}
+        />
+      </>
     );
   }
 
@@ -979,6 +1153,8 @@ export function TeacherMaterialsSection({
       onChangeTab={handleChangeTab}
       onOpenMaterial={(materialId) => setViewState({ mode: 'detail', materialId })}
       onOpenCreate={handleOpenCreate}
+      statusMessage={materialsStatusMessage}
+      statusType={materialsStatusType}
     />
   );
 }

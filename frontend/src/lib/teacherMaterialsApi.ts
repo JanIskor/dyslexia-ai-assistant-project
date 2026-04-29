@@ -68,6 +68,10 @@ export interface TeacherLearningMaterialAssignment {
   created_at: string;
 }
 
+export interface TeacherDeleteLearningMaterialResponse {
+  detail: string;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -181,5 +185,18 @@ export const assignTeacherMaterial = async (
     {
       method: 'POST',
       body: JSON.stringify(payload),
+    },
+  );
+
+export const deleteTeacherMaterial = async (
+  token: string,
+  materialId: string,
+): Promise<TeacherDeleteLearningMaterialResponse> =>
+  request<TeacherDeleteLearningMaterialResponse>(
+    `/api/v1/teacher/materials/${materialId}`,
+    token,
+    'Не удалось удалить материал',
+    {
+      method: 'DELETE',
     },
   );
