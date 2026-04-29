@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Uuid, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -29,6 +29,10 @@ class StudentLearningMaterial(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    assigned_title = Column(String, nullable=True)
+    assigned_text = Column(Text, nullable=True)
+    assigned_adaptation_mode = Column(String, nullable=True)
+    assigned_is_adapted = Column(Boolean, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     student_user = relationship("User", foreign_keys=[student_user_id])

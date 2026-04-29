@@ -471,6 +471,10 @@ def assign_learning_material_to_student(
         student_user_id=payload.student_user_id,
         learning_material_id=material_id,
         assigned_by_teacher_user_id=teacher_user_id,
+        assigned_title=material.title,
+        assigned_text=material.adapted_text or material.original_text,
+        assigned_adaptation_mode=material.adaptation_mode,
+        assigned_is_adapted=material.adapted_text is not None,
     )
     db.add(assignment)
     db.flush()

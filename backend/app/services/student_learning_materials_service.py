@@ -38,9 +38,15 @@ def list_student_learning_materials(
         items=[
             StudentLearningMaterialListItem(
                 id=material.id,
-                title=material.title,
-                preview_text=_build_student_preview_text(material.adapted_text or material.original_text),
-                is_adapted=material.adapted_text is not None,
+                title=assignment.assigned_title or material.title,
+                preview_text=_build_student_preview_text(
+                    assignment.assigned_text or material.adapted_text or material.original_text
+                ),
+                is_adapted=(
+                    assignment.assigned_is_adapted
+                    if assignment.assigned_is_adapted is not None
+                    else material.adapted_text is not None
+                ),
                 created_at=assignment.created_at,
             )
             for assignment, material in assignments
@@ -71,12 +77,16 @@ def get_student_learning_material(
         return None
 
     assigned_material, material = assignment
-    student_visible_text = material.adapted_text or material.original_text
+    student_visible_text = assigned_material.assigned_text or material.adapted_text or material.original_text
 
     return StudentLearningMaterialDetailResponse(
         id=material.id,
-        title=material.title,
+        title=assigned_material.assigned_title or material.title,
         original_text=student_visible_text,
-        is_adapted=material.adapted_text is not None,
+        is_adapted=(
+            assigned_material.assigned_is_adapted
+            if assigned_material.assigned_is_adapted is not None
+            else material.adapted_text is not None
+        ),
         created_at=assigned_material.created_at,
     )
