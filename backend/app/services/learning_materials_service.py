@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -16,6 +17,7 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialAssignmentResponse,
     TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
+    TeacherLearningMaterialDeleteResponse,
     TeacherLearningMaterialsListResponse,
 )
 from app.services.notifications_service import create_notification
@@ -116,6 +118,7 @@ def _get_group_sibling_materials(
         .filter(
             LearningMaterial.teacher_user_id == teacher_user_id,
             LearningMaterial.adapted_text.is_not(None),
+            LearningMaterial.deleted_at.is_(None),
         )
         .order_by(LearningMaterial.created_at.asc())
         .all()
@@ -288,7 +291,10 @@ def list_teacher_learning_materials(
     teacher_user_id: UUID,
     kind: str = "all",
 ) -> TeacherLearningMaterialsListResponse:
-    query = db.query(LearningMaterial).filter(LearningMaterial.teacher_user_id == teacher_user_id)
+    query = db.query(LearningMaterial).filter(
+        LearningMaterial.teacher_user_id == teacher_user_id,
+        LearningMaterial.deleted_at.is_(None),
+    )
 
     if kind == "draft":
         query = query.filter(LearningMaterial.adapted_text.is_(None))
@@ -325,6 +331,7 @@ def get_teacher_learning_material(
         .filter(
             LearningMaterial.id == material_id,
             LearningMaterial.teacher_user_id == teacher_user_id,
+            LearningMaterial.deleted_at.is_(None),
         )
         .first()
     )
@@ -346,6 +353,7 @@ def get_teacher_learning_material_compare_ready_detail(
         .filter(
             LearningMaterial.id == material_id,
             LearningMaterial.teacher_user_id == teacher_user_id,
+            LearningMaterial.deleted_at.is_(None),
         )
         .first()
     )
@@ -370,6 +378,7 @@ def get_teacher_learning_material_compare_ready_detail(
             .filter(
                 LearningMaterial.teacher_user_id == teacher_user_id,
                 LearningMaterial.adapted_text.is_not(None),
+                LearningMaterial.deleted_at.is_(None),
             )
             .order_by(LearningMaterial.created_at.desc())
             .all()
@@ -403,6 +412,7 @@ def get_teacher_learning_material_compare_ready_detail(
             .filter(
                 LearningMaterial.id == material.source_material_id,
                 LearningMaterial.teacher_user_id == teacher_user_id,
+                LearningMaterial.deleted_at.is_(None),
             )
             .first()
         )
@@ -436,6 +446,7 @@ def assign_learning_material_to_student(
         .filter(
             LearningMaterial.id == material_id,
             LearningMaterial.teacher_user_id == teacher_user_id,
+            LearningMaterial.deleted_at.is_(None),
         )
         .first()
     )
@@ -501,3 +512,28 @@ def assign_learning_material_to_student(
         assigned_by_teacher_user_id=assignment.assigned_by_teacher_user_id,
         created_at=assignment.created_at,
     )
+
+
+def soft_delete_learning_material(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+    material_id: UUID,
+) -> TeacherLearningMaterialDeleteResponse:
+    material = (
+        db.query(LearningMaterial)
+        .filter(
+            LearningMaterial.id == material_id,
+            LearningMaterial.teacher_user_id == teacher_user_id,
+            LearningMaterial.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if material is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learning material not found")
+
+    material.deleted_at = datetime.now(timezone.utc)
+    db.add(material)
+    db.commit()
+
+    return TeacherLearningMaterialDeleteResponse(detail="Material deleted")

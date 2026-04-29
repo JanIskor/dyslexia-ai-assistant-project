@@ -89,3 +89,7 @@ class TeacherLearningMaterialAssignmentResponse(BaseModel):
     learning_material_id: UUID
     assigned_by_teacher_user_id: UUID
     created_at: datetime
+
+
+class TeacherLearningMaterialDeleteResponse(BaseModel):
+    detail: str

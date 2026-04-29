@@ -15,6 +15,7 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialAssignmentResponse,
     TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
+    TeacherLearningMaterialDeleteResponse,
     TeacherLearningMaterialsListResponse,
 )
 from app.schemas.profile_avatar import ProfileAvatarUploadResponse
@@ -42,6 +43,7 @@ from app.services.learning_materials_service import (
     get_teacher_learning_material_compare_ready_detail,
     get_teacher_learning_material,
     list_teacher_learning_materials,
+    soft_delete_learning_material,
 )
 from app.services.teacher_profile_update_requests_service import (
     get_teacher_profile_edit_state,
@@ -218,6 +220,19 @@ def assign_teacher_material_to_student(
         teacher_user_id=current_teacher.id,
         material_id=material_id,
         payload=payload,
+    )
+
+
+@router.delete("/materials/{material_id}", response_model=TeacherLearningMaterialDeleteResponse)
+def delete_teacher_material(
+    material_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    return soft_delete_learning_material(
+        db,
+        teacher_user_id=current_teacher.id,
+        material_id=material_id,
     )
 
 
