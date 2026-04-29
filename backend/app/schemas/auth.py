@@ -32,6 +32,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class LogoutResponse(BaseModel):
+    detail: str
+
+
 class TokenData(BaseModel):
     user_id: Optional[UUID] = None
     role: Optional[str] = None

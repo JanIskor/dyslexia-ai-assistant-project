@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, get_current_user
 from app.core.security import create_access_token
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, Token, UserResponse
+from app.schemas.auth import LoginRequest, LogoutResponse, RegisterRequest, Token, UserResponse
 from app.services.auth_service import authenticate_user, create_user, get_user_by_email
 
 router = APIRouter()
@@ -27,3 +27,9 @@ def login(user: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
+
+
+@router.post("/logout", response_model=LogoutResponse)
+def logout(current_user: User = Depends(get_current_user)):
+    _ = current_user
+    return LogoutResponse(detail="Logged out")

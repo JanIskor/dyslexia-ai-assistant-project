@@ -10,6 +10,8 @@ from app.models.user import User
 from app.schemas.learning_materials import (
     AdaptedLearningMaterialDetailResponse,
     LearningMaterialResponse,
+    TeacherAdaptationVersionsResponse,
+    TeacherLearningMaterialCompareResponse,
     TeacherLearningMaterialAssignmentResponse,
     TeacherLearningMaterialAssignRequest,
     TeacherLearningMaterialCreateRequest,
@@ -157,6 +159,51 @@ def read_teacher_material_detail(
     if material is None:
         raise HTTPException(status_code=404, detail="Learning material not found")
     return material
+
+
+@router.get("/materials/{material_id}/compare", response_model=TeacherLearningMaterialCompareResponse)
+def read_teacher_material_compare(
+    material_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    material = get_teacher_learning_material_compare_ready_detail(
+        db,
+        teacher_user_id=current_teacher.id,
+        material_id=material_id,
+    )
+    if material is None:
+        raise HTTPException(status_code=404, detail="Learning material not found")
+
+    return TeacherLearningMaterialCompareResponse(
+        material_id=material.id,
+        title=material.title,
+        original_text=material.original_text,
+        current_adapted_text=material.adapted_text,
+        current_adaptation_mode=material.adaptation_mode,
+        available_adaptation_versions=material.available_adaptation_versions,
+        source_info=material.source_info,
+    )
+
+
+@router.get("/materials/{material_id}/adaptation-versions", response_model=TeacherAdaptationVersionsResponse)
+def read_teacher_material_adaptation_versions(
+    material_id: UUID,
+    current_teacher: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    material = get_teacher_learning_material_compare_ready_detail(
+        db,
+        teacher_user_id=current_teacher.id,
+        material_id=material_id,
+    )
+    if material is None:
+        raise HTTPException(status_code=404, detail="Learning material not found")
+
+    return TeacherAdaptationVersionsResponse(
+        material_id=material.id,
+        items=material.available_adaptation_versions,
+    )
 
 
 @router.post("/materials/{material_id}/assign", response_model=TeacherLearningMaterialAssignmentResponse)

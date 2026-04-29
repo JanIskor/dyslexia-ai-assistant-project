@@ -64,6 +64,21 @@ class AdaptedLearningMaterialDetailResponse(LearningMaterialResponse):
     available_adaptation_versions: list[AdaptationVersionSummary] = []
 
 
+class TeacherLearningMaterialCompareResponse(BaseModel):
+    material_id: UUID
+    title: str
+    original_text: str
+    current_adapted_text: str | None = None
+    current_adaptation_mode: AdaptationMode | None = None
+    available_adaptation_versions: list[AdaptationVersionSummary] = []
+    source_info: AdaptedMaterialSourceInfo | None = None
+
+
+class TeacherAdaptationVersionsResponse(BaseModel):
+    material_id: UUID
+    items: list[AdaptationVersionSummary]
+
+
 class TeacherLearningMaterialAssignRequest(BaseModel):
     student_user_id: UUID
 
