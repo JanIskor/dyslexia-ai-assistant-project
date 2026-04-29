@@ -6,6 +6,7 @@ import { LogOut } from 'lucide-react';
 import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplicationDetailPanel';
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { AdminKnowledgeBasePanel } from '@/components/admin/AdminKnowledgeBasePanel';
+import { AdminStudentRemovalRequestsPanel } from '@/components/admin/AdminStudentRemovalRequestsPanel';
 import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
 import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
@@ -30,10 +31,16 @@ import {
   type AdminTeacherAssignmentOption,
 } from '@/lib/adminApplicationsApi';
 
-type AdminDashboardSection = 'student-applications' | 'teachers' | 'students' | 'knowledge-base';
+type AdminDashboardSection =
+  | 'student-applications'
+  | 'student-removal-requests'
+  | 'teachers'
+  | 'students'
+  | 'knowledge-base';
 
 const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
   { id: 'student-applications', label: 'Заявки учеников' },
+  { id: 'student-removal-requests', label: 'Открепление учеников' },
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'students', label: 'Ученики' },
   { id: 'knowledge-base', label: 'Правила адаптации' },
@@ -458,6 +465,10 @@ function AdminSectionContent({
     return <AdminStudentsDirectoryPanel token={token} />;
   }
 
+  if (section === 'student-removal-requests') {
+    return <AdminStudentRemovalRequestsPanel token={token} />;
+  }
+
   if (section === 'knowledge-base') {
     return <AdminKnowledgeBasePanel token={token} />;
   }
@@ -515,6 +526,12 @@ export function AdminDashboard() {
     const timeoutId = window.setTimeout(() => {
       if (requestedTab === 'teachers') {
         setActiveSection('teachers');
+        setInitialApplicationId(null);
+        return;
+      }
+
+      if (requestedTab === 'student-removal-requests') {
+        setActiveSection('student-removal-requests');
         setInitialApplicationId(null);
         return;
       }
@@ -586,6 +603,8 @@ export function AdminDashboard() {
                           data-testid={
                             item.id === 'knowledge-base'
                               ? 'admin-sidebar-knowledge-base-tab'
+                              : item.id === 'student-removal-requests'
+                                ? 'admin-sidebar-student-removal-requests-tab'
                               : undefined
                           }
                           className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${

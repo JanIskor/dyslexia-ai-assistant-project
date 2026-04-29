@@ -20,6 +20,8 @@ export function getNotificationHref(notification: NotificationItem): string | nu
 
       return `/admin?${searchParams.toString()}`;
     }
+    case 'admin_student_removal_requests':
+      return '/admin?tab=student-removal-requests';
     case 'student_profile_edit':
       return '/student?tab=profile-edit';
     case 'student_profile':
@@ -28,6 +30,15 @@ export function getNotificationHref(notification: NotificationItem): string | nu
       return '/teacher?tab=profile-edit';
     case 'teacher_profile':
       return '/teacher?tab=profile';
+    case 'teacher_students': {
+      const searchParams = new URLSearchParams({ tab: 'students' });
+
+      if (notification.target_id) {
+        searchParams.set('studentId', notification.target_id);
+      }
+
+      return `/teacher?${searchParams.toString()}`;
+    }
     case 'student_messages': {
       const searchParams = new URLSearchParams({ tab: 'messages' });
 

@@ -18,6 +18,29 @@ export interface TeacherStudentDetail {
   avatar_url: string | null;
 }
 
+export interface TeacherStudentRemovalRequestPayload {
+  reason?: string | null;
+}
+
+export interface TeacherStudentRemovalRequestItem {
+  id: string;
+  teacher: {
+    user_id: string;
+    full_name: string;
+  };
+  student: {
+    user_id: string;
+    full_name: string;
+    grade_label: string | null;
+  };
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string | null;
+  admin_comment: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by_admin_user_id: string | null;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -51,7 +74,15 @@ const getTeacherStudentsErrorMessage = (
   }
 
   if (status === 404 && typeof body?.detail === 'string') {
+    if (body.detail === 'Teacher student not found') {
+      return 'Ученик не найден в вашем списке.';
+    }
+
     return 'Не удалось загрузить профиль ученика';
+  }
+
+  if (status === 400 && body?.detail === 'Removal request already exists') {
+    return 'Заявка на открепление уже отправлена и ожидает решения администратора.';
   }
 
   if (status >= 500) {
@@ -70,6 +101,37 @@ async function request<T>(path: string, token: string, fallbackMessage: string):
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getTeacherStudentsErrorMessage(response.status, fallbackMessage, body));
+  }
+
+  return parseJson<T>(response);
+}
+
+async function requestWithInit<T>(
+  path: string,
+  token: string,
+  fallbackMessage: string,
+  init: RequestInit,
+): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init.headers,
     },
     cache: 'no-store',
   });
@@ -135,4 +197,19 @@ export const getTeacherStudentDetail = async (
     `/api/v1/teacher/students/${studentId}`,
     token,
     'Не удалось загрузить профиль ученика',
+  );
+
+export const createTeacherStudentRemovalRequest = async (
+  token: string,
+  studentId: string,
+  payload: TeacherStudentRemovalRequestPayload,
+): Promise<TeacherStudentRemovalRequestItem> =>
+  requestWithInit<TeacherStudentRemovalRequestItem>(
+    `/api/v1/teacher/students/${studentId}/removal-requests`,
+    token,
+    'Не удалось отправить заявку на открепление.',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
   );

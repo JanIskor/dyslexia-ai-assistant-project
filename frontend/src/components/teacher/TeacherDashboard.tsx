@@ -14,6 +14,7 @@ import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
+  createTeacherStudentRemovalRequest,
   getTeacherStudentDetail,
   getTeacherStudents,
   type TeacherStudentDetail,
@@ -393,6 +394,10 @@ function StudentDetailProfile({
   isSendingMessage,
   sendStatusMessage,
   sendStatusType,
+  onOpenRemovalModal,
+  isRemovalDisabled,
+  removalStatusMessage,
+  removalStatusType,
 }: {
   student: TeacherStudentDetail;
   onBack: () => void;
@@ -404,6 +409,10 @@ function StudentDetailProfile({
   isSendingMessage: boolean;
   sendStatusMessage: string | null;
   sendStatusType: 'error' | 'success';
+  onOpenRemovalModal: () => void;
+  isRemovalDisabled: boolean;
+  removalStatusMessage: string | null;
+  removalStatusType: 'error' | 'success';
 }) {
   const detailFields: TeacherProfileField[] = [
     { label: 'Дата рождения:', value: formatProfileDate(student.birth_date) },
@@ -453,6 +462,30 @@ function StudentDetailProfile({
             ))}
           </dl>
         </div>
+
+        <div className="mt-6 flex w-full max-w-2xl justify-end">
+          <button
+            type="button"
+            onClick={onOpenRemovalModal}
+            disabled={isRemovalDisabled}
+            data-testid="teacher-student-removal-trigger"
+            className="inline-flex items-center justify-center rounded-[22px] border border-rose-200 bg-white px-5 py-3 text-base font-medium text-rose-600 shadow-[0_12px_26px_rgba(244,63,94,0.08)] transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Запросить открепление
+          </button>
+        </div>
+
+        {removalStatusMessage ? (
+          <p
+            className={`mt-5 w-full max-w-2xl rounded-2xl border px-4 py-3 text-left text-sm sm:text-base ${
+              removalStatusType === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {removalStatusMessage}
+          </p>
+        ) : null}
 
         <div className="mt-8 w-full max-w-2xl rounded-[24px] border border-orange-100/70 bg-white/75 px-4 py-5 text-left sm:px-5 sm:py-6">
           <h3 className="text-lg font-medium text-stone-700 sm:text-xl">Сообщение ученику</h3>
@@ -522,6 +555,77 @@ function StudentDetailProfile({
         </div>
       </div>
     </section>
+  );
+}
+
+function StudentRemovalRequestModal({
+  isOpen,
+  reason,
+  onReasonChange,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  isOpen: boolean;
+  reason: string;
+  onReasonChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4 py-6">
+      <div
+        className="w-full max-w-xl rounded-[28px] border border-orange-100/80 bg-white px-6 py-6 shadow-[0_24px_60px_rgba(120,53,15,0.22)] sm:px-7"
+        data-testid="teacher-student-removal-modal"
+      >
+        <h2 className="text-2xl font-medium text-stone-700">Открепить ученика?</h2>
+        <p className="mt-3 text-sm leading-relaxed text-stone-500 sm:text-base">
+          Заявка будет отправлена администратору. До подтверждения администратором ученик останется в вашем списке.
+        </p>
+
+        <div className="mt-5">
+          <label
+            htmlFor="teacher-student-removal-reason"
+            className="mb-2 block text-sm font-medium text-stone-500 sm:text-base"
+          >
+            Причина (необязательно)
+          </label>
+          <textarea
+            id="teacher-student-removal-reason"
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={4}
+            className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+            placeholder="При необходимости укажите причину"
+          />
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isSubmitting}
+            data-testid="teacher-student-removal-confirm"
+            className="rounded-2xl bg-rose-500 px-5 py-3 text-base font-semibold text-white shadow-[0_14px_30px_rgba(244,63,94,0.24)] transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? 'Отправляем...' : 'Отправить заявку'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -771,6 +875,11 @@ function TeacherStudentsSection({
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [sendStatusMessage, setSendStatusMessage] = useState<string | null>(null);
   const [sendStatusType, setSendStatusType] = useState<'error' | 'success'>('success');
+  const [isRemovalModalOpen, setIsRemovalModalOpen] = useState(false);
+  const [removalReason, setRemovalReason] = useState('');
+  const [isSubmittingRemovalRequest, setIsSubmittingRemovalRequest] = useState(false);
+  const [removalStatusMessage, setRemovalStatusMessage] = useState<string | null>(null);
+  const [removalStatusType, setRemovalStatusType] = useState<'error' | 'success'>('success');
 
   useEffect(() => {
     setCurrentPage(1);
@@ -849,6 +958,9 @@ function TeacherStudentsSection({
       setMessageTitle('');
       setMessageBody('');
       setSendStatusMessage(null);
+      setIsRemovalModalOpen(false);
+      setRemovalReason('');
+      setRemovalStatusMessage(null);
       return;
     }
 
@@ -930,6 +1042,32 @@ function TeacherStudentsSection({
     }
   };
 
+  const handleSubmitRemovalRequest = async () => {
+    if (viewState.mode !== 'detail') {
+      return;
+    }
+
+    setIsSubmittingRemovalRequest(true);
+    setRemovalStatusMessage(null);
+
+    try {
+      await createTeacherStudentRemovalRequest(accessToken, viewState.studentId, {
+        reason: removalReason.trim() || null,
+      });
+      setRemovalStatusType('success');
+      setRemovalStatusMessage('Заявка отправлена администратору.');
+      setIsRemovalModalOpen(false);
+      setRemovalReason('');
+    } catch (error) {
+      setRemovalStatusType('error');
+      setRemovalStatusMessage(
+        error instanceof Error ? error.message : 'Не удалось отправить заявку на открепление.',
+      );
+    } finally {
+      setIsSubmittingRemovalRequest(false);
+    }
+  };
+
   if (viewState.mode === 'detail') {
     if (isStudentDetailLoading) {
       return <StudentsListState message="Загрузка профиля ученика..." />;
@@ -944,18 +1082,38 @@ function TeacherStudentsSection({
     }
 
     return (
-      <StudentDetailProfile
-        student={selectedStudent}
-        onBack={onBackToList}
-        messageTitle={messageTitle}
-        messageBody={messageBody}
-        onMessageTitleChange={setMessageTitle}
-        onMessageBodyChange={setMessageBody}
-        onSendMessage={() => void handleSendMessage()}
-        isSendingMessage={isSendingMessage}
-        sendStatusMessage={sendStatusMessage}
-        sendStatusType={sendStatusType}
-      />
+      <>
+        <StudentDetailProfile
+          student={selectedStudent}
+          onBack={onBackToList}
+          messageTitle={messageTitle}
+          messageBody={messageBody}
+          onMessageTitleChange={setMessageTitle}
+          onMessageBodyChange={setMessageBody}
+          onSendMessage={() => void handleSendMessage()}
+          isSendingMessage={isSendingMessage}
+          sendStatusMessage={sendStatusMessage}
+          sendStatusType={sendStatusType}
+          onOpenRemovalModal={() => setIsRemovalModalOpen(true)}
+          isRemovalDisabled={isSubmittingRemovalRequest}
+          removalStatusMessage={removalStatusMessage}
+          removalStatusType={removalStatusType}
+        />
+        <StudentRemovalRequestModal
+          isOpen={isRemovalModalOpen}
+          reason={removalReason}
+          onReasonChange={setRemovalReason}
+          onClose={() => {
+            if (isSubmittingRemovalRequest) {
+              return;
+            }
+
+            setIsRemovalModalOpen(false);
+          }}
+          onSubmit={() => void handleSubmitRemovalRequest()}
+          isSubmitting={isSubmittingRemovalRequest}
+        />
+      </>
     );
   }
 
