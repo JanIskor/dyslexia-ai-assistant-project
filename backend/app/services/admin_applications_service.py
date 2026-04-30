@@ -136,7 +136,10 @@ def list_admin_teacher_assignment_options(
         )
         .join(User, User.id == TeacherProfile.user_id)
         .outerjoin(TeacherStudent, TeacherStudent.teacher_user_id == TeacherProfile.user_id)
-        .filter(User.role == "teacher")
+        .filter(
+            User.role == "teacher",
+            User.is_active.is_(True),
+        )
         .group_by(TeacherProfile.user_id, TeacherProfile.full_name, TeacherProfile.subject_name)
         .order_by(TeacherProfile.full_name.asc())
         .all()

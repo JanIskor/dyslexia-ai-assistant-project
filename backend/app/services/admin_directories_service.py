@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Literal
 from uuid import UUID
 
@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.models.teacher_student import TeacherStudent
 from app.models.student_profile import StudentProfile
+from app.models.student_teacher_removal_request import StudentTeacherRemovalRequest
 from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
 from app.schemas.admin_directories import (
     AdminTeacherCreateRequest,
+    AdminTeacherDeleteResponse,
     AdminStudentDetailResponse,
     AdminStudentListItem,
     AdminUnassignedStudentListItem,
@@ -118,6 +120,7 @@ def list_admin_teachers(
         .outerjoin(TeacherStudent, TeacherStudent.teacher_user_id == TeacherProfile.user_id)
         .filter(
             User.role == "teacher",
+            User.is_active.is_(True),
             TeacherProfile.full_name.isnot(None),
         )
         .group_by(TeacherProfile.id)
@@ -160,27 +163,37 @@ def get_admin_teacher_detail(
     teacher_id: UUID,
 ) -> AdminTeacherDetailResponse:
     profile = (
-        db.query(TeacherProfile)
+        db.query(
+            TeacherProfile,
+            func.count(TeacherStudent.id).label("current_students_count"),
+        )
         .join(User, User.id == TeacherProfile.user_id)
+        .outerjoin(TeacherStudent, TeacherStudent.teacher_user_id == TeacherProfile.user_id)
         .filter(
             User.role == "teacher",
+            User.is_active.is_(True),
             TeacherProfile.user_id == teacher_id,
         )
+        .group_by(TeacherProfile.id)
         .first()
     )
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
+    teacher_profile, current_students_count = profile
+
     return AdminTeacherDetailResponse(
-        id=profile.user_id,
-        full_name=profile.full_name,
-        birth_date=profile.birth_date,
-        gender=profile.gender,
-        position=profile.position,
-        phone=profile.phone,
-        work_email=profile.work_email,
-        subject_name=profile.subject_name,
-        avatar_url=profile.avatar_url,
+        id=teacher_profile.user_id,
+        full_name=teacher_profile.full_name,
+        birth_date=teacher_profile.birth_date,
+        gender=teacher_profile.gender,
+        position=teacher_profile.position,
+        phone=teacher_profile.phone,
+        work_email=teacher_profile.work_email,
+        subject_name=teacher_profile.subject_name,
+        avatar_url=teacher_profile.avatar_url,
+        current_students_count=current_students_count,
+        capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
     )
 
 
@@ -309,6 +322,74 @@ def create_admin_teacher(
         current_students_count=0,
         capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
         available_slots=TEACHER_ASSIGNMENT_CAPACITY,
+    )
+
+
+def delete_admin_teacher(
+    db: Session,
+    *,
+    teacher_user_id: UUID,
+) -> AdminTeacherDeleteResponse:
+    user = (
+        db.query(User)
+        .filter(
+            User.id == teacher_user_id,
+            User.role == "teacher",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+    teacher_profile = db.query(TeacherProfile).filter(TeacherProfile.user_id == teacher_user_id).first()
+    if teacher_profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+    assignments = (
+        db.query(TeacherStudent)
+        .filter(TeacherStudent.teacher_user_id == teacher_user_id)
+        .all()
+    )
+    released_student_ids = {assignment.student_user_id for assignment in assignments}
+    released_students_count = len(released_student_ids)
+
+    if released_student_ids:
+        student_profiles = (
+            db.query(StudentProfile)
+            .filter(StudentProfile.user_id.in_(released_student_ids))
+            .all()
+        )
+        for student_profile in student_profiles:
+            student_profile.profile_status = "approved"
+            student_profile.current_teacher_user_id = None
+            student_profile.teacher_review_status = None
+
+    for assignment in assignments:
+        db.delete(assignment)
+
+    pending_removal_requests = (
+        db.query(StudentTeacherRemovalRequest)
+        .filter(
+            StudentTeacherRemovalRequest.teacher_user_id == teacher_user_id,
+            StudentTeacherRemovalRequest.status == "pending",
+        )
+        .all()
+    )
+    resolved_at = datetime.now(timezone.utc)
+    for request in pending_removal_requests:
+        request.status = "approved"
+        request.admin_comment = "Автоматически закрыто при удалении преподавателя."
+        request.resolved_at = resolved_at
+        request.resolved_by_admin_user_id = None
+
+    user.is_active = False
+    db.commit()
+
+    return AdminTeacherDeleteResponse(
+        detail="Teacher deleted",
+        teacher_user_id=teacher_user_id,
+        released_students_count=released_students_count,
     )
 
 

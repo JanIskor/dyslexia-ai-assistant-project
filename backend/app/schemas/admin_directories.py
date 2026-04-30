@@ -38,6 +38,14 @@ class AdminTeacherDetailResponse(BaseModel):
     work_email: str
     subject_name: str
     avatar_url: str | None = None
+    current_students_count: int = 0
+    capacity_limit: int | None = None
+
+
+class AdminTeacherDeleteResponse(BaseModel):
+    detail: str
+    teacher_user_id: UUID
+    released_students_count: int
 
 
 class AdminStudentListItem(BaseModel):
