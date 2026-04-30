@@ -237,10 +237,19 @@ export const getAdminApplicationFilters = async (
 
 export const getAdminTeacherAssignmentOptions = async (
   token: string,
-  applicationId: string,
+  applicationId?: string,
 ): Promise<AdminTeacherAssignmentOptionsResponse> => {
-  const params = new URLSearchParams({ application_id: applicationId });
-  const response = await fetch(buildApiUrl(`/api/v1/admin/teachers/assignment-options?${params.toString()}`), {
+  const params = new URLSearchParams();
+
+  if (applicationId) {
+    params.set('application_id', applicationId);
+  }
+
+  const path = params.toString()
+    ? `/api/v1/admin/teachers/assignment-options?${params.toString()}`
+    : '/api/v1/admin/teachers/assignment-options';
+
+  const response = await fetch(buildApiUrl(path), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',

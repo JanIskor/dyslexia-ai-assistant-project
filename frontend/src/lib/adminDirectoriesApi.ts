@@ -9,6 +9,9 @@ export interface AdminTeacherDirectoryItem {
   subject_name: string;
   work_email: string;
   avatar_url: string | null;
+  current_students_count: number | null;
+  capacity_limit: number | null;
+  available_slots: number | null;
 }
 
 export interface AdminTeachersDirectoryResponse {
@@ -57,6 +60,26 @@ export interface AdminStudentDirectoryDetail {
   avatar_url: string | null;
 }
 
+export interface AdminTeacherCreatePayload {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface AdminUnassignedStudentItem {
+  application_id: string;
+  user_id: string;
+  full_name: string;
+  grade_label: string | null;
+  avatar_url: string | null;
+  profile_status: string;
+}
+
+export interface AdminUnassignedStudentsResponse {
+  items: AdminUnassignedStudentItem[];
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -95,6 +118,10 @@ const getErrorMessage = (
     return 'Ученик не найден.';
   }
 
+  if (detail === 'Email already registered') {
+    return 'Пользователь с таким email уже существует.';
+  }
+
   if (status >= 500) {
     return 'Ошибка сервера. Попробуйте ещё раз позже.';
   }
@@ -107,6 +134,37 @@ async function request<T>(path: string, token: string, fallbackMessage: string):
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body, fallbackMessage));
+  }
+
+  return parseJson<T>(response);
+}
+
+async function requestWithInit<T>(
+  path: string,
+  token: string,
+  fallbackMessage: string,
+  init: RequestInit,
+): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init.headers,
     },
     cache: 'no-store',
   });
@@ -188,4 +246,27 @@ export const getAdminStudentDirectoryDetail = async (
     `/api/v1/admin/students/${studentId}`,
     token,
     'Не удалось загрузить профиль ученика.',
+  );
+
+export const createAdminTeacher = async (
+  token: string,
+  payload: AdminTeacherCreatePayload,
+): Promise<AdminTeacherDirectoryItem> =>
+  requestWithInit<AdminTeacherDirectoryItem>(
+    '/api/v1/admin/teachers',
+    token,
+    'Не удалось создать преподавателя.',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const getAdminUnassignedStudents = async (
+  token: string,
+): Promise<AdminUnassignedStudentsResponse> =>
+  request<AdminUnassignedStudentsResponse>(
+    '/api/v1/admin/students/unassigned',
+    token,
+    'Не удалось загрузить список учеников без преподавателя.',
   );

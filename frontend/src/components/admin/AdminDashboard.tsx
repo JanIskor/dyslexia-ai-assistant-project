@@ -7,6 +7,7 @@ import { AdminApplicationDetailPanel } from '@/components/admin/AdminApplication
 import { AdminApplicationsListPanel } from '@/components/admin/AdminApplicationsListPanel';
 import { AdminKnowledgeBasePanel } from '@/components/admin/AdminKnowledgeBasePanel';
 import { AdminStudentRemovalRequestsPanel } from '@/components/admin/AdminStudentRemovalRequestsPanel';
+import { AdminTeacherAssignmentTabPanel } from '@/components/admin/AdminTeacherAssignmentTabPanel';
 import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
 import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
@@ -34,6 +35,7 @@ import {
 type AdminDashboardSection =
   | 'student-applications'
   | 'student-removal-requests'
+  | 'teacher-assignment'
   | 'teachers'
   | 'students'
   | 'knowledge-base';
@@ -41,6 +43,7 @@ type AdminDashboardSection =
 const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
   { id: 'student-applications', label: 'Заявки учеников' },
   { id: 'student-removal-requests', label: 'Открепление учеников' },
+  { id: 'teacher-assignment', label: 'Назначить преподавателя' },
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'students', label: 'Ученики' },
   { id: 'knowledge-base', label: 'Правила адаптации' },
@@ -469,6 +472,10 @@ function AdminSectionContent({
     return <AdminStudentRemovalRequestsPanel token={token} />;
   }
 
+  if (section === 'teacher-assignment') {
+    return <AdminTeacherAssignmentTabPanel token={token} />;
+  }
+
   if (section === 'knowledge-base') {
     return <AdminKnowledgeBasePanel token={token} />;
   }
@@ -532,6 +539,12 @@ export function AdminDashboard() {
 
       if (requestedTab === 'student-removal-requests') {
         setActiveSection('student-removal-requests');
+        setInitialApplicationId(null);
+        return;
+      }
+
+      if (requestedTab === 'teacher-assignment') {
+        setActiveSection('teacher-assignment');
         setInitialApplicationId(null);
         return;
       }
@@ -603,6 +616,8 @@ export function AdminDashboard() {
                           data-testid={
                             item.id === 'knowledge-base'
                               ? 'admin-sidebar-knowledge-base-tab'
+                              : item.id === 'teacher-assignment'
+                                ? 'admin-sidebar-teacher-assignment-tab'
                               : item.id === 'student-removal-requests'
                                 ? 'admin-sidebar-student-removal-requests-tab'
                               : undefined
