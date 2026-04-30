@@ -2,7 +2,7 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 AdminTeachersSort = Literal["surname_asc", "surname_desc"]
@@ -15,6 +15,9 @@ class AdminTeacherListItem(BaseModel):
     subject_name: str
     work_email: str
     avatar_url: str | None = None
+    current_students_count: int | None = None
+    capacity_limit: int | None = None
+    available_slots: int | None = None
 
 
 class AdminTeachersListResponse(BaseModel):
@@ -61,3 +64,29 @@ class AdminStudentDetailResponse(BaseModel):
     enrollment_date: date | None = None
     quote: str | None = None
     avatar_url: str | None = None
+
+
+class AdminTeacherCreateRequest(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    birth_date: date | None = None
+    gender: str | None = None
+    position: str | None = None
+    phone: str | None = None
+    work_email: EmailStr | None = None
+    subject_name: str | None = None
+
+
+class AdminUnassignedStudentListItem(BaseModel):
+    application_id: UUID
+    user_id: UUID
+    full_name: str
+    grade_label: str | None = None
+    avatar_url: str | None = None
+    profile_status: str
+
+
+class AdminUnassignedStudentsListResponse(BaseModel):
+    items: list[AdminUnassignedStudentListItem]

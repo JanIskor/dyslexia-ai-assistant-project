@@ -13,10 +13,13 @@ from app.schemas.admin_applications import (
     AdminApplicationUpdateRequest,
 )
 from app.schemas.admin_directories import (
+    AdminTeacherCreateRequest,
     AdminStudentDetailResponse,
+    AdminUnassignedStudentsListResponse,
     AdminStudentsListResponse,
     AdminStudentsSort,
     AdminTeacherDetailResponse,
+    AdminTeacherListItem,
     AdminTeachersListResponse,
     AdminTeachersSort,
 )
@@ -47,8 +50,10 @@ from app.services.admin_applications_service import (
     update_admin_application,
 )
 from app.services.admin_directories_service import (
+    create_admin_teacher,
     get_admin_student_detail,
     get_admin_teacher_detail,
+    list_admin_unassigned_students,
     list_admin_students,
     list_admin_teachers,
 )
@@ -267,6 +272,16 @@ def read_admin_teachers(
     )
 
 
+@router.post("/teachers", response_model=AdminTeacherListItem)
+def create_admin_teacher_endpoint(
+    payload: AdminTeacherCreateRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return create_admin_teacher(db, payload=payload)
+
+
 @router.get("/teachers/{teacher_id}", response_model=AdminTeacherDetailResponse)
 def read_admin_teacher_detail(
     teacher_id: UUID,
@@ -292,6 +307,15 @@ def read_admin_students(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/students/unassigned", response_model=AdminUnassignedStudentsListResponse)
+def read_admin_unassigned_students(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return list_admin_unassigned_students(db)
 
 
 @router.get("/students/{student_id}", response_model=AdminStudentDetailResponse)

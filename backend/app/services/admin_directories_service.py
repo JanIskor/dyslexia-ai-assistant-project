@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 from uuid import UUID
 
@@ -5,12 +6,17 @@ from fastapi import HTTPException, status
 from sqlalchemy import Integer, cast, func
 from sqlalchemy.orm import Session
 
+from app.models.teacher_student import TeacherStudent
 from app.models.student_profile import StudentProfile
 from app.models.teacher_profile import TeacherProfile
 from app.models.user import User
+from app.schemas.auth import RegisterRequest
 from app.schemas.admin_directories import (
+    AdminTeacherCreateRequest,
     AdminStudentDetailResponse,
     AdminStudentListItem,
+    AdminUnassignedStudentListItem,
+    AdminUnassignedStudentsListResponse,
     AdminStudentsListResponse,
     AdminStudentsSort,
     AdminTeacherDetailResponse,
@@ -18,6 +24,15 @@ from app.schemas.admin_directories import (
     AdminTeachersListResponse,
     AdminTeachersSort,
 )
+from app.services.auth_service import create_user, get_user_by_email, normalize_email
+from app.services.admin_applications_service import ASSIGNABLE_APPLICATION_STATUSES, TEACHER_ASSIGNMENT_CAPACITY
+
+
+DEFAULT_TEACHER_BIRTH_DATE = date(1970, 1, 1)
+DEFAULT_TEACHER_GENDER = "Не указан"
+DEFAULT_TEACHER_POSITION = "Преподаватель"
+DEFAULT_TEACHER_PHONE = "Не указан"
+DEFAULT_TEACHER_SUBJECT = "Не указан"
 
 
 def _build_teacher_surname_search_filter(search: str):
@@ -95,12 +110,17 @@ def list_admin_teachers(
     page_size: int = 10,
 ) -> AdminTeachersListResponse:
     query = (
-        db.query(TeacherProfile)
+        db.query(
+            TeacherProfile,
+            func.count(TeacherStudent.id).label("current_students_count"),
+        )
         .join(User, User.id == TeacherProfile.user_id)
+        .outerjoin(TeacherStudent, TeacherStudent.teacher_user_id == TeacherProfile.user_id)
         .filter(
             User.role == "teacher",
             TeacherProfile.full_name.isnot(None),
         )
+        .group_by(TeacherProfile.id)
     )
 
     if search and search.strip():
@@ -116,13 +136,16 @@ def list_admin_teachers(
     return AdminTeachersListResponse(
         items=[
             AdminTeacherListItem(
-                id=item.user_id,
-                full_name=item.full_name,
-                subject_name=item.subject_name,
-                work_email=item.work_email,
-                avatar_url=item.avatar_url,
+                id=profile.user_id,
+                full_name=profile.full_name,
+                subject_name=profile.subject_name,
+                work_email=profile.work_email,
+                avatar_url=profile.avatar_url,
+                current_students_count=current_students_count,
+                capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
+                available_slots=max(0, TEACHER_ASSIGNMENT_CAPACITY - current_students_count),
             )
-            for item in items
+            for profile, current_students_count in items
         ],
         page=page,
         page_size=page_size,
@@ -235,4 +258,88 @@ def get_admin_student_detail(
         enrollment_date=profile.enrollment_date,
         quote=profile.quote,
         avatar_url=profile.avatar_url,
+    )
+
+
+def create_admin_teacher(
+    db: Session,
+    *,
+    payload: AdminTeacherCreateRequest,
+) -> AdminTeacherListItem:
+    existing_user = get_user_by_email(db, payload.email)
+    if existing_user is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    teacher_user = create_user(
+        db,
+        RegisterRequest(
+            email=normalize_email(payload.email),
+            password=payload.password,
+        ),
+    )
+
+    user = db.query(User).filter(User.id == teacher_user.id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Teacher creation failed")
+
+    user.role = "teacher"
+    full_name = f"{payload.last_name.strip()} {payload.first_name.strip()}".strip()
+    work_email = str(payload.work_email).strip() if payload.work_email is not None else normalize_email(payload.email)
+    profile = TeacherProfile(
+        user_id=user.id,
+        full_name=full_name,
+        birth_date=payload.birth_date or DEFAULT_TEACHER_BIRTH_DATE,
+        gender=(payload.gender or DEFAULT_TEACHER_GENDER).strip(),
+        position=(payload.position or DEFAULT_TEACHER_POSITION).strip(),
+        phone=(payload.phone or DEFAULT_TEACHER_PHONE).strip(),
+        work_email=work_email,
+        subject_name=(payload.subject_name or DEFAULT_TEACHER_SUBJECT).strip(),
+        avatar_url=None,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+
+    return AdminTeacherListItem(
+        id=profile.user_id,
+        full_name=profile.full_name,
+        subject_name=profile.subject_name,
+        work_email=profile.work_email,
+        avatar_url=profile.avatar_url,
+        current_students_count=0,
+        capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
+        available_slots=TEACHER_ASSIGNMENT_CAPACITY,
+    )
+
+
+def list_admin_unassigned_students(
+    db: Session,
+) -> AdminUnassignedStudentsListResponse:
+    rows = (
+        db.query(StudentProfile)
+        .join(User, User.id == StudentProfile.user_id)
+        .outerjoin(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
+        .filter(
+            User.role == "student",
+            StudentProfile.full_name.isnot(None),
+            func.length(func.trim(StudentProfile.full_name)) > 0,
+            TeacherStudent.id.is_(None),
+            StudentProfile.profile_status.in_(ASSIGNABLE_APPLICATION_STATUSES),
+        )
+        .order_by(StudentProfile.full_name.asc())
+        .all()
+    )
+
+    return AdminUnassignedStudentsListResponse(
+        items=[
+            AdminUnassignedStudentListItem(
+                application_id=row.id,
+                user_id=row.user_id,
+                full_name=row.full_name,
+                grade_label=row.grade_label,
+                avatar_url=row.avatar_url,
+                profile_status=row.profile_status,
+            )
+            for row in rows
+        ]
     )
