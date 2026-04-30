@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, UserRound } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface PersonDetailField {
   label: string;
@@ -14,6 +15,7 @@ interface PersonDetailPanelProps {
   subtitle?: string | null;
   fields: PersonDetailField[];
   onBack: () => void;
+  actions?: ReactNode;
 }
 
 export function PersonDetailPanel({
@@ -23,6 +25,7 @@ export function PersonDetailPanel({
   subtitle,
   fields,
   onBack,
+  actions,
 }: PersonDetailPanelProps) {
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-5 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-7 sm:py-7">
@@ -60,6 +63,8 @@ export function PersonDetailPanel({
             </div>
           ))}
         </dl>
+
+        {actions ? <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">{actions}</div> : null}
       </div>
     </section>
   );

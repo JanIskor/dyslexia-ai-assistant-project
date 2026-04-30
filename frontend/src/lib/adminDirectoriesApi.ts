@@ -32,6 +32,14 @@ export interface AdminTeacherDirectoryDetail {
   work_email: string;
   subject_name: string;
   avatar_url: string | null;
+  current_students_count: number;
+  capacity_limit: number | null;
+}
+
+export interface AdminTeacherDeleteResponse {
+  detail: string;
+  teacher_user_id: string;
+  released_students_count: number;
 }
 
 export interface AdminStudentDirectoryItem {
@@ -120,6 +128,10 @@ const getErrorMessage = (
 
   if (detail === 'Email already registered') {
     return 'Пользователь с таким email уже существует.';
+  }
+
+  if (detail === 'Teacher deleted') {
+    return 'Преподаватель удалён.';
   }
 
   if (status >= 500) {
@@ -269,4 +281,17 @@ export const getAdminUnassignedStudents = async (
     '/api/v1/admin/students/unassigned',
     token,
     'Не удалось загрузить список учеников без преподавателя.',
+  );
+
+export const deleteAdminTeacher = async (
+  token: string,
+  teacherId: string,
+): Promise<AdminTeacherDeleteResponse> =>
+  requestWithInit<AdminTeacherDeleteResponse>(
+    `/api/v1/admin/teachers/${teacherId}`,
+    token,
+    'Не удалось удалить преподавателя.',
+    {
+      method: 'DELETE',
+    },
   );
