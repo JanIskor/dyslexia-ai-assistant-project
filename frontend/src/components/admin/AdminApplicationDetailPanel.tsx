@@ -4,7 +4,7 @@ import { ArrowLeft, Check, RefreshCcw, Save, UserRound } from 'lucide-react';
 import { ModerationEntityBadge } from '@/components/admin/ModerationEntityBadge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { AdminApplicationDetail } from '@/lib/adminApplicationsApi';
-import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
+import { getAdminModerationStatusUi } from '@/lib/adminModerationStatusUi';
 
 interface AdminApplicationDetailPanelProps {
   application: AdminApplicationDetail;
@@ -67,6 +67,8 @@ export function AdminApplicationDetailPanel({
 }: AdminApplicationDetailPanelProps) {
   const isStudentProfileUpdate = application.request_kind === 'profile_update';
   const isTeacherProfileUpdate = application.request_kind === 'teacher_profile_update';
+  const isSystemAssignmentEvent = application.request_kind === 'system_assignment_event';
+  const statusUi = getAdminModerationStatusUi(application.status);
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-5 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-7 sm:py-7">
@@ -97,8 +99,8 @@ export function AdminApplicationDetailPanel({
             />
 
             <StatusBadge
-              label={application.status}
-              toneClassName={getAdminApplicationStatusStyle(application.status)}
+              label={statusUi.label}
+              toneClassName={statusUi.toneClassName}
               className="mt-4"
             />
           </div>
@@ -227,17 +229,19 @@ export function AdminApplicationDetailPanel({
                 {isSaving ? 'Сохраняем...' : 'Сохранить'}
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onRequestChanges}
-              disabled={isSaving || isActing}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              {isStudentProfileUpdate || isTeacherProfileUpdate
-                ? 'Отправить изменения на доработку'
-                : 'Отправить на доработку'}
-            </button>
+            {!isSystemAssignmentEvent ? (
+              <button
+                type="button"
+                onClick={onRequestChanges}
+                disabled={isSaving || isActing}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                {isStudentProfileUpdate || isTeacherProfileUpdate
+                  ? 'Отправить изменения на доработку'
+                  : 'Отправить на доработку'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onApprove}
@@ -245,7 +249,11 @@ export function AdminApplicationDetailPanel({
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
-              {isStudentProfileUpdate || isTeacherProfileUpdate ? 'Подтвердить изменения' : 'Подтвердить заявку'}
+              {isSystemAssignmentEvent
+                ? 'Назначить преподавателя'
+                : isStudentProfileUpdate || isTeacherProfileUpdate
+                  ? 'Подтвердить изменения'
+                  : 'Подтвердить заявку'}
             </button>
           </div>
 

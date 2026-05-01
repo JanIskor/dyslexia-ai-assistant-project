@@ -12,6 +12,7 @@ import {
   updateAdminStudentRemovalRequest,
   type AdminStudentRemovalRequestItem,
 } from '@/lib/adminStudentRemovalRequestsApi';
+import { getAdminModerationStatusUi } from '@/lib/adminModerationStatusUi';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
 const PAGE_SIZE = 10;
@@ -30,28 +31,6 @@ function formatDisplayDate(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsedDate);
-}
-
-function getStatusStyle(status: AdminStudentRemovalRequestItem['status']): string {
-  switch (status) {
-    case 'approved':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    case 'rejected':
-      return 'border-rose-200 bg-rose-50 text-rose-700';
-    default:
-      return 'border-amber-200 bg-amber-50 text-amber-700';
-  }
-}
-
-function getStatusLabel(status: AdminStudentRemovalRequestItem['status']): string {
-  switch (status) {
-    case 'approved':
-      return 'Подтверждена';
-    case 'rejected':
-      return 'Отклонена';
-    default:
-      return 'Ожидает решения';
-  }
 }
 
 export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
@@ -218,6 +197,7 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
           {paginatedItems.map((item) => {
             const isPending = item.status === 'pending';
             const isActing = actingRequestId === item.id;
+            const statusUi = getAdminModerationStatusUi(item.status);
 
             return (
               <article
@@ -243,8 +223,8 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
                           {item.student.full_name}
                         </h2>
                         <StatusBadge
-                          label={getStatusLabel(item.status)}
-                          toneClassName={getStatusStyle(item.status)}
+                          label={statusUi.label}
+                          toneClassName={statusUi.toneClassName}
                         />
                       </div>
                       <p className="mt-2 text-sm text-stone-500 sm:text-base">

@@ -7,7 +7,7 @@ export interface AdminTeacherDirectoryItem {
   id: string;
   full_name: string;
   subject_name: string;
-  work_email: string;
+  email: string;
   avatar_url: string | null;
   current_students_count: number | null;
   capacity_limit: number | null;
@@ -25,11 +25,11 @@ export interface AdminTeachersDirectoryResponse {
 export interface AdminTeacherDirectoryDetail {
   id: string;
   full_name: string;
+  email: string;
   birth_date: string;
   gender: string;
   position: string;
   phone: string;
-  work_email: string;
   subject_name: string;
   avatar_url: string | null;
   current_students_count: number;
@@ -79,6 +79,11 @@ export interface AdminTeacherCreatePayload {
   password: string;
   first_name: string;
   last_name: string;
+  birth_date?: string | null;
+  gender?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  subject_name?: string | null;
 }
 
 export interface AdminUnassignedStudentItem {

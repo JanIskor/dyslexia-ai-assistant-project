@@ -15,6 +15,7 @@ import {
   type AdminTeacherDirectoryItem,
   type AdminTeachersSort,
 } from '@/lib/adminDirectoriesApi';
+import { getGenderLabel } from '@/lib/profileGenderUi';
 
 const TEACHERS_SORT_OPTIONS: Array<{ value: AdminTeachersSort; label: string }> = [
   { value: 'surname_asc', label: 'По фамилии А-Я' },
@@ -223,10 +224,10 @@ export function AdminTeachersDirectoryPanel({ token }: { token: string }) {
           onBack={() => setSelectedTeacherId(null)}
           fields={[
             { label: 'Дата рождения', value: formatDisplayDate(selectedTeacher.birth_date) },
-            { label: 'Пол', value: selectedTeacher.gender },
+            { label: 'Пол', value: getGenderLabel(selectedTeacher.gender) },
             { label: 'Должность', value: selectedTeacher.position },
             { label: 'Телефон', value: selectedTeacher.phone },
-            { label: 'Рабочий email', value: selectedTeacher.work_email },
+            { label: 'Email', value: selectedTeacher.email },
             { label: 'Предмет', value: selectedTeacher.subject_name },
             {
               label: 'Текущие ученики',
@@ -352,7 +353,7 @@ export function AdminTeachersDirectoryPanel({ token }: { token: string }) {
                 avatarAlt={`Аватар ${teacher.full_name}`}
                 meta={[
                   { label: 'Предмет', value: teacher.subject_name },
-                  { label: 'Email', value: teacher.work_email },
+                  { label: 'Email', value: teacher.email },
                 ]}
                 onClick={() => setSelectedTeacherId(teacher.id)}
               />

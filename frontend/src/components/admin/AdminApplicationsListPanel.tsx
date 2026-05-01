@@ -5,7 +5,7 @@ import { DirectoryPagination } from '@/components/admin/DirectoryPagination';
 import { ModerationEntityBadge } from '@/components/admin/ModerationEntityBadge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { AdminApplication, AdminApplicationStatusFilterOption } from '@/lib/adminApplicationsApi';
-import { getAdminApplicationStatusStyle } from '@/lib/adminApplicationStatusUi';
+import { getAdminModerationStatusUi } from '@/lib/adminModerationStatusUi';
 
 interface AdminApplicationsListPanelProps {
   searchValue: string;
@@ -178,8 +178,8 @@ export function AdminApplicationsListPanel({
         {selectedStatuses.map((status) => (
           <StatusBadge
             key={status}
-            label={status}
-            toneClassName={getAdminApplicationStatusStyle(status)}
+            label={getAdminModerationStatusUi(status).label}
+            toneClassName={getAdminModerationStatusUi(status).toneClassName}
             className="px-3 py-1 text-xs"
           />
         ))}
@@ -235,8 +235,8 @@ export function AdminApplicationsListPanel({
                       ) : null}
                     </span>
                     <StatusBadge
-                      label={application.status}
-                      toneClassName={getAdminApplicationStatusStyle(application.status)}
+                      label={getAdminModerationStatusUi(application.status).label}
+                      toneClassName={getAdminModerationStatusUi(application.status).toneClassName}
                       className="ml-auto shrink-0 sm:min-w-[168px]"
                     />
                   </button>

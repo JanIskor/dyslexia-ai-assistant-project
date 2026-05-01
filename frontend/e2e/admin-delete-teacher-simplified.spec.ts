@@ -127,6 +127,11 @@ async function createTeacherAndAssignStudent(request: APIRequestContext) {
       password: DELETABLE_TEACHER_PASSWORD,
       first_name: DELETABLE_TEACHER_FIRST_NAME,
       last_name: DELETABLE_TEACHER_LAST_NAME,
+      birth_date: '1988-06-15',
+      gender: 'female',
+      position: 'Преподаватель',
+      phone: '+79005554433',
+      subject_name: 'Литература',
     },
   });
   expect(createResponse.ok()).toBeTruthy();
@@ -171,7 +176,7 @@ test.describe.serial('admin delete teacher simplified', () => {
     await expect(page.getByRole('button', { name: 'Удалить преподавателя' })).toBeVisible();
   });
 
-  test('confirm deletes teacher, teacher disappears, released student returns to assignment flow, and deleted teacher is unavailable for reassignment', async ({
+  test('confirm deletes teacher, teacher disappears, and released student becomes visible as needs-assignment system event', async ({
     page,
   }) => {
     await loginAdminViaUi(page);
@@ -186,12 +191,10 @@ test.describe.serial('admin delete teacher simplified', () => {
     ).toBeVisible();
     await expect(page.getByText(DELETABLE_TEACHER_FULL_NAME)).toHaveCount(0);
 
-    await page.getByTestId('admin-sidebar-teacher-assignment-tab').click();
-    const studentCard = page.locator('article').filter({ hasText: STUDENT_FULL_NAME }).first();
+    await page.getByTestId('admin-sidebar-student-applications-tab').click();
+    const studentCard = page.locator('li').filter({ hasText: STUDENT_FULL_NAME }).first();
     await expect(studentCard).toBeVisible();
-
-    await studentCard.getByRole('button', { name: 'Назначить' }).click({ force: true });
-    await expect(page.getByRole('heading', { name: 'Назначение преподавателя' })).toBeVisible();
-    await expect(page.getByText(DELETABLE_TEACHER_FULL_NAME)).toHaveCount(0);
+    await expect(studentCard.getByText('Системное событие')).toBeVisible();
+    await expect(studentCard.getByText('Требует назначения')).toBeVisible();
   });
 });

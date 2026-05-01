@@ -7,6 +7,7 @@ import {
   type AdminTeacherCreatePayload,
   type AdminTeacherDirectoryItem,
 } from '@/lib/adminDirectoriesApi';
+import { TEACHER_GENDER_OPTIONS } from '@/lib/profileGenderUi';
 
 export function AdminTeacherAssignmentTabPanel({ token }: { token: string }) {
   const [teacherForm, setTeacherForm] = useState<AdminTeacherCreatePayload>({
@@ -14,6 +15,11 @@ export function AdminTeacherAssignmentTabPanel({ token }: { token: string }) {
     password: '',
     first_name: '',
     last_name: '',
+    birth_date: '',
+    gender: 'not_specified',
+    position: 'Преподаватель',
+    phone: '',
+    subject_name: '',
   });
   const [isCreatingTeacher, setIsCreatingTeacher] = useState(false);
   const [createTeacherMessage, setCreateTeacherMessage] = useState<string | null>(null);
@@ -31,12 +37,27 @@ export function AdminTeacherAssignmentTabPanel({ token }: { token: string }) {
     setCreateTeacherMessage(null);
 
     try {
-      const createdTeacher: AdminTeacherDirectoryItem = await createAdminTeacher(token, teacherForm);
+      const createdTeacher: AdminTeacherDirectoryItem = await createAdminTeacher(token, {
+        email: teacherForm.email,
+        password: teacherForm.password,
+        first_name: teacherForm.first_name,
+        last_name: teacherForm.last_name,
+        birth_date: teacherForm.birth_date?.trim() ? teacherForm.birth_date : null,
+        gender: teacherForm.gender?.trim() ? teacherForm.gender : 'not_specified',
+        position: teacherForm.position?.trim() ? teacherForm.position : null,
+        phone: teacherForm.phone?.trim() ? teacherForm.phone : null,
+        subject_name: teacherForm.subject_name?.trim() ? teacherForm.subject_name : null,
+      });
       setTeacherForm({
         email: '',
         password: '',
         first_name: '',
         last_name: '',
+        birth_date: '',
+        gender: 'not_specified',
+        position: 'Преподаватель',
+        phone: '',
+        subject_name: '',
       });
       setCreateTeacherMessageType('success');
       setCreateTeacherMessage(`Преподаватель ${createdTeacher.full_name} создан.`);
@@ -112,6 +133,85 @@ export function AdminTeacherAssignmentTabPanel({ token }: { token: string }) {
             className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
             placeholder="Введите фамилию"
           />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-500 sm:text-base" htmlFor="admin-create-teacher-birth-date">
+              Дата рождения
+            </label>
+            <input
+              id="admin-create-teacher-birth-date"
+              type="date"
+              value={teacherForm.birth_date ?? ''}
+              onChange={(event) => handleTeacherFormChange('birth_date', event.target.value)}
+              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-500 sm:text-base" htmlFor="admin-create-teacher-gender">
+              Пол
+            </label>
+            <select
+              id="admin-create-teacher-gender"
+              value={teacherForm.gender ?? ''}
+              onChange={(event) => handleTeacherFormChange('gender', event.target.value)}
+              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+            >
+              {TEACHER_GENDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-500 sm:text-base" htmlFor="admin-create-teacher-position">
+              Должность
+            </label>
+            <input
+              id="admin-create-teacher-position"
+              type="text"
+              value={teacherForm.position ?? ''}
+              onChange={(event) => handleTeacherFormChange('position', event.target.value)}
+              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+              placeholder="Например, Учитель-логопед"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-500 sm:text-base" htmlFor="admin-create-teacher-phone">
+              Телефон
+            </label>
+            <input
+              id="admin-create-teacher-phone"
+              type="tel"
+              value={teacherForm.phone ?? ''}
+              onChange={(event) => handleTeacherFormChange('phone', event.target.value)}
+              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+              placeholder="+7..."
+            />
+          </div>
+        </div>
+
+        <div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-stone-500 sm:text-base" htmlFor="admin-create-teacher-subject-name">
+              Предмет
+            </label>
+            <input
+              id="admin-create-teacher-subject-name"
+              type="text"
+              value={teacherForm.subject_name ?? ''}
+              onChange={(event) => handleTeacherFormChange('subject_name', event.target.value)}
+              className="w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-base text-stone-700 shadow-sm outline-none transition focus:border-orange-300 sm:text-lg"
+              placeholder="Например, Литература"
+            />
+          </div>
         </div>
       </div>
 

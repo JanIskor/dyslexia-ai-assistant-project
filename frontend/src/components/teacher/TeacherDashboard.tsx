@@ -42,7 +42,8 @@ import {
   type TeacherProfileEditState,
 } from '@/lib/teacherProfileApi';
 import { sendTeacherStudentMessage } from '@/lib/teacherStudentMessagesApi';
-import { GENDER_OPTIONS, ProfileEditForm, type ProfileEditFieldConfig } from '@/components/profile/ProfileEditForm';
+import { ProfileEditForm, type ProfileEditFieldConfig } from '@/components/profile/ProfileEditForm';
+import { getGenderLabel, getTeacherGenderFormValue, TEACHER_GENDER_OPTIONS } from '@/lib/profileGenderUi';
 
 type TeacherDashboardSection = 'profile' | 'students' | 'incoming-students' | 'materials' | 'assistant';
 type TeacherProfileViewMode = 'view' | 'edit';
@@ -93,7 +94,7 @@ const TEACHER_STUDENTS_PAGE_SIZE = 9;
 const TEACHER_PROFILE_EDIT_FIELDS: ProfileEditFieldConfig[] = [
   { key: 'full_name', label: 'ФИО', type: 'text' },
   { key: 'birth_date', label: 'Дата рождения', type: 'date' },
-  { key: 'gender', label: 'Пол', type: 'select', options: GENDER_OPTIONS },
+  { key: 'gender', label: 'Пол', type: 'select', options: TEACHER_GENDER_OPTIONS },
   { key: 'position', label: 'Должность', type: 'text' },
   { key: 'phone', label: 'Телефон', type: 'text' },
   { key: 'work_email', label: 'Рабочий email', type: 'email' },
@@ -219,7 +220,7 @@ function TeacherProfileCard({
 }) {
   const teacherProfileFields: TeacherProfileField[] = [
     { label: 'Дата рождения:', value: formatProfileDate(profile.birth_date) },
-    { label: 'Пол:', value: profile.gender },
+    { label: 'Пол:', value: getGenderLabel(profile.gender) },
     { label: 'Должность:', value: profile.position },
     { label: 'Номер телефона:', value: profile.phone },
     { label: 'Рабочий email:', value: profile.work_email },
@@ -292,7 +293,7 @@ function buildTeacherProfileEditFormState(
   return {
     full_name: source.full_name ?? '',
     birth_date: source.birth_date ?? '',
-    gender: source.gender ?? '',
+    gender: getTeacherGenderFormValue(source.gender),
     position: source.position ?? '',
     phone: source.phone ?? '',
     work_email: source.work_email ?? '',

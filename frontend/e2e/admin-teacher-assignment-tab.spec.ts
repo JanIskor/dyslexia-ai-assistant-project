@@ -39,10 +39,21 @@ test.describe.serial('admin teacher assignment tab', () => {
     await page.locator('#admin-create-teacher-password').fill(CREATED_TEACHER_PASSWORD);
     await page.locator('#admin-create-teacher-first-name').fill(CREATED_TEACHER_FIRST_NAME);
     await page.locator('#admin-create-teacher-last-name').fill(CREATED_TEACHER_LAST_NAME);
+    await page.locator('#admin-create-teacher-birth-date').fill('1989-04-12');
+    await expect(page.locator('#admin-create-teacher-work-email')).toHaveCount(0);
+    await page.locator('#admin-create-teacher-gender').selectOption('female');
+    await page.locator('#admin-create-teacher-position').fill('Учитель-логопед');
+    await page.locator('#admin-create-teacher-phone').fill('+79001234567');
+    await page.locator('#admin-create-teacher-subject-name').fill('Русский язык');
     await page.getByRole('button', { name: 'Создать преподавателя' }).click();
 
     await expect(page.getByTestId('admin-create-teacher-message')).toHaveText(
       `Преподаватель ${CREATED_TEACHER_FULL_NAME} создан.`,
     );
+
+    await page.getByTestId('admin-sidebar-teachers-tab').click();
+    await page.getByRole('heading', { name: CREATED_TEACHER_FULL_NAME }).click();
+    await expect(page.getByText(CREATED_TEACHER_EMAIL)).toBeVisible();
+    await expect(page.getByText('Женский')).toBeVisible();
   });
 });

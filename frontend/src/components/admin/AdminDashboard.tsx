@@ -699,6 +699,12 @@ export function AdminDashboard() {
                                 ? 'admin-sidebar-teacher-assignment-tab'
                               : item.id === 'student-removal-requests'
                                 ? 'admin-sidebar-student-removal-requests-tab'
+                              : item.id === 'student-applications'
+                                ? 'admin-sidebar-student-applications-tab'
+                              : item.id === 'students'
+                                ? 'admin-sidebar-students-tab'
+                              : item.id === 'teachers'
+                                ? 'admin-sidebar-teachers-tab'
                               : undefined
                           }
                           className={`mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-2xl px-5 py-4 text-left text-lg leading-tight transition sm:px-6 sm:text-xl lg:text-2xl ${
