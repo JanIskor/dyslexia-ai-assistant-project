@@ -68,6 +68,12 @@ export interface AdminStudentDirectoryDetail {
   avatar_url: string | null;
 }
 
+export interface AdminStudentDeleteResponse {
+  detail: string;
+  student_user_id: string;
+  notified_teacher_user_id: string | null;
+}
+
 export interface AdminTeacherCreatePayload {
   email: string;
   password: string;
@@ -132,6 +138,10 @@ const getErrorMessage = (
 
   if (detail === 'Teacher deleted') {
     return 'Преподаватель удалён.';
+  }
+
+  if (detail === 'Student deleted') {
+    return 'Ученик удалён.';
   }
 
   if (status >= 500) {
@@ -291,6 +301,19 @@ export const deleteAdminTeacher = async (
     `/api/v1/admin/teachers/${teacherId}`,
     token,
     'Не удалось удалить преподавателя.',
+    {
+      method: 'DELETE',
+    },
+  );
+
+export const deleteAdminStudent = async (
+  token: string,
+  studentId: string,
+): Promise<AdminStudentDeleteResponse> =>
+  requestWithInit<AdminStudentDeleteResponse>(
+    `/api/v1/admin/students/${studentId}`,
+    token,
+    'Не удалось удалить ученика.',
     {
       method: 'DELETE',
     },
