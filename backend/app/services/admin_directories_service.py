@@ -15,6 +15,7 @@ from app.schemas.auth import RegisterRequest
 from app.schemas.admin_directories import (
     AdminTeacherCreateRequest,
     AdminTeacherDeleteResponse,
+    AdminStudentDeleteResponse,
     AdminStudentDetailResponse,
     AdminStudentListItem,
     AdminUnassignedStudentListItem,
@@ -28,6 +29,7 @@ from app.schemas.admin_directories import (
 )
 from app.services.auth_service import create_user, get_user_by_email, normalize_email
 from app.services.admin_applications_service import ASSIGNABLE_APPLICATION_STATUSES, TEACHER_ASSIGNMENT_CAPACITY
+from app.services.notifications_service import create_notification
 
 
 DEFAULT_TEACHER_BIRTH_DATE = date(1970, 1, 1)
@@ -210,6 +212,7 @@ def list_admin_students(
         .join(User, User.id == StudentProfile.user_id)
         .filter(
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfile.full_name.isnot(None),
             func.length(func.trim(StudentProfile.full_name)) > 0,
         )
@@ -255,6 +258,7 @@ def get_admin_student_detail(
         .join(User, User.id == StudentProfile.user_id)
         .filter(
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfile.user_id == student_id,
         )
         .first()
@@ -393,6 +397,78 @@ def delete_admin_teacher(
     )
 
 
+def delete_admin_student(
+    db: Session,
+    *,
+    student_user_id: UUID,
+) -> AdminStudentDeleteResponse:
+    user = (
+        db.query(User)
+        .filter(
+            User.id == student_user_id,
+            User.role == "student",
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    student_profile = db.query(StudentProfile).filter(StudentProfile.user_id == student_user_id).first()
+    if student_profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    active_relation = (
+        db.query(TeacherStudent)
+        .filter(TeacherStudent.student_user_id == student_user_id)
+        .first()
+    )
+    notified_teacher_user_id = active_relation.teacher_user_id if active_relation is not None else None
+
+    if active_relation is not None:
+        student_label = student_profile.full_name or user.email
+        create_notification(
+            db,
+            user_id=active_relation.teacher_user_id,
+            role="teacher",
+            type="student_deleted_by_admin",
+            title="Ученик удалён администратором",
+            message=(
+                f"Ученик {student_label} был удалён администратором и больше не отображается в вашем списке."
+            ),
+            target_view="teacher_students",
+            action_key="open_tab",
+            target_id=student_user_id,
+        )
+        db.delete(active_relation)
+
+    pending_removal_requests = (
+        db.query(StudentTeacherRemovalRequest)
+        .filter(
+            StudentTeacherRemovalRequest.student_user_id == student_user_id,
+            StudentTeacherRemovalRequest.status == "pending",
+        )
+        .all()
+    )
+    resolved_at = datetime.now(timezone.utc)
+    for request in pending_removal_requests:
+        request.status = "approved"
+        request.admin_comment = "Автоматически закрыто при удалении ученика."
+        request.resolved_at = resolved_at
+        request.resolved_by_admin_user_id = None
+
+    student_profile.current_teacher_user_id = None
+    student_profile.teacher_review_status = None
+    user.is_active = False
+    db.commit()
+
+    return AdminStudentDeleteResponse(
+        detail="Student deleted",
+        student_user_id=student_user_id,
+        notified_teacher_user_id=notified_teacher_user_id,
+    )
+
+
 def list_admin_unassigned_students(
     db: Session,
 ) -> AdminUnassignedStudentsListResponse:
@@ -402,6 +478,7 @@ def list_admin_unassigned_students(
         .outerjoin(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
         .filter(
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfile.full_name.isnot(None),
             func.length(func.trim(StudentProfile.full_name)) > 0,
             TeacherStudent.id.is_(None),

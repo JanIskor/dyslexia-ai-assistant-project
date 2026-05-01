@@ -185,6 +185,7 @@ def list_admin_applications(
         .join(User, User.id == StudentProfile.user_id)
         .filter(
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfile.full_name.isnot(None),
             func.length(func.trim(StudentProfile.full_name)) > 0,
             StudentProfile.profile_status.in_(VISIBLE_APPLICATION_STATUSES),
@@ -222,6 +223,7 @@ def list_admin_applications(
         .join(User, User.id == StudentProfileUpdateRequest.student_user_id)
         .filter(
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfileUpdateRequest.status.in_(VISIBLE_UPDATE_REQUEST_STATUSES),
         )
         .order_by(StudentProfileUpdateRequest.full_name.asc())
@@ -407,6 +409,7 @@ def _get_admin_application_or_404(db: Session, application_id) -> StudentProfile
         .filter(
             StudentProfile.id == application_id,
             User.role == "student",
+            User.is_active.is_(True),
             StudentProfile.profile_status.in_(VISIBLE_APPLICATION_STATUSES),
         )
         .first()
@@ -425,6 +428,7 @@ def _get_student_profile_for_assignment_or_404(db: Session, application_id: UUID
         .filter(
             StudentProfile.id == application_id,
             User.role == "student",
+            User.is_active.is_(True),
         )
         .first()
     )
@@ -446,6 +450,7 @@ def _get_profile_update_request_or_none(
         .filter(
             StudentProfileUpdateRequest.id == application_id,
             User.role == "student",
+            User.is_active.is_(True),
         )
         .first()
     )

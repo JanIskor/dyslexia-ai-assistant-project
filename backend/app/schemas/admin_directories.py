@@ -74,6 +74,12 @@ class AdminStudentDetailResponse(BaseModel):
     avatar_url: str | None = None
 
 
+class AdminStudentDeleteResponse(BaseModel):
+    detail: str
+    student_user_id: UUID
+    notified_teacher_user_id: UUID | None = None
+
+
 class AdminTeacherCreateRequest(BaseModel):
     email: EmailStr
     password: str

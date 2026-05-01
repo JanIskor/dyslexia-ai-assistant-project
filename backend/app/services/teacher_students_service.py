@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.student_profile import StudentProfile
 from app.models.teacher_student import TeacherStudent
+from app.models.user import User
 from app.schemas.teacher_students import (
     TeacherStudentDetail,
     TeacherStudentListItem,
@@ -68,8 +69,10 @@ def list_teacher_students(
     query = (
         db.query(StudentProfile)
         .join(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
+        .join(User, User.id == StudentProfile.user_id)
         .filter(
             TeacherStudent.teacher_user_id == teacher_user_id,
+            User.is_active.is_(True),
             StudentProfile.profile_status == "teacher_accepted",
         )
     )
@@ -110,9 +113,11 @@ def get_teacher_student(
     profile = (
         db.query(StudentProfile)
         .join(TeacherStudent, TeacherStudent.student_user_id == StudentProfile.user_id)
+        .join(User, User.id == StudentProfile.user_id)
         .filter(
             TeacherStudent.teacher_user_id == teacher_user_id,
             StudentProfile.user_id == student_user_id,
+            User.is_active.is_(True),
             StudentProfile.profile_status == "teacher_accepted",
         )
         .first()

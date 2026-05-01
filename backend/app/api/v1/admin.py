@@ -15,6 +15,7 @@ from app.schemas.admin_applications import (
 from app.schemas.admin_directories import (
     AdminTeacherCreateRequest,
     AdminTeacherDeleteResponse,
+    AdminStudentDeleteResponse,
     AdminStudentDetailResponse,
     AdminUnassignedStudentsListResponse,
     AdminStudentsListResponse,
@@ -53,6 +54,7 @@ from app.services.admin_applications_service import (
 from app.services.admin_directories_service import (
     create_admin_teacher,
     delete_admin_teacher,
+    delete_admin_student,
     get_admin_student_detail,
     get_admin_teacher_detail,
     list_admin_unassigned_students,
@@ -337,6 +339,16 @@ def read_admin_student_detail(
     db: Session = Depends(get_db),
 ):
     return get_admin_student_detail(db, student_id=student_id)
+
+
+@router.delete("/students/{student_id}", response_model=AdminStudentDeleteResponse)
+def delete_admin_student_endpoint(
+    student_id: UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return delete_admin_student(db, student_user_id=student_id)
 
 
 @router.get("/applications/{application_id}", response_model=AdminApplicationDetailResponse)
