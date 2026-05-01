@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_profile_update_request import TeacherProfileUpdateRequest
 from app.schemas.teacher_profile_edit import TeacherProfileEditRequest, TeacherProfileEditResponse
-from app.services.profile_gender import normalize_profile_gender
 from app.services.notifications_service import create_notification, create_notifications_for_role
 from app.services.storage_service import build_object_name, delete_object, extract_object_name, upload_image
+from app.services.teacher_gender_service import normalize_teacher_gender
 
 
 EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
@@ -140,7 +140,7 @@ def save_teacher_profile_edit_draft(
 
     update_request.full_name = _normalize_text(payload.full_name)
     update_request.birth_date = payload.birth_date
-    update_request.gender = normalize_profile_gender(payload.gender)
+    update_request.gender = normalize_teacher_gender(payload.gender)
     update_request.position = _normalize_text(payload.position)
     update_request.phone = _normalize_text(payload.phone)
     update_request.work_email = _normalize_text(payload.work_email)

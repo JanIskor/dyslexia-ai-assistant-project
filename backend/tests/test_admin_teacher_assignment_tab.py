@@ -195,12 +195,18 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
                 "password": "NewTeacherAssignmentTab123!",
                 "first_name": "Ирина",
                 "last_name": "Соколова",
+                "birth_date": "1989-04-12",
+                "gender": "female",
+                "position": "Учитель-логопед",
+                "phone": "+79001234567",
+                "subject_name": "Русский язык",
             },
         )
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertEqual(payload["full_name"], "Соколова Ирина")
+        self.assertEqual(payload["email"], "new.teacher.assignmenttab@example.com")
         self.assertEqual(payload["current_students_count"], 0)
         self.assertEqual(payload["capacity_limit"], 15)
         self.assertEqual(payload["available_slots"], 15)
@@ -212,6 +218,69 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
             profile = db.query(TeacherProfile).filter(TeacherProfile.user_id == user.id).first()
             self.assertIsNotNone(profile)
             self.assertEqual(profile.full_name, "Соколова Ирина")
+            self.assertEqual(str(profile.birth_date), "1989-04-12")
+            self.assertEqual(profile.gender, "female")
+            self.assertEqual(profile.position, "Учитель-логопед")
+            self.assertEqual(profile.phone, "+79001234567")
+            self.assertEqual(profile.work_email, "new.teacher.assignmenttab@example.com")
+            self.assertEqual(profile.subject_name, "Русский язык")
+
+    def test_teacher_detail_returns_email_from_user_and_gender_codes_are_saved(self) -> None:
+        token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")
+
+        create_response = self.client.post(
+            "/api/v1/admin/teachers",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": "detail.teacher.assignmenttab@example.com",
+                "password": "DetailTeacherAssignmentTab123!",
+                "first_name": "Мария",
+                "last_name": "Павлова",
+                "gender": "not_specified",
+            },
+        )
+        self.assertEqual(create_response.status_code, 200, create_response.text)
+        teacher_id = create_response.json()["id"]
+
+        detail_response = self.client.get(
+            f"/api/v1/admin/teachers/{teacher_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(detail_response.status_code, 200, detail_response.text)
+        detail_payload = detail_response.json()
+        self.assertEqual(detail_payload["email"], "detail.teacher.assignmenttab@example.com")
+        self.assertEqual(detail_payload["gender"], "not_specified")
+
+    def test_teacher_gender_codes_are_saved_for_all_supported_values(self) -> None:
+        token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")
+
+        test_cases = [
+            ("gender.ns.assignmenttab@example.com", "not_specified"),
+            ("gender.m.assignmenttab@example.com", "male"),
+            ("gender.f.assignmenttab@example.com", "female"),
+        ]
+
+        for index, (email, gender) in enumerate(test_cases):
+            response = self.client.post(
+                "/api/v1/admin/teachers",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "email": email,
+                    "password": f"GenderTeacher{index}123!",
+                    "first_name": "Тест",
+                    "last_name": f"Гендер{index}",
+                    "gender": gender,
+                },
+            )
+            self.assertEqual(response.status_code, 200, response.text)
+
+        with self.SessionLocal() as db:
+            for email, gender in test_cases:
+                user = db.query(User).filter(User.email == email).first()
+                self.assertIsNotNone(user)
+                profile = db.query(TeacherProfile).filter(TeacherProfile.user_id == user.id).first()
+                self.assertIsNotNone(profile)
+                self.assertEqual(profile.gender, gender)
 
     def test_duplicate_email_is_rejected(self) -> None:
         token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")

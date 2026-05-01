@@ -38,6 +38,7 @@ PROFILE_STATUS_TO_APPLICATION_STATUS = {
     "in_review": "На рассмотрении",
     "needs_completion": "На доработке",
     "approved": "Подтверждена",
+    "needs_assignment": "NEEDS_ASSIGNMENT",
     "teacher_accepted": "Принята преподавателем",
     "teacher_rejected": "Отклонена преподавателем",
     "draft": "Черновик",
@@ -49,6 +50,7 @@ APPLICATION_STATUS_TO_PROFILE_STATUSES = {
     "На рассмотрении": ("in_review",),
     "На доработке": ("needs_completion",),
     "Подтверждена": ("approved",),
+    "NEEDS_ASSIGNMENT": ("needs_assignment",),
     "Принята преподавателем": ("teacher_accepted",),
     "Отклонена преподавателем": ("teacher_rejected",),
 }
@@ -58,6 +60,7 @@ VISIBLE_APPLICATION_STATUSES = (
     "in_review",
     "needs_completion",
     "approved",
+    "needs_assignment",
     "teacher_accepted",
     "teacher_rejected",
 )
@@ -68,7 +71,7 @@ VISIBLE_UPDATE_REQUEST_STATUSES = (
 )
 VISIBLE_TEACHER_UPDATE_REQUEST_STATUSES = VISIBLE_UPDATE_REQUEST_STATUSES
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
-ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "approved", "teacher_rejected"}
+ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "approved", "needs_assignment", "teacher_rejected"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
 TEACHER_REVIEW_STATUS_LABELS = {
     "pending": "Ожидает решения преподавателя",
@@ -86,6 +89,7 @@ UPDATE_REQUEST_STATUS_TO_APPLICATION_STATUS = {
 REQUEST_KIND_INITIAL_PROFILE = "initial_profile"
 REQUEST_KIND_STUDENT_PROFILE_UPDATE = "profile_update"
 REQUEST_KIND_TEACHER_PROFILE_UPDATE = "teacher_profile_update"
+REQUEST_KIND_SYSTEM_ASSIGNMENT_EVENT = "system_assignment_event"
 
 
 def map_application_status(profile_status: str) -> str:
@@ -106,7 +110,10 @@ def map_teacher_review_status(review_status: str | None) -> str | None:
 def get_admin_application_status_filters() -> AdminApplicationsFiltersResponse:
     return AdminApplicationsFiltersResponse(
         statuses=[
-            AdminApplicationStatusFilterOption(value=status_label, label=status_label)
+            AdminApplicationStatusFilterOption(
+                value=status_label,
+                label="Требует назначения" if status_label == "NEEDS_ASSIGNMENT" else status_label,
+            )
             for status_label in APPLICATION_STATUS_TO_PROFILE_STATUSES
         ]
     )
@@ -274,8 +281,16 @@ def list_admin_applications(
             id=profile.id,
             full_name=profile.full_name,
             status=map_application_status(profile.profile_status),
-            request_kind=REQUEST_KIND_INITIAL_PROFILE,
-            request_kind_label="Первичная заявка",
+            request_kind=(
+                REQUEST_KIND_SYSTEM_ASSIGNMENT_EVENT
+                if profile.profile_status == "needs_assignment"
+                else REQUEST_KIND_INITIAL_PROFILE
+            ),
+            request_kind_label=(
+                "Системное событие"
+                if profile.profile_status == "needs_assignment"
+                else "Первичная заявка"
+            ),
         )
         for profile in profiles
         if profile.user_id not in update_request_student_ids
@@ -316,8 +331,16 @@ def _build_admin_application_detail(profile: StudentProfile) -> AdminApplication
 
     return AdminApplicationDetailResponse(
         id=profile.id,
-        request_kind=REQUEST_KIND_INITIAL_PROFILE,
-        request_kind_label="Первичная заявка",
+        request_kind=(
+            REQUEST_KIND_SYSTEM_ASSIGNMENT_EVENT
+            if profile.profile_status == "needs_assignment"
+            else REQUEST_KIND_INITIAL_PROFILE
+        ),
+        request_kind_label=(
+            "Системное событие"
+            if profile.profile_status == "needs_assignment"
+            else "Первичная заявка"
+        ),
         full_name=profile.full_name,
         birth_date=profile.birth_date,
         gender=profile.gender,

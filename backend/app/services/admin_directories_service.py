@@ -30,10 +30,14 @@ from app.schemas.admin_directories import (
 from app.services.auth_service import create_user, get_user_by_email, normalize_email
 from app.services.admin_applications_service import ASSIGNABLE_APPLICATION_STATUSES, TEACHER_ASSIGNMENT_CAPACITY
 from app.services.notifications_service import create_notification
+from app.services.teacher_gender_service import (
+    TEACHER_GENDER_NOT_SPECIFIED,
+    normalize_teacher_gender,
+)
 
 
 DEFAULT_TEACHER_BIRTH_DATE = date(1970, 1, 1)
-DEFAULT_TEACHER_GENDER = "Не указан"
+DEFAULT_TEACHER_GENDER = TEACHER_GENDER_NOT_SPECIFIED
 DEFAULT_TEACHER_POSITION = "Преподаватель"
 DEFAULT_TEACHER_PHONE = "Не указан"
 DEFAULT_TEACHER_SUBJECT = "Не указан"
@@ -116,6 +120,7 @@ def list_admin_teachers(
     query = (
         db.query(
             TeacherProfile,
+            User.email.label("email"),
             func.count(TeacherStudent.id).label("current_students_count"),
         )
         .join(User, User.id == TeacherProfile.user_id)
@@ -125,7 +130,7 @@ def list_admin_teachers(
             User.is_active.is_(True),
             TeacherProfile.full_name.isnot(None),
         )
-        .group_by(TeacherProfile.id)
+        .group_by(TeacherProfile.id, User.email)
     )
 
     if search and search.strip():
@@ -144,13 +149,13 @@ def list_admin_teachers(
                 id=profile.user_id,
                 full_name=profile.full_name,
                 subject_name=profile.subject_name,
-                work_email=profile.work_email,
+                email=email,
                 avatar_url=profile.avatar_url,
                 current_students_count=current_students_count,
                 capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
                 available_slots=max(0, TEACHER_ASSIGNMENT_CAPACITY - current_students_count),
             )
-            for profile, current_students_count in items
+            for profile, email, current_students_count in items
         ],
         page=page,
         page_size=page_size,
@@ -167,6 +172,7 @@ def get_admin_teacher_detail(
     profile = (
         db.query(
             TeacherProfile,
+            User.email.label("email"),
             func.count(TeacherStudent.id).label("current_students_count"),
         )
         .join(User, User.id == TeacherProfile.user_id)
@@ -176,22 +182,22 @@ def get_admin_teacher_detail(
             User.is_active.is_(True),
             TeacherProfile.user_id == teacher_id,
         )
-        .group_by(TeacherProfile.id)
+        .group_by(TeacherProfile.id, User.email)
         .first()
     )
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
-    teacher_profile, current_students_count = profile
+    teacher_profile, email, current_students_count = profile
 
     return AdminTeacherDetailResponse(
         id=teacher_profile.user_id,
         full_name=teacher_profile.full_name,
+        email=email,
         birth_date=teacher_profile.birth_date,
         gender=teacher_profile.gender,
         position=teacher_profile.position,
         phone=teacher_profile.phone,
-        work_email=teacher_profile.work_email,
         subject_name=teacher_profile.subject_name,
         avatar_url=teacher_profile.avatar_url,
         current_students_count=current_students_count,
@@ -301,15 +307,15 @@ def create_admin_teacher(
 
     user.role = "teacher"
     full_name = f"{payload.last_name.strip()} {payload.first_name.strip()}".strip()
-    work_email = str(payload.work_email).strip() if payload.work_email is not None else normalize_email(payload.email)
+    normalized_email = normalize_email(payload.email)
     profile = TeacherProfile(
         user_id=user.id,
         full_name=full_name,
         birth_date=payload.birth_date or DEFAULT_TEACHER_BIRTH_DATE,
-        gender=(payload.gender or DEFAULT_TEACHER_GENDER).strip(),
+        gender=normalize_teacher_gender(payload.gender or DEFAULT_TEACHER_GENDER),
         position=(payload.position or DEFAULT_TEACHER_POSITION).strip(),
         phone=(payload.phone or DEFAULT_TEACHER_PHONE).strip(),
-        work_email=work_email,
+        work_email=normalized_email,
         subject_name=(payload.subject_name or DEFAULT_TEACHER_SUBJECT).strip(),
         avatar_url=None,
     )
@@ -321,7 +327,7 @@ def create_admin_teacher(
         id=profile.user_id,
         full_name=profile.full_name,
         subject_name=profile.subject_name,
-        work_email=profile.work_email,
+        email=user.email,
         avatar_url=profile.avatar_url,
         current_students_count=0,
         capacity_limit=TEACHER_ASSIGNMENT_CAPACITY,
@@ -365,7 +371,7 @@ def delete_admin_teacher(
             .all()
         )
         for student_profile in student_profiles:
-            student_profile.profile_status = "approved"
+            student_profile.profile_status = "needs_assignment"
             student_profile.current_teacher_user_id = None
             student_profile.teacher_review_status = None
 

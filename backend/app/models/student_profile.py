@@ -10,7 +10,7 @@ class StudentProfile(Base):
     __tablename__ = "student_profiles"
     __table_args__ = (
         CheckConstraint(
-            "profile_status IN ('draft', 'submitted', 'in_review', 'needs_completion', 'approved', 'teacher_accepted', 'teacher_rejected')",
+            "profile_status IN ('draft', 'submitted', 'in_review', 'needs_completion', 'approved', 'needs_assignment', 'teacher_accepted', 'teacher_rejected')",
             name="ck_student_profiles_status",
         ),
         CheckConstraint(

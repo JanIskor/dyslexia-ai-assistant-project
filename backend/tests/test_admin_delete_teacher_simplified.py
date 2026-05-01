@@ -14,8 +14,10 @@ from app.main import app
 from app.models.learning_material import LearningMaterial
 from app.models.student_learning_material import StudentLearningMaterial
 from app.models.student_profile import StudentProfile
+from app.models.student_profile_update_request import StudentProfileUpdateRequest
 from app.models.student_teacher_removal_request import StudentTeacherRemovalRequest
 from app.models.teacher_profile import TeacherProfile
+from app.models.teacher_profile_update_request import TeacherProfileUpdateRequest
 from app.models.teacher_student import TeacherStudent
 from app.models.user import User
 from app.services.auth_service import get_password_hash
@@ -48,6 +50,8 @@ class AdminDeleteTeacherSimplifiedTests(unittest.TestCase):
         User.__table__.create(bind=cls.engine, checkfirst=True)
         TeacherProfile.__table__.create(bind=cls.engine, checkfirst=True)
         StudentProfile.__table__.create(bind=cls.engine, checkfirst=True)
+        StudentProfileUpdateRequest.__table__.create(bind=cls.engine, checkfirst=True)
+        TeacherProfileUpdateRequest.__table__.create(bind=cls.engine, checkfirst=True)
         TeacherStudent.__table__.create(bind=cls.engine, checkfirst=True)
         StudentTeacherRemovalRequest.__table__.create(bind=cls.engine, checkfirst=True)
         LearningMaterial.__table__.create(bind=cls.engine, checkfirst=True)
@@ -79,6 +83,8 @@ class AdminDeleteTeacherSimplifiedTests(unittest.TestCase):
             db.query(LearningMaterial).delete()
             db.query(StudentTeacherRemovalRequest).delete()
             db.query(TeacherStudent).delete()
+            db.query(TeacherProfileUpdateRequest).delete()
+            db.query(StudentProfileUpdateRequest).delete()
             db.query(StudentProfile).delete()
             db.query(TeacherProfile).delete()
             db.query(User).delete()
@@ -305,7 +311,7 @@ class AdminDeleteTeacherSimplifiedTests(unittest.TestCase):
             )
             self.assertEqual(len(released_profiles), 2)
             for profile in released_profiles:
-                self.assertEqual(profile.profile_status, "approved")
+                self.assertEqual(profile.profile_status, "needs_assignment")
                 self.assertIsNone(profile.current_teacher_user_id)
                 self.assertIsNone(profile.teacher_review_status)
 
@@ -342,6 +348,38 @@ class AdminDeleteTeacherSimplifiedTests(unittest.TestCase):
         self.assertIn(str(self.student_assigned_id), returned_user_ids)
         self.assertIn(str(self.student_assigned_second_id), returned_user_ids)
         self.assertIn(str(self.student_unassigned_id), returned_user_ids)
+        status_by_user_id = {
+            item["user_id"]: item["profile_status"] for item in unassigned_response.json()["items"]
+        }
+        self.assertEqual(status_by_user_id[str(self.student_assigned_id)], "needs_assignment")
+        self.assertEqual(status_by_user_id[str(self.student_assigned_second_id)], "needs_assignment")
+
+    def test_released_students_appear_in_applications_as_system_assignment_events(self) -> None:
+        token = self._login("admin.delete.teacher@example.com", "AdminDeleteTeacher123!")
+
+        delete_response = self.client.delete(
+            f"/api/v1/admin/teachers/{self.teacher_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(delete_response.status_code, 200, delete_response.text)
+
+        applications_response = self.client.get(
+            "/api/v1/admin/applications",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(applications_response.status_code, 200, applications_response.text)
+
+        item_by_name = {
+            item["full_name"]: item for item in applications_response.json()["items"]
+        }
+        first_released = item_by_name["Иванов Андрей Викторович"]
+        second_released = item_by_name["Петров Артём Сергеевич"]
+
+        self.assertEqual(first_released["status"], "NEEDS_ASSIGNMENT")
+        self.assertEqual(first_released["request_kind"], "system_assignment_event")
+        self.assertEqual(first_released["request_kind_label"], "Системное событие")
+        self.assertEqual(second_released["status"], "NEEDS_ASSIGNMENT")
+        self.assertEqual(second_released["request_kind"], "system_assignment_event")
 
     def test_deleted_teacher_not_in_assignment_options_or_active_teacher_list(self) -> None:
         token = self._login("admin.delete.teacher@example.com", "AdminDeleteTeacher123!")

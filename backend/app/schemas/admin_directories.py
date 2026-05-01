@@ -13,7 +13,7 @@ class AdminTeacherListItem(BaseModel):
     id: UUID
     full_name: str
     subject_name: str
-    work_email: str
+    email: str
     avatar_url: str | None = None
     current_students_count: int | None = None
     capacity_limit: int | None = None
@@ -31,11 +31,11 @@ class AdminTeachersListResponse(BaseModel):
 class AdminTeacherDetailResponse(BaseModel):
     id: UUID
     full_name: str
+    email: str
     birth_date: date
     gender: str
     position: str
     phone: str
-    work_email: str
     subject_name: str
     avatar_url: str | None = None
     current_students_count: int = 0
@@ -86,10 +86,9 @@ class AdminTeacherCreateRequest(BaseModel):
     first_name: str
     last_name: str
     birth_date: date | None = None
-    gender: str | None = None
+    gender: Literal["not_specified", "male", "female"] | None = None
     position: str | None = None
     phone: str | None = None
-    work_email: EmailStr | None = None
     subject_name: str | None = None
 
 
