@@ -10,7 +10,9 @@ import { AdminStudentRemovalRequestsPanel } from '@/components/admin/AdminStuden
 import { AdminTeacherAssignmentTabPanel } from '@/components/admin/AdminTeacherAssignmentTabPanel';
 import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
 import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
+import { ConfirmActionModal } from '@/components/admin/ConfirmActionModal';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
+import { useBulkSelection } from '@/components/admin/useBulkSelection';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
@@ -49,6 +51,8 @@ const ADMIN_MENU_ITEMS: Array<{ id: AdminDashboardSection; label: string }> = [
   { id: 'knowledge-base', label: 'Правила адаптации' },
 ];
 
+const ADMIN_APPLICATIONS_PAGE_SIZE = 10;
+
 function DashboardSkeleton() {
   return (
     <div className="flex min-h-screen flex-col bg-[linear-gradient(180deg,#fff9f5_0%,#fdf2eb_100%)] text-stone-700">
@@ -75,6 +79,7 @@ function ApplicationsPanel({
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [applicationsPage, setApplicationsPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<AdminApplicationDetail | null>(null);
   const [gradeLabel, setGradeLabel] = useState('');
   const [enrollmentDate, setEnrollmentDate] = useState('');
@@ -91,10 +96,28 @@ function ApplicationsPanel({
   const [isAssigningTeacher, setIsAssigningTeacher] = useState(false);
   const [selectedTeacherUserId, setSelectedTeacherUserId] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [isApplicationsSelectionMode, setIsApplicationsSelectionMode] = useState(false);
+  const [isApplicationsDeleteModalOpen, setIsApplicationsDeleteModalOpen] = useState(false);
+
+  const {
+    selectedIds: selectedApplicationIds,
+    selectedCount: selectedApplicationsCount,
+    clearSelection: clearApplicationSelection,
+    toggleSelection: toggleApplicationSelection,
+    removeMissingSelections: removeMissingApplicationSelections,
+  } = useBulkSelection(applications.map((application) => application.id));
 
   useEffect(() => {
     setSelectedApplicationId(initialApplicationId);
   }, [initialApplicationId]);
+
+  useEffect(() => {
+    setApplicationsPage(1);
+  }, [searchValue, selectedStatuses]);
+
+  useEffect(() => {
+    removeMissingApplicationSelections();
+  }, [applications, removeMissingApplicationSelections]);
 
   const isProfileCompleteForAssignment = (application: AdminApplicationDetail) =>
     Boolean(
@@ -124,6 +147,18 @@ function ApplicationsPanel({
 
     return null;
   };
+
+  const canDeleteApplication = (_application: AdminApplication) => false;
+
+  const deletableApplications = applications.filter(canDeleteApplication);
+  const applicationsTotalPages = Math.max(
+    1,
+    Math.ceil(applications.length / ADMIN_APPLICATIONS_PAGE_SIZE),
+  );
+  const visibleApplications = applications.slice(
+    (applicationsPage - 1) * ADMIN_APPLICATIONS_PAGE_SIZE,
+    applicationsPage * ADMIN_APPLICATIONS_PAGE_SIZE,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -237,6 +272,31 @@ function ApplicationsPanel({
         ? currentStatuses.filter((currentStatus) => currentStatus !== status)
         : [...currentStatuses, status]
     );
+  };
+
+  const handleEnterApplicationsSelectionMode = () => {
+    clearApplicationSelection();
+    setIsApplicationsSelectionMode(true);
+  };
+
+  const handleExitApplicationsSelectionMode = () => {
+    clearApplicationSelection();
+    setIsApplicationsSelectionMode(false);
+    setIsApplicationsDeleteModalOpen(false);
+  };
+
+  const handleDeleteSelectedApplications = () => {
+    if (selectedApplicationsCount === 0) {
+      return;
+    }
+    setIsApplicationsDeleteModalOpen(true);
+  };
+
+  const handleDeleteAllApplications = () => {
+    if (deletableApplications.length === 0) {
+      return;
+    }
+    setIsApplicationsDeleteModalOpen(true);
   };
 
   const handleSave = async () => {
@@ -438,10 +498,29 @@ function ApplicationsPanel({
         isFilterOpen={isFilterOpen}
         onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
         statusOptions={statusOptions}
-        applications={applications}
+        applications={visibleApplications}
         onSelectApplication={setSelectedApplicationId}
+        selectionMode={isApplicationsSelectionMode}
+        selectedApplicationIds={selectedApplicationIds}
+        canDeleteApplication={canDeleteApplication}
+        onEnterSelectionMode={handleEnterApplicationsSelectionMode}
+        onExitSelectionMode={handleExitApplicationsSelectionMode}
+        onToggleApplicationSelection={toggleApplicationSelection}
+        onDeleteSelected={handleDeleteSelectedApplications}
+        onDeleteAll={handleDeleteAllApplications}
+        page={applicationsPage}
+        totalPages={applicationsTotalPages}
+        onPageChange={setApplicationsPage}
         isLoading={isLoading}
         errorMessage={errorMessage}
+      />
+      <ConfirmActionModal
+        isOpen={isApplicationsDeleteModalOpen}
+        title="Удалить заявки?"
+        description="Массовое удаление заявок учеников будет включено после отдельного шага по систематизации статусов и правил удаления."
+        confirmLabel="Удалить"
+        onCancel={() => setIsApplicationsDeleteModalOpen(false)}
+        onConfirm={() => setIsApplicationsDeleteModalOpen(false)}
       />
     </>
   );

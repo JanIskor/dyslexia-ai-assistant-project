@@ -212,4 +212,67 @@ test.describe.serial('teacher student removal requests', () => {
     };
     expect(teacherStudentsPayload.items.some((item) => item.full_name === STUDENT_FULL_NAME)).toBeFalsy();
   });
+
+  test('admin can bulk delete selected and all removal requests', async ({ page, request }) => {
+    const teacherAuth = await loginViaApi(request, TEACHER_EMAIL, TEACHER_PASSWORD);
+    const teacherStudentsResponse = await request.get(`${BACKEND_BASE_URL}/api/v1/teacher/students`, {
+      headers: { Authorization: `Bearer ${teacherAuth.access_token}` },
+    });
+    expect(teacherStudentsResponse.ok()).toBeTruthy();
+    const teacherStudentsPayload = (await teacherStudentsResponse.json()) as {
+      items: Array<{ id: string; full_name: string }>;
+    };
+    const seedStudent = teacherStudentsPayload.items.find((item) => item.full_name === STUDENT_FULL_NAME);
+    expect(seedStudent).toBeTruthy();
+
+    const createResponse = await request.post(
+      `${BACKEND_BASE_URL}/api/v1/teacher/students/${seedStudent?.id}/removal-requests`,
+      {
+        headers: {
+          Authorization: `Bearer ${teacherAuth.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        data: { reason: 'Первая заявка для bulk delete.' },
+      },
+    );
+    expect(createResponse.ok()).toBeTruthy();
+
+    await rejectPendingRemovalRequests(request);
+
+    const secondResponse = await request.post(
+      `${BACKEND_BASE_URL}/api/v1/teacher/students/${seedStudent?.id}/removal-requests`,
+      {
+        headers: {
+          Authorization: `Bearer ${teacherAuth.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        data: { reason: 'Вторая заявка для bulk delete.' },
+      },
+    );
+    expect(secondResponse.ok()).toBeTruthy();
+
+    await openAdminRemovalRequests(page);
+    await expect(page.getByRole('button', { name: 'Удалить' })).toBeVisible();
+    await page.getByRole('button', { name: 'Удалить' }).click();
+
+    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]');
+    await expect(checkboxes).toHaveCount(2);
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Удалить' }).click();
+    await expect(checkboxes).toHaveCount(2);
+    await page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]').first().check();
+    await page.getByRole('button', { name: 'Удалить выбранные' }).click();
+    await expect(page.getByRole('heading', { name: 'Удалить заявки?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Удалить' }).last().click();
+    await expect(page.getByText('Заявка на открепление удалена.')).toBeVisible();
+
+    await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Удалить все' }).click();
+    await expect(page.getByRole('heading', { name: 'Удалить заявки?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Удалить' }).last().click();
+    await expect(page.getByText('Заявка на открепление удалена.')).toBeVisible();
+    await expect(page.getByText('Заявок на открепление пока нет.')).toBeVisible();
+  });
 });

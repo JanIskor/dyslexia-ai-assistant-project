@@ -21,7 +21,7 @@ const TEACHERS_SORT_OPTIONS: Array<{ value: AdminTeachersSort; label: string }> 
   { value: 'surname_desc', label: 'По фамилии Я-А' },
 ];
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 10;
 
 function formatDisplayDate(value: string): string {
   const parsedDate = new Date(value);

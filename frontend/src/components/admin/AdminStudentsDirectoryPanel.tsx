@@ -23,7 +23,7 @@ const STUDENTS_SORT_OPTIONS: Array<{ value: AdminStudentsSort; label: string }> 
   { value: 'grade_desc', label: 'По классу ↓' },
 ];
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 10;
 
 function formatDisplayDate(value: string | null): string {
   if (!value) {

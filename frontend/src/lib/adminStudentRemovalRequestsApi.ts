@@ -23,6 +23,16 @@ export interface AdminStudentRemovalRequestsResponse {
   items: AdminStudentRemovalRequestItem[];
 }
 
+export interface AdminStudentRemovalRequestsBulkDeletePayload {
+  ids?: string[];
+  delete_all?: boolean;
+}
+
+export interface AdminStudentRemovalRequestsBulkDeleteResponse {
+  detail: string;
+  deleted_count: number;
+}
+
 export interface AdminStudentRemovalRequestUpdatePayload {
   action: 'approve' | 'reject';
   admin_comment?: string | null;
@@ -53,6 +63,10 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null, fallbackMess
 
   if (detail === 'Teacher student relation not found') {
     return 'Связь преподавателя и ученика уже неактивна.';
+  }
+
+  if (detail === 'Removal requests deleted') {
+    return 'Заявки удалены.';
   }
 
   if (status >= 500) {
@@ -113,6 +127,20 @@ export const updateAdminStudentRemovalRequest = async (
     'Не удалось обработать заявку на открепление.',
     {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const deleteAdminStudentRemovalRequests = async (
+  token: string,
+  payload: AdminStudentRemovalRequestsBulkDeletePayload,
+): Promise<AdminStudentRemovalRequestsBulkDeleteResponse> =>
+  request<AdminStudentRemovalRequestsBulkDeleteResponse>(
+    '/api/v1/admin/student-removal-requests',
+    token,
+    'Не удалось удалить заявки на открепление.',
+    {
+      method: 'DELETE',
       body: JSON.stringify(payload),
     },
   );
