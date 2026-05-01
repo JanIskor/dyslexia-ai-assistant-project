@@ -198,6 +198,16 @@ class TeacherStudentRemovalRequestTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def _create_pending_request_for_other_teacher(self) -> dict:
+        teacher_token = self._login("teacher.other.removal@example.com", "TeacherOtherRemoval123!")
+        response = self.client.post(
+            f"/api/v1/teacher/students/{self.foreign_student_id}/removal-requests",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={"reason": "Вторая заявка для bulk delete."},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
     def test_teacher_can_create_removal_request_for_own_student(self) -> None:
         payload = self._create_pending_request()
 
@@ -371,6 +381,95 @@ class TeacherStudentRemovalRequestTests(unittest.TestCase):
         )
         self.assertEqual(student_response.status_code, 403, student_response.text)
         self.assertEqual(student_response.json()["detail"], "Admin access required")
+
+    def test_admin_can_bulk_delete_removal_requests_by_ids(self) -> None:
+        first_request = self._create_pending_request()
+        second_request = self._create_pending_request_for_other_teacher()
+        admin_token = self._login("admin.removal@example.com", "AdminRemoval123!")
+
+        response = self.client.request(
+            "DELETE",
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"ids": [first_request["id"]], "delete_all": False},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["deleted_count"], 1)
+
+        list_response = self.client.get(
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        self.assertEqual(list_response.status_code, 200, list_response.text)
+        remaining_ids = [item["id"] for item in list_response.json()["items"]]
+        self.assertNotIn(first_request["id"], remaining_ids)
+        self.assertIn(second_request["id"], remaining_ids)
+
+        with self.SessionLocal() as db:
+            deleted_request = (
+                db.query(StudentTeacherRemovalRequest)
+                .filter(StudentTeacherRemovalRequest.id == uuid.UUID(first_request["id"]))
+                .first()
+            )
+            self.assertIsNotNone(deleted_request)
+            self.assertIsNotNone(deleted_request.deleted_at)
+
+    def test_admin_can_bulk_delete_all_removal_requests(self) -> None:
+        self._create_pending_request()
+        self._create_pending_request_for_other_teacher()
+        admin_token = self._login("admin.removal@example.com", "AdminRemoval123!")
+
+        response = self.client.request(
+            "DELETE",
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"ids": [], "delete_all": True},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["deleted_count"], 2)
+
+        list_response = self.client.get(
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        self.assertEqual(list_response.status_code, 200, list_response.text)
+        self.assertEqual(list_response.json()["items"], [])
+
+    def test_bulk_delete_unknown_id_is_safe(self) -> None:
+        self._create_pending_request()
+        admin_token = self._login("admin.removal@example.com", "AdminRemoval123!")
+
+        response = self.client.request(
+            "DELETE",
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"ids": [str(uuid.uuid4())], "delete_all": False},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["deleted_count"], 0)
+
+        list_response = self.client.get(
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        self.assertEqual(len(list_response.json()["items"]), 1)
+
+    def test_non_admin_cannot_bulk_delete_removal_requests(self) -> None:
+        request_payload = self._create_pending_request()
+        teacher_token = self._login("teacher.removal@example.com", "TeacherRemoval123!")
+
+        response = self.client.request(
+            "DELETE",
+            "/api/v1/admin/student-removal-requests",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+            json={"ids": [request_payload["id"]], "delete_all": False},
+        )
+
+        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(response.json()["detail"], "Admin access required")
 
 
 if __name__ == "__main__":

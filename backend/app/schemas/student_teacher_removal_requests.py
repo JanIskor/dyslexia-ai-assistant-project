@@ -32,6 +32,16 @@ class StudentTeacherRemovalRequestsListResponse(BaseModel):
     items: list[StudentTeacherRemovalRequestItem]
 
 
+class AdminStudentRemovalRequestsBulkDeleteRequest(BaseModel):
+    ids: list[UUID] = []
+    delete_all: bool = False
+
+
+class AdminStudentRemovalRequestsBulkDeleteResponse(BaseModel):
+    detail: str
+    deleted_count: int
+
+
 class TeacherStudentRemovalRequestCreateRequest(BaseModel):
     reason: str | None = None
 

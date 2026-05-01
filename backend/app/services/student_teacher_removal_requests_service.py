@@ -9,6 +9,8 @@ from app.models.student_teacher_removal_request import StudentTeacherRemovalRequ
 from app.models.teacher_profile import TeacherProfile
 from app.models.teacher_student import TeacherStudent
 from app.schemas.student_teacher_removal_requests import (
+    AdminStudentRemovalRequestsBulkDeleteRequest,
+    AdminStudentRemovalRequestsBulkDeleteResponse,
     AdminStudentRemovalRequestUpdateRequest,
     StudentTeacherRemovalRequestItem,
     StudentTeacherRemovalRequestStudentInfo,
@@ -96,6 +98,7 @@ def create_teacher_student_removal_request(
             StudentTeacherRemovalRequest.teacher_user_id == teacher_user_id,
             StudentTeacherRemovalRequest.student_user_id == student_user_id,
             StudentTeacherRemovalRequest.status == "pending",
+            StudentTeacherRemovalRequest.deleted_at.is_(None),
         )
         .first()
     )
@@ -148,6 +151,7 @@ def list_admin_student_removal_requests(
         )
         .join(TeacherProfile, TeacherProfile.user_id == StudentTeacherRemovalRequest.teacher_user_id)
         .join(StudentProfile, StudentProfile.user_id == StudentTeacherRemovalRequest.student_user_id)
+        .filter(StudentTeacherRemovalRequest.deleted_at.is_(None))
         .order_by(
             StudentTeacherRemovalRequest.created_at.desc(),
             StudentTeacherRemovalRequest.id.desc(),
@@ -175,7 +179,14 @@ def resolve_admin_student_removal_request(
     request_id: UUID,
     payload: AdminStudentRemovalRequestUpdateRequest,
 ) -> StudentTeacherRemovalRequestItem:
-    request = db.query(StudentTeacherRemovalRequest).filter(StudentTeacherRemovalRequest.id == request_id).first()
+    request = (
+        db.query(StudentTeacherRemovalRequest)
+        .filter(
+            StudentTeacherRemovalRequest.id == request_id,
+            StudentTeacherRemovalRequest.deleted_at.is_(None),
+        )
+        .first()
+    )
     if request is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Removal request not found")
 
@@ -258,4 +269,32 @@ def resolve_admin_student_removal_request(
         teacher_full_name=teacher_profile.full_name,
         student_full_name=student_profile.full_name,
         student_grade_label=student_profile.grade_label,
+    )
+
+
+def delete_admin_student_removal_requests(
+    db: Session,
+    *,
+    payload: AdminStudentRemovalRequestsBulkDeleteRequest,
+) -> AdminStudentRemovalRequestsBulkDeleteResponse:
+    query = db.query(StudentTeacherRemovalRequest).filter(StudentTeacherRemovalRequest.deleted_at.is_(None))
+
+    if not payload.delete_all:
+        if not payload.ids:
+            return AdminStudentRemovalRequestsBulkDeleteResponse(
+                detail="Removal requests deleted",
+                deleted_count=0,
+            )
+        query = query.filter(StudentTeacherRemovalRequest.id.in_(payload.ids))
+
+    requests = query.all()
+    deleted_at = datetime.now(timezone.utc)
+    for request in requests:
+        request.deleted_at = deleted_at
+
+    db.commit()
+
+    return AdminStudentRemovalRequestsBulkDeleteResponse(
+        detail="Removal requests deleted",
+        deleted_count=len(requests),
     )

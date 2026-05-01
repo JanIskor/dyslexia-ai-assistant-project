@@ -37,6 +37,8 @@ from app.schemas.knowledge_documents import (
     KnowledgeDocumentsListResponse,
 )
 from app.schemas.student_teacher_removal_requests import (
+    AdminStudentRemovalRequestsBulkDeleteRequest,
+    AdminStudentRemovalRequestsBulkDeleteResponse,
     AdminStudentRemovalRequestUpdateRequest,
     StudentTeacherRemovalRequestItem,
     StudentTeacherRemovalRequestsListResponse,
@@ -72,6 +74,7 @@ from app.services.knowledge_base_service import (
 )
 from app.services.retrieval_service import retrieve_relevant_chunks
 from app.services.student_teacher_removal_requests_service import (
+    delete_admin_student_removal_requests,
     list_admin_student_removal_requests,
     resolve_admin_student_removal_request,
 )
@@ -106,6 +109,19 @@ def patch_admin_student_removal_request(
         request_id=request_id,
         payload=payload,
     )
+
+
+@router.delete(
+    "/student-removal-requests",
+    response_model=AdminStudentRemovalRequestsBulkDeleteResponse,
+)
+def delete_admin_student_removal_requests_endpoint(
+    payload: AdminStudentRemovalRequestsBulkDeleteRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return delete_admin_student_removal_requests(db, payload=payload)
 
 
 @router.post("/knowledge-base/documents", response_model=KnowledgeDocumentResponse)

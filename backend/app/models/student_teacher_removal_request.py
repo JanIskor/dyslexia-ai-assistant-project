@@ -23,3 +23,4 @@ class StudentTeacherRemovalRequest(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     resolved_by_admin_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
