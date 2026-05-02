@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, object_session
 from uuid import UUID
 
@@ -13,6 +15,7 @@ from app.models.teacher_student_rejection import TeacherStudentRejection
 from app.models.user import User
 from app.schemas.admin_applications import (
     AdminAssignTeacherRequest,
+    AdminApplicationsBulkDeleteResponse,
     AdminApplicationDetailResponse,
     AdminApplicationListItem,
     AdminApplicationsFiltersResponse,
@@ -68,8 +71,14 @@ VISIBLE_UPDATE_REQUEST_STATUSES = (
     "submitted",
     "in_review",
     "revision_requested",
+    "approved",
 )
 VISIBLE_TEACHER_UPDATE_REQUEST_STATUSES = VISIBLE_UPDATE_REQUEST_STATUSES
+ACTIVE_UPDATE_REQUEST_STATUSES = (
+    "submitted",
+    "in_review",
+    "revision_requested",
+)
 REVIEWABLE_APPLICATION_STATUSES = {"submitted", "in_review"}
 ASSIGNABLE_APPLICATION_STATUSES = {"submitted", "in_review", "approved", "needs_assignment", "teacher_rejected"}
 TEACHER_ASSIGNMENT_CAPACITY = 15
@@ -196,6 +205,12 @@ def list_admin_applications(
             StudentProfile.full_name.isnot(None),
             func.length(func.trim(StudentProfile.full_name)) > 0,
             StudentProfile.profile_status.in_(VISIBLE_APPLICATION_STATUSES),
+            or_(
+                StudentProfile.admin_application_deleted_at.is_(None),
+                StudentProfile.profile_status.in_(
+                    ("submitted", "in_review", "needs_completion", "approved", "needs_assignment", "teacher_rejected")
+                ),
+            ),
         )
         .order_by(StudentProfile.full_name.asc())
     )
@@ -232,6 +247,10 @@ def list_admin_applications(
             User.role == "student",
             User.is_active.is_(True),
             StudentProfileUpdateRequest.status.in_(VISIBLE_UPDATE_REQUEST_STATUSES),
+            or_(
+                StudentProfileUpdateRequest.deleted_at.is_(None),
+                StudentProfileUpdateRequest.status.in_(ACTIVE_UPDATE_REQUEST_STATUSES),
+            ),
         )
         .order_by(StudentProfileUpdateRequest.full_name.asc())
     )
@@ -257,6 +276,10 @@ def list_admin_applications(
         .filter(
             User.role == "teacher",
             TeacherProfileUpdateRequest.status.in_(VISIBLE_TEACHER_UPDATE_REQUEST_STATUSES),
+            or_(
+                TeacherProfileUpdateRequest.deleted_at.is_(None),
+                TeacherProfileUpdateRequest.status.in_(ACTIVE_UPDATE_REQUEST_STATUSES),
+            ),
         )
         .order_by(TeacherProfileUpdateRequest.full_name.asc())
     )
@@ -443,6 +466,12 @@ def _get_admin_application_or_404(db: Session, application_id) -> StudentProfile
             User.role == "student",
             User.is_active.is_(True),
             StudentProfile.profile_status.in_(VISIBLE_APPLICATION_STATUSES),
+            or_(
+                StudentProfile.admin_application_deleted_at.is_(None),
+                StudentProfile.profile_status.in_(
+                    ("submitted", "in_review", "needs_completion", "approved", "needs_assignment", "teacher_rejected")
+                ),
+            ),
         )
         .first()
     )
@@ -483,6 +512,10 @@ def _get_profile_update_request_or_none(
             StudentProfileUpdateRequest.id == application_id,
             User.role == "student",
             User.is_active.is_(True),
+            or_(
+                StudentProfileUpdateRequest.deleted_at.is_(None),
+                StudentProfileUpdateRequest.status.in_(ACTIVE_UPDATE_REQUEST_STATUSES),
+            ),
         )
         .first()
     )
@@ -511,6 +544,10 @@ def _get_teacher_profile_update_request_or_none(
         .filter(
             TeacherProfileUpdateRequest.id == application_id,
             User.role == "teacher",
+            or_(
+                TeacherProfileUpdateRequest.deleted_at.is_(None),
+                TeacherProfileUpdateRequest.status.in_(ACTIVE_UPDATE_REQUEST_STATUSES),
+            ),
         )
         .first()
     )
@@ -567,6 +604,18 @@ def _has_teacher_rejected_student(
         .first()
         is not None
     )
+
+
+def _can_delete_student_profile_application(profile: StudentProfile) -> bool:
+    return profile.profile_status == "teacher_accepted"
+
+
+def _can_delete_student_profile_update_request(update_request: StudentProfileUpdateRequest) -> bool:
+    return update_request.status == "approved"
+
+
+def _can_delete_teacher_profile_update_request(update_request: TeacherProfileUpdateRequest) -> bool:
+    return update_request.status == "approved"
 
 
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
@@ -889,3 +938,104 @@ def assign_teacher_to_application(
         ) from exc
 
     return _build_admin_application_detail(profile)
+
+
+def delete_admin_applications(
+    db: Session,
+    *,
+    payload,
+) -> AdminApplicationsBulkDeleteResponse:
+    deleted_count = 0
+    deleted_at = datetime.now(timezone.utc)
+
+    if payload.delete_all:
+        student_profiles = (
+            db.query(StudentProfile)
+            .join(User, User.id == StudentProfile.user_id)
+            .filter(
+                User.role == "student",
+                User.is_active.is_(True),
+                StudentProfile.profile_status == "teacher_accepted",
+                StudentProfile.admin_application_deleted_at.is_(None),
+                ~StudentProfile.user_id.in_(
+                    db.query(StudentProfileUpdateRequest.student_user_id).filter(
+                        StudentProfileUpdateRequest.status.in_(VISIBLE_UPDATE_REQUEST_STATUSES),
+                        or_(
+                            StudentProfileUpdateRequest.deleted_at.is_(None),
+                            StudentProfileUpdateRequest.status.in_(ACTIVE_UPDATE_REQUEST_STATUSES),
+                        ),
+                    )
+                ),
+            )
+            .all()
+        )
+        student_update_requests = (
+            db.query(StudentProfileUpdateRequest)
+            .filter(
+                StudentProfileUpdateRequest.status == "approved",
+                StudentProfileUpdateRequest.deleted_at.is_(None),
+            )
+            .all()
+        )
+        teacher_update_requests = (
+            db.query(TeacherProfileUpdateRequest)
+            .filter(
+                TeacherProfileUpdateRequest.status == "approved",
+                TeacherProfileUpdateRequest.deleted_at.is_(None),
+            )
+            .all()
+        )
+    else:
+        requested_ids = set(payload.ids)
+        if not requested_ids:
+            return AdminApplicationsBulkDeleteResponse(detail="Applications deleted", deleted_count=0)
+
+        student_profiles = (
+            db.query(StudentProfile)
+            .join(User, User.id == StudentProfile.user_id)
+            .filter(
+                StudentProfile.id.in_(requested_ids),
+                User.role == "student",
+                User.is_active.is_(True),
+                StudentProfile.admin_application_deleted_at.is_(None),
+            )
+            .all()
+        )
+        student_update_requests = (
+            db.query(StudentProfileUpdateRequest)
+            .filter(
+                StudentProfileUpdateRequest.id.in_(requested_ids),
+                StudentProfileUpdateRequest.deleted_at.is_(None),
+            )
+            .all()
+        )
+        teacher_update_requests = (
+            db.query(TeacherProfileUpdateRequest)
+            .filter(
+                TeacherProfileUpdateRequest.id.in_(requested_ids),
+                TeacherProfileUpdateRequest.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+    for profile in student_profiles:
+        if _can_delete_student_profile_application(profile):
+            profile.admin_application_deleted_at = deleted_at
+            deleted_count += 1
+
+    for update_request in student_update_requests:
+        if _can_delete_student_profile_update_request(update_request):
+            update_request.deleted_at = deleted_at
+            deleted_count += 1
+
+    for update_request in teacher_update_requests:
+        if _can_delete_teacher_profile_update_request(update_request):
+            update_request.deleted_at = deleted_at
+            deleted_count += 1
+
+    db.commit()
+
+    return AdminApplicationsBulkDeleteResponse(
+        detail="Applications deleted",
+        deleted_count=deleted_count,
+    )

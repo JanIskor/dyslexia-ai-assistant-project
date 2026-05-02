@@ -31,6 +31,7 @@ class StudentProfile(Base):
     profile_status = Column(String, nullable=False, default="draft", server_default="draft")
     current_teacher_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     teacher_review_status = Column(String, nullable=True)
+    admin_application_deleted_at = Column(DateTime(timezone=True), nullable=True)
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

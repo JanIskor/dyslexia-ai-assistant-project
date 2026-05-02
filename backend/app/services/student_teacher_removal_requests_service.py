@@ -277,7 +277,10 @@ def delete_admin_student_removal_requests(
     *,
     payload: AdminStudentRemovalRequestsBulkDeleteRequest,
 ) -> AdminStudentRemovalRequestsBulkDeleteResponse:
-    query = db.query(StudentTeacherRemovalRequest).filter(StudentTeacherRemovalRequest.deleted_at.is_(None))
+    query = db.query(StudentTeacherRemovalRequest).filter(
+        StudentTeacherRemovalRequest.deleted_at.is_(None),
+        StudentTeacherRemovalRequest.status.in_(("approved", "rejected")),
+    )
 
     if not payload.delete_all:
         if not payload.ids:

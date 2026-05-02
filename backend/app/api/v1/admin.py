@@ -6,6 +6,8 @@ from app.core.dependencies import get_current_admin, get_db
 from app.models.user import User
 from app.schemas.admin_applications import (
     AdminAssignTeacherRequest,
+    AdminApplicationsBulkDeleteRequest,
+    AdminApplicationsBulkDeleteResponse,
     AdminApplicationDetailResponse,
     AdminApplicationsFiltersResponse,
     AdminApplicationsListResponse,
@@ -46,6 +48,7 @@ from app.schemas.student_teacher_removal_requests import (
 from app.services.admin_applications_service import (
     approve_admin_application,
     assign_teacher_to_application,
+    delete_admin_applications,
     get_admin_application_detail,
     get_admin_application_status_filters,
     list_admin_teacher_assignment_options,
@@ -258,6 +261,16 @@ def read_admin_applications(
     db: Session = Depends(get_db),
 ):
     return list_admin_applications(db, search=search, statuses=status)
+
+
+@router.delete("/applications", response_model=AdminApplicationsBulkDeleteResponse)
+def delete_admin_applications_endpoint(
+    payload: AdminApplicationsBulkDeleteRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return delete_admin_applications(db, payload=payload)
 
 
 @router.get("/applications/filters", response_model=AdminApplicationsFiltersResponse)

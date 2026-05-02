@@ -29,5 +29,6 @@ class StudentProfileUpdateRequest(Base):
     avatar_url = Column(String, nullable=True)
     status = Column(String, nullable=False, default="draft", server_default="draft")
     admin_comment = Column(Text, nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

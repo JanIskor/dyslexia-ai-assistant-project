@@ -19,6 +19,16 @@ class AdminApplicationsListResponse(BaseModel):
     items: list[AdminApplicationListItem]
 
 
+class AdminApplicationsBulkDeleteRequest(BaseModel):
+    ids: list[UUID] = []
+    delete_all: bool = False
+
+
+class AdminApplicationsBulkDeleteResponse(BaseModel):
+    detail: str
+    deleted_count: int
+
+
 class AdminApplicationStatusFilterOption(BaseModel):
     value: str
     label: str
