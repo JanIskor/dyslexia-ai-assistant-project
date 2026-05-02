@@ -83,7 +83,7 @@ def ensure_student_profile(db: Session, student_user: User) -> None:
         profile.enrollment_date = date(2017, 9, 3)
         profile.quote = "Маленький человек может сделать гораздо больше, чем он об этом предполагает"
         profile.avatar_url = None
-        profile.profile_status = "draft"
+        profile.profile_status = "teacher_accepted"
         profile.submitted_at = None
         db.commit()
         return
@@ -99,7 +99,7 @@ def ensure_student_profile(db: Session, student_user: User) -> None:
             enrollment_date=date(2017, 9, 3),
             quote="Маленький человек может сделать гораздо больше, чем он об этом предполагает",
             avatar_url=None,
-            profile_status="draft",
+            profile_status="teacher_accepted",
             submitted_at=None,
         )
     )
@@ -107,15 +107,17 @@ def ensure_student_profile(db: Session, student_user: User) -> None:
 
 
 def ensure_teacher_student_link(db: Session, teacher_user: User, student_user: User) -> None:
-    link = (
+    links = (
         db.query(TeacherStudent)
-        .filter(
-            TeacherStudent.teacher_user_id == teacher_user.id,
-            TeacherStudent.student_user_id == student_user.id,
-        )
-        .first()
+        .filter(TeacherStudent.student_user_id == student_user.id)
+        .all()
     )
-    if link:
+    if links:
+        primary_link = links[0]
+        primary_link.teacher_user_id = teacher_user.id
+        for stale_link in links[1:]:
+            db.delete(stale_link)
+        db.commit()
         return
 
     db.add(
@@ -141,6 +143,11 @@ def seed() -> None:
         ensure_teacher_profile(db, teacher_user)
         ensure_student_profile(db, student_user)
         ensure_teacher_student_link(db, teacher_user, student_user)
+        profile = db.query(StudentProfile).filter(StudentProfile.user_id == student_user.id).first()
+        if profile is not None:
+            profile.current_teacher_user_id = teacher_user.id
+            profile.teacher_review_status = "accepted"
+            db.commit()
 
         print(f"Teacher seed user: {TEACHER_EMAIL}")
         print(f"Student seed user: {STUDENT_EMAIL}")

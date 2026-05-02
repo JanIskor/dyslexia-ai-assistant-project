@@ -70,8 +70,9 @@ export function searchApplicationsInGroup(
 }
 
 export function getVisibleApplicationGroups(
-  _applications: AdminApplication[],
+  applications: AdminApplication[],
 ): AdminApplicationGroup[] {
+  void applications;
   return [
     'INITIAL',
     'PROFILE_UPDATES',

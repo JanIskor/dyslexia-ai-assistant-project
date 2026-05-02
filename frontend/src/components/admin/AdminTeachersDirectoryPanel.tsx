@@ -255,7 +255,7 @@ export function AdminTeachersDirectoryPanel({ token }: { token: string }) {
                     <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Удалить преподавателя?</h2>
                     <p className="mt-2 text-sm text-stone-500 sm:text-base">
                       У этого преподавателя сейчас {selectedTeacher.current_students_count} учеников из{' '}
-                      {selectedTeacher.capacity_limit ?? 15}. После удаления преподавателя все его ученики перейдут в состояние "ожидает назначения".
+                      {selectedTeacher.capacity_limit ?? 15}. После удаления преподавателя все его ученики перейдут в состояние &quot;ожидает назначения&quot;.
                     </p>
                   </div>
                   <button

@@ -613,6 +613,7 @@ function ApplicationsPanel({
         title="Удалить заявки?"
         description="Будут удалены только завершённые заявки. Активные процессы останутся в системе."
         confirmLabel="Удалить"
+        isSubmitting={isDeletingApplications}
         onCancel={() => setIsApplicationsDeleteModalOpen(false)}
         onConfirm={() => void handleConfirmDeleteApplications()}
       />
