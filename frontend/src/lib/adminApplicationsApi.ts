@@ -51,11 +51,6 @@ export interface AdminApplicationDetail {
   can_assign_teacher: boolean;
 }
 
-export interface AdminApplicationStatusFilterOption {
-  value: string;
-  label: string;
-}
-
 export interface AdminTeacherAssignmentOption {
   teacher_user_id: string;
   full_name: string;
@@ -78,10 +73,6 @@ export interface AdminApplicationsBulkDeletePayload {
 export interface AdminApplicationsBulkDeleteResponse {
   detail: string;
   deleted_count: number;
-}
-
-export interface AdminApplicationFiltersResponse {
-  statuses: AdminApplicationStatusFilterOption[];
 }
 
 export interface AdminTeacherAssignmentOptionsResponse {
@@ -263,32 +254,6 @@ export const deleteAdminApplications = async (
   }
 
   return parseJson<AdminApplicationsBulkDeleteResponse>(response);
-};
-
-export const getAdminApplicationFilters = async (
-  token: string,
-): Promise<AdminApplicationFiltersResponse> => {
-  const response = await fetch(buildApiUrl('/api/v1/admin/applications/filters'), {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    let body: ApiErrorBody | null = null;
-
-    try {
-      body = await parseJson<ApiErrorBody>(response);
-    } catch {
-      body = null;
-    }
-
-    throw new Error(getErrorMessage(response.status, body));
-  }
-
-  return parseJson<AdminApplicationFiltersResponse>(response);
 };
 
 export const getAdminTeacherAssignmentOptions = async (
