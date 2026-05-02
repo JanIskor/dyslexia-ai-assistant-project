@@ -70,6 +70,16 @@ export interface AdminApplicationsResponse {
   items: AdminApplication[];
 }
 
+export interface AdminApplicationsBulkDeletePayload {
+  ids?: string[];
+  delete_all?: boolean;
+}
+
+export interface AdminApplicationsBulkDeleteResponse {
+  detail: string;
+  deleted_count: number;
+}
+
 export interface AdminApplicationFiltersResponse {
   statuses: AdminApplicationStatusFilterOption[];
 }
@@ -213,6 +223,34 @@ export const getAdminApplications = async (
   }
 
   return parseJson<AdminApplicationsResponse>(response);
+};
+
+export const deleteAdminApplications = async (
+  token: string,
+  payload: AdminApplicationsBulkDeletePayload,
+): Promise<AdminApplicationsBulkDeleteResponse> => {
+  const response = await fetch(buildApiUrl('/api/v1/admin/applications'), {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  return parseJson<AdminApplicationsBulkDeleteResponse>(response);
 };
 
 export const getAdminApplicationFilters = async (

@@ -57,6 +57,9 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const paginatedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const canDeleteRemovalRequest = (item: AdminStudentRemovalRequestItem) => item.status !== 'pending';
+  const getDeleteRestrictionReason = (item: AdminStudentRemovalRequestItem) =>
+    item.status === 'pending' ? 'Заявка на открепление ещё ожидает решения администратора.' : null;
 
   const loadItems = useCallback(async () => {
     setIsLoading(true);
@@ -131,10 +134,11 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
   };
 
   const handleDeleteAll = () => {
-    if (items.length === 0) {
+    const deletableIds = items.filter(canDeleteRemovalRequest).map((item) => item.id);
+    if (deletableIds.length === 0) {
       return;
     }
-    replaceSelection(items.map((item) => item.id));
+    replaceSelection(deletableIds);
     setDeleteScope('all');
   };
 
@@ -211,8 +215,9 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
                       <input
                         type="checkbox"
                         checked={selectedIdSet.has(item.id)}
+                        disabled={!canDeleteRemovalRequest(item)}
                         onChange={() => toggleSelection(item.id)}
-                        className="mt-1 h-5 w-5 rounded border-orange-200 text-orange-400 focus:ring-orange-200"
+                        className="mt-1 h-5 w-5 rounded border-orange-200 text-orange-400 focus:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label={`Выбрать заявку ${item.student.full_name}`}
                       />
                     ) : null}
@@ -242,6 +247,11 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
                       {item.admin_comment ? (
                         <p className="mt-3 text-sm leading-relaxed text-stone-500 sm:text-base">
                           Комментарий администратора: {item.admin_comment}
+                        </p>
+                      ) : null}
+                      {selectionMode && !canDeleteRemovalRequest(item) ? (
+                        <p className="mt-3 text-xs text-stone-400">
+                          {getDeleteRestrictionReason(item)}
                         </p>
                       ) : null}
                     </div>
@@ -303,10 +313,10 @@ export function AdminStudentRemovalRequestsPanel({ token }: { token: string }) {
             <button
               type="button"
               onClick={handleDeleteAll}
-              disabled={items.length === 0}
+              disabled={items.filter(canDeleteRemovalRequest).length === 0}
               className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Удалить все
+              Удалить все доступные
             </button>
             <button
               type="button"

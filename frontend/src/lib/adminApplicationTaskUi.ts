@@ -7,6 +7,10 @@ export type ApplicationResponsibleLabel =
   | 'Завершено';
 
 export type ApplicationAvailableAction = 'approve' | 'request_changes' | 'assign_teacher';
+export interface ApplicationDeleteAvailability {
+  canDelete: boolean;
+  reason: string | null;
+}
 
 type TaskAwareApplication = Pick<
   AdminApplicationDetail,
@@ -153,6 +157,43 @@ export function getApplicationAvailableActions(
 
 export function isApplicationActionableByAdmin(application: TaskAwareApplication): boolean {
   return getApplicationAvailableActions(application).length > 0;
+}
+
+export function getApplicationDeleteAvailability(
+  application: TaskAwareApplication,
+): ApplicationDeleteAvailability {
+  const displayStatus = getApplicationDisplayStatus(application);
+  const responsibleLabel = getApplicationResponsibleLabel(application);
+
+  if (responsibleLabel === 'Завершено') {
+    return { canDelete: true, reason: null };
+  }
+
+  if (displayStatus === 'Требует назначения') {
+    return {
+      canDelete: false,
+      reason: 'Для ученика ещё нужно назначить преподавателя.',
+    };
+  }
+
+  if (responsibleLabel === 'Ожидает преподавателя') {
+    return {
+      canDelete: false,
+      reason: 'Заявка ещё ожидает решения преподавателя.',
+    };
+  }
+
+  if (responsibleLabel === 'Ожидает ученика') {
+    return {
+      canDelete: false,
+      reason: 'Заявка находится на доработке и ещё не завершена.',
+    };
+  }
+
+  return {
+    canDelete: false,
+    reason: 'Заявка ещё ожидает решения администратора.',
+  };
 }
 
 export function getTaskUiApplicationId(application: AdminApplication | AdminApplicationDetail): string {

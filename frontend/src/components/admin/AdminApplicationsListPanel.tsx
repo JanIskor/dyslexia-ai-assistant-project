@@ -25,6 +25,7 @@ interface AdminApplicationsListPanelProps {
   onToggleApplicationSelection: (applicationId: string) => void;
   onDeleteSelected: () => void;
   onDeleteAll: () => void;
+  getDeleteRestrictionReason: (application: AdminApplication) => string | null;
   visibleGroups: AdminApplicationGroup[];
   selectedGroup: AdminApplicationGroup;
   onSelectGroup: (group: AdminApplicationGroup) => void;
@@ -35,6 +36,8 @@ interface AdminApplicationsListPanelProps {
   onPageChange: (page: number) => void;
   isLoading: boolean;
   errorMessage: string | null;
+  statusMessage: string | null;
+  statusType: 'error' | 'success';
 }
 
 export function AdminApplicationsListPanel({
@@ -50,6 +53,7 @@ export function AdminApplicationsListPanel({
   onToggleApplicationSelection,
   onDeleteSelected,
   onDeleteAll,
+  getDeleteRestrictionReason,
   visibleGroups,
   selectedGroup,
   onSelectGroup,
@@ -60,6 +64,8 @@ export function AdminApplicationsListPanel({
   onPageChange,
   isLoading,
   errorMessage,
+  statusMessage,
+  statusType,
 }: AdminApplicationsListPanelProps) {
   const deletableApplications = applications.filter(canDeleteApplication);
 
@@ -120,7 +126,7 @@ export function AdminApplicationsListPanel({
               disabled={deletableApplications.length === 0}
               className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-white px-5 py-3 text-sm font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Удалить все
+              Удалить все доступные
             </button>
             <button
               type="button"
@@ -144,6 +150,18 @@ export function AdminApplicationsListPanel({
         )}
       </div>
 
+      {statusMessage ? (
+        <p
+          className={`mt-4 rounded-2xl border px-4 py-3 text-sm sm:text-base ${
+            statusType === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {statusMessage}
+        </p>
+      ) : null}
+
       <div className="mt-5 rounded-[26px] border border-orange-50/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,249,246,0.96))] px-3 py-3 sm:px-4 sm:py-4">
         {isLoading ? (
           <div className="rounded-[22px] px-4 py-8 text-base text-stone-400 sm:px-5 sm:text-lg">Загружаем заявки...</div>
@@ -159,6 +177,7 @@ export function AdminApplicationsListPanel({
               const displayStatus = getApplicationDisplayStatus(application);
               const statusUi = getAdminModerationStatusUi(displayStatus);
               const responsibleLabel = getApplicationResponsibleLabel(application);
+              const deleteRestrictionReason = getDeleteRestrictionReason(application);
 
               return (
                 <li
@@ -192,7 +211,7 @@ export function AdminApplicationsListPanel({
                         </span>
                         {selectionMode && !canDeleteApplication(application) ? (
                           <span className="mt-2 block text-xs text-stone-400">
-                            Удаление будет доступно после отдельного шага по систематизации статусов.
+                            {deleteRestrictionReason ?? 'Эту заявку сейчас нельзя удалить.'}
                           </span>
                         ) : null}
                       </span>

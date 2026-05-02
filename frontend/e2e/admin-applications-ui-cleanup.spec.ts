@@ -27,6 +27,16 @@ function buildGroupedApplications() {
       can_assign_teacher: false,
     },
     {
+      id: 'profile-update-approved-1',
+      full_name: 'Профиль Подтверждён',
+      status: 'Подтверждена',
+      request_kind: 'profile_update',
+      request_kind_label: 'Изменение профиля ученика',
+      current_teacher_user_id: null,
+      teacher_review_status: null,
+      can_assign_teacher: false,
+    },
+    {
       id: 'teacher-profile-update-1',
       full_name: 'Преподаватель Профиль',
       status: 'На доработке',
@@ -178,6 +188,19 @@ function buildApplicationDetail(applicationId: string) {
       can_edit_admin_fields: false,
       can_assign_teacher: false,
     },
+    'profile-update-approved-1': {
+      ...common,
+      id: 'profile-update-approved-1',
+      full_name: 'Профиль Подтверждён',
+      request_kind: 'profile_update',
+      request_kind_label: 'Обновление профиля',
+      status: 'Подтверждена',
+      current_teacher_user_id: null,
+      current_teacher_full_name: null,
+      teacher_review_status: null,
+      can_edit_admin_fields: false,
+      can_assign_teacher: false,
+    },
   };
 
   return details[applicationId];
@@ -186,12 +209,12 @@ function buildApplicationDetail(applicationId: string) {
 function buildRemovalRequests(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     id: `removal-${index + 1}`,
-    status: 'pending',
+    status: index === 0 ? 'approved' : index === 1 ? 'rejected' : 'pending',
     reason: `Причина ${index + 1}`,
     admin_comment: null,
     created_at: '2026-05-01T10:00:00Z',
-    resolved_at: null,
-    resolved_by_admin_user_id: null,
+    resolved_at: index < 2 ? '2026-05-01T11:00:00Z' : null,
+    resolved_by_admin_user_id: index < 2 ? 'admin-1' : null,
     teacher: {
       user_id: `teacher-${index + 1}`,
       full_name: `Преподаватель ${index + 1}`,
@@ -245,10 +268,29 @@ async function fulfillDirectoryPage(route: Route, prefix: 'student' | 'teacher')
 
 test.describe.serial('admin applications ui cleanup', () => {
   test('applications use task-oriented statuses, responsible labels, inner tabs, and scoped search', async ({ page }) => {
+    let applications = buildGroupedApplications();
+    let removalRequests = buildRemovalRequests(11);
+
     await page.route('**/api/v1/admin/applications*', async (route) => {
       const url = new URL(route.request().url());
       const pathname = url.pathname;
       const applicationId = pathname.split('/').pop();
+
+      if (route.request().method() === 'DELETE') {
+        const payload = route.request().postDataJSON() as { ids?: string[]; delete_all?: boolean };
+        const requestedIds = new Set(payload.ids ?? []);
+        const beforeCount = applications.length;
+        applications = applications.filter((item) => !requestedIds.has(item.id));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            detail: 'Applications deleted',
+            deleted_count: beforeCount - applications.length,
+          }),
+        });
+        return;
+      }
 
       if (applicationId && applicationId !== 'applications') {
         const detail = buildApplicationDetail(applicationId);
@@ -269,7 +311,7 @@ test.describe.serial('admin applications ui cleanup', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: buildGroupedApplications(),
+          items: applications,
         }),
       });
     });
@@ -313,11 +355,34 @@ test.describe.serial('admin applications ui cleanup', () => {
     });
 
     await page.route('**/api/v1/admin/student-removal-requests', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        const payload = route.request().postDataJSON() as { ids?: string[]; delete_all?: boolean };
+        const deletableIds = new Set(
+          removalRequests.filter((item) => item.status !== 'pending').map((item) => item.id),
+        );
+        if (payload.delete_all) {
+          removalRequests = removalRequests.filter((item) => item.status === 'pending');
+        } else {
+          const requestedIds = new Set((payload.ids ?? []).filter((id) => deletableIds.has(id)));
+          removalRequests = removalRequests.filter((item) => !requestedIds.has(item.id));
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            detail: 'Removal requests deleted',
+            deleted_count: payload.delete_all ? 2 : (payload.ids ?? []).filter((id) => deletableIds.has(id)).length,
+          }),
+        });
+        return;
+      }
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: buildRemovalRequests(11),
+          items: removalRequests,
         }),
       });
     });
@@ -412,6 +477,16 @@ test.describe.serial('admin applications ui cleanup', () => {
 
     await page.getByRole('button', { name: 'Удалить' }).click();
     await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]')).toHaveCount(2);
+    await expect(page.getByText('Для ученика ещё нужно назначить преподавателя.')).toBeVisible();
+
+    await page.getByTestId('admin-application-group-accepted').click();
+    await page.getByRole('button', { name: 'Удалить' }).click();
+    await page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]').first().check();
+    await page.getByRole('button', { name: 'Удалить выбранные' }).click();
+    await expect(page.getByRole('heading', { name: 'Удалить заявки?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Удалить' }).last().click();
+    await expect(page.getByText('Заявка удалена.')).toBeVisible();
+    await expect(page.getByText('Принятый Ученик')).toHaveCount(0);
 
     await page.getByTestId('admin-sidebar-student-removal-requests-tab').click();
     await expect(page.getByRole('heading', { name: 'Заявки на открепление' })).toBeVisible();
@@ -420,8 +495,20 @@ test.describe.serial('admin applications ui cleanup', () => {
 
     await page.getByRole('button', { name: 'Удалить' }).click();
     await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]')).toHaveCount(10);
+    await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]:not(:disabled)')).toHaveCount(2);
+    await expect(page.getByText('Заявка на открепление ещё ожидает решения администратора.')).toBeVisible();
     await page.getByRole('button', { name: 'Отмена' }).click();
     await expect(page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Удалить' }).click();
+    await page.locator('input[type="checkbox"][aria-label^="Выбрать заявку "]').first().check();
+    await page.getByRole('button', { name: 'Удалить выбранные' }).click();
+    await page.getByRole('button', { name: 'Удалить' }).last().click();
+    await expect(page.getByText('Заявка на открепление удалена.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Удалить все доступные' }).click();
+    await page.getByRole('button', { name: 'Удалить' }).last().click();
+    await expect(page.getByText('Заявки на открепление удалены.')).toBeVisible();
 
     await page.getByRole('button', { name: '2' }).click();
     await expect(page.getByTestId('admin-student-removal-request-card')).toHaveCount(1);

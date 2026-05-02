@@ -28,6 +28,7 @@ import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
   approveAdminApplication,
   assignTeacherToApplication,
+  deleteAdminApplications,
   getAdminApplicationDetail,
   getAdminApplications,
   getAdminTeacherAssignmentOptions,
@@ -37,6 +38,7 @@ import {
   type AdminApplicationDetail,
   type AdminTeacherAssignmentOption,
 } from '@/lib/adminApplicationsApi';
+import { getApplicationDeleteAvailability } from '@/lib/adminApplicationTaskUi';
 
 type AdminDashboardSection =
   | 'student-applications'
@@ -92,6 +94,8 @@ function ApplicationsPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detailMessage, setDetailMessage] = useState<string | null>(null);
   const [detailMessageType, setDetailMessageType] = useState<'error' | 'success'>('success');
+  const [listStatusMessage, setListStatusMessage] = useState<string | null>(null);
+  const [listStatusType, setListStatusType] = useState<'error' | 'success'>('success');
   const [assignmentOptions, setAssignmentOptions] = useState<AdminTeacherAssignmentOption[]>([]);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [isLoadingAssignmentOptions, setIsLoadingAssignmentOptions] = useState(false);
@@ -100,12 +104,15 @@ function ApplicationsPanel({
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [isApplicationsSelectionMode, setIsApplicationsSelectionMode] = useState(false);
   const [isApplicationsDeleteModalOpen, setIsApplicationsDeleteModalOpen] = useState(false);
+  const [applicationsDeleteScope, setApplicationsDeleteScope] = useState<'selected' | 'all' | null>(null);
+  const [isDeletingApplications, setIsDeletingApplications] = useState(false);
 
   const {
     selectedIds: selectedApplicationIds,
     selectedCount: selectedApplicationsCount,
     clearSelection: clearApplicationSelection,
     toggleSelection: toggleApplicationSelection,
+    replaceSelection: replaceApplicationSelection,
     removeMissingSelections: removeMissingApplicationSelections,
   } = useBulkSelection(applications.map((application) => application.id));
 
@@ -150,7 +157,10 @@ function ApplicationsPanel({
     return null;
   };
 
-  const canDeleteApplication = (_application: AdminApplication) => false;
+  const canDeleteApplication = (application: AdminApplication) =>
+    getApplicationDeleteAvailability(application).canDelete;
+  const getDeleteRestrictionReason = (application: AdminApplication) =>
+    getApplicationDeleteAvailability(application).reason;
 
   const visibleGroups = getVisibleApplicationGroups(applications);
 
@@ -269,12 +279,14 @@ function ApplicationsPanel({
     clearApplicationSelection();
     setIsApplicationsSelectionMode(false);
     setIsApplicationsDeleteModalOpen(false);
+    setApplicationsDeleteScope(null);
   };
 
   const handleDeleteSelectedApplications = () => {
     if (selectedApplicationsCount === 0) {
       return;
     }
+    setApplicationsDeleteScope('selected');
     setIsApplicationsDeleteModalOpen(true);
   };
 
@@ -282,7 +294,41 @@ function ApplicationsPanel({
     if (deletableApplications.length === 0) {
       return;
     }
+    replaceApplicationSelection(deletableApplications.map((application) => application.id));
+    setApplicationsDeleteScope('all');
     setIsApplicationsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDeleteApplications = async () => {
+    if (!applicationsDeleteScope) {
+      return;
+    }
+
+    setIsDeletingApplications(true);
+    setDetailMessage(null);
+    setErrorMessage(null);
+    setListStatusMessage(null);
+
+    try {
+      const response = await deleteAdminApplications(token, {
+        ids:
+          applicationsDeleteScope === 'selected'
+            ? selectedApplicationIds
+            : deletableApplications.map((application) => application.id),
+      });
+      const refreshedApplications = await getAdminApplications(token, '', []);
+      setApplications(refreshedApplications.items);
+      setListStatusType('success');
+      setListStatusMessage(response.deleted_count === 1 ? 'Заявка удалена.' : 'Заявки удалены.');
+      handleExitApplicationsSelectionMode();
+    } catch (error) {
+      setListStatusType('error');
+      setListStatusMessage(error instanceof Error ? error.message : 'Не удалось удалить заявки.');
+    } finally {
+      setApplicationsDeleteScope(null);
+      setIsApplicationsDeleteModalOpen(false);
+      setIsDeletingApplications(false);
+    }
   };
 
   const handleSave = async () => {
@@ -488,6 +534,7 @@ function ApplicationsPanel({
         onToggleApplicationSelection={toggleApplicationSelection}
         onDeleteSelected={handleDeleteSelectedApplications}
         onDeleteAll={handleDeleteAllApplications}
+        getDeleteRestrictionReason={getDeleteRestrictionReason}
         visibleGroups={visibleGroups}
         selectedGroup={selectedGroup}
         onSelectGroup={setSelectedGroup}
@@ -498,14 +545,16 @@ function ApplicationsPanel({
         onPageChange={setApplicationsPage}
         isLoading={isLoading}
         errorMessage={errorMessage}
+        statusMessage={listStatusMessage}
+        statusType={listStatusType}
       />
       <ConfirmActionModal
         isOpen={isApplicationsDeleteModalOpen}
         title="Удалить заявки?"
-        description="Массовое удаление заявок учеников будет включено после отдельного шага по систематизации статусов и правил удаления."
+        description="Будут удалены только завершённые заявки. Активные процессы останутся в системе."
         confirmLabel="Удалить"
         onCancel={() => setIsApplicationsDeleteModalOpen(false)}
-        onConfirm={() => setIsApplicationsDeleteModalOpen(false)}
+        onConfirm={() => void handleConfirmDeleteApplications()}
       />
     </>
   );
