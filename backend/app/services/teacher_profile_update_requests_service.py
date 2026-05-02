@@ -12,8 +12,8 @@ from app.services.storage_service import build_object_name, delete_object, extra
 from app.services.teacher_gender_service import normalize_teacher_gender
 
 
-EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
-SUBMITTABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
+EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved", "rejected"}
+SUBMITTABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved", "rejected"}
 
 
 def _normalize_text(value: str | None) -> str | None:
@@ -265,6 +265,36 @@ def request_teacher_profile_update_changes(
         target_view="teacher_profile_edit",
         action_key="open_tab",
         target_id=update_request.id,
+    )
+
+    db.commit()
+    db.refresh(update_request)
+    return _build_edit_response(teacher_profile=teacher_profile, update_request=update_request)
+
+
+def reject_teacher_profile_update_request(
+    db: Session,
+    *,
+    teacher_profile: TeacherProfile,
+    update_request: TeacherProfileUpdateRequest,
+    admin_comment: str | None = None,
+) -> TeacherProfileEditResponse:
+    normalized_comment = _normalize_text(admin_comment)
+    update_request.status = "rejected"
+    update_request.admin_comment = normalized_comment
+
+    create_notification(
+        db,
+        user_id=teacher_profile.user_id,
+        role="teacher",
+        type="teacher_profile_update_rejected",
+        title="Изменение профиля отклонено",
+        message=(
+            "Администратор отклонил изменение профиля."
+            + (f" Комментарий: {normalized_comment}" if normalized_comment else "")
+        ),
+        target_view="teacher_profile_edit",
+        action_key="open_tab",
     )
 
     db.commit()

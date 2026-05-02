@@ -97,6 +97,10 @@ export interface AdminAssignTeacherPayload {
   teacher_user_id: string;
 }
 
+export interface AdminApplicationRejectPayload {
+  admin_comment?: string | null;
+}
+
 interface ApiErrorBody {
   detail?: string;
 }
@@ -134,6 +138,14 @@ const getErrorMessage = (status: number, body: ApiErrorBody | null): string => {
 
   if (detail === 'Application cannot be approved') {
     return 'Эту заявку сейчас нельзя подтвердить.';
+  }
+
+  if (detail === 'Application cannot be rejected') {
+    return 'Эту заявку сейчас нельзя отклонить.';
+  }
+
+  if (detail === 'Initial student application cannot be rejected') {
+    return 'Первичную заявку ученика нельзя отклонить.';
   }
 
   if (detail === 'Profile update request does not support admin fields editing') {
@@ -411,6 +423,35 @@ export const approveAdminApplication = async (
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+
+    try {
+      body = await parseJson<ApiErrorBody>(response);
+    } catch {
+      body = null;
+    }
+
+    throw new Error(getErrorMessage(response.status, body));
+  }
+
+  return parseJson<AdminApplicationDetail>(response);
+};
+
+export const rejectAdminApplication = async (
+  token: string,
+  applicationId: string,
+  payload: AdminApplicationRejectPayload,
+): Promise<AdminApplicationDetail> => {
+  const response = await fetch(buildApiUrl(`/api/v1/admin/applications/${applicationId}/reject`), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

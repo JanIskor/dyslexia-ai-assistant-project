@@ -9,6 +9,7 @@ from app.schemas.admin_applications import (
     AdminApplicationsBulkDeleteRequest,
     AdminApplicationsBulkDeleteResponse,
     AdminApplicationDetailResponse,
+    AdminApplicationRejectRequest,
     AdminApplicationsFiltersResponse,
     AdminApplicationsListResponse,
     AdminTeacherAssignmentOptionsResponse,
@@ -53,6 +54,7 @@ from app.services.admin_applications_service import (
     get_admin_application_status_filters,
     list_admin_teacher_assignment_options,
     list_admin_applications,
+    reject_admin_application,
     request_admin_application_changes,
     update_admin_application,
 )
@@ -415,6 +417,17 @@ def approve_admin_application_endpoint(
     db: Session = Depends(get_db),
 ):
     return approve_admin_application(db, application_id=application_id)
+
+
+@router.post("/applications/{application_id}/reject", response_model=AdminApplicationDetailResponse)
+def reject_admin_application_endpoint(
+    application_id: UUID,
+    payload: AdminApplicationRejectRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _ = current_admin
+    return reject_admin_application(db, application_id=application_id, payload=payload)
 
 
 @router.post("/applications/{application_id}/assign-teacher", response_model=AdminApplicationDetailResponse)

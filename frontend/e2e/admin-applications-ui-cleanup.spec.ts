@@ -149,6 +149,23 @@ function buildApplicationDetail(applicationId: string) {
       can_edit_admin_fields: true,
       can_assign_teacher: true,
     },
+    'profile-update-1': {
+      ...common,
+      id: 'profile-update-1',
+      full_name: 'Профиль Ученик',
+      request_kind: 'profile_update',
+      request_kind_label: 'Обновление профиля',
+      status: 'На рассмотрении',
+      current_teacher_user_id: null,
+      current_teacher_full_name: null,
+      teacher_review_status: null,
+      current_profile_full_name: 'Профиль Ученик Текущий',
+      current_profile_birth_date: '2012-05-01',
+      current_profile_gender: 'Женский',
+      current_profile_quote: 'Текущая цитата',
+      can_edit_admin_fields: false,
+      can_assign_teacher: false,
+    },
     'waiting-teacher-1': {
       ...common,
       id: 'waiting-teacher-1',
@@ -292,6 +309,39 @@ test.describe.serial('admin applications ui cleanup', () => {
         return;
       }
 
+      if (route.request().method() === 'POST' && pathname.endsWith('/reject')) {
+        const targetId = pathname.split('/').at(-2);
+        if (!targetId) {
+          await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ detail: 'Application not found' }) });
+          return;
+        }
+
+        applications = applications.map((item) =>
+          item.id === targetId
+            ? {
+                ...item,
+                status: 'Отклонена',
+              }
+            : item,
+        );
+
+        const detail = buildApplicationDetail(targetId);
+        if (!detail) {
+          await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'Application not found' }) });
+          return;
+        }
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...detail,
+            status: 'Отклонена',
+          }),
+        });
+        return;
+      }
+
       if (applicationId && applicationId !== 'applications') {
         const detail = buildApplicationDetail(applicationId);
         if (!detail) {
@@ -413,6 +463,7 @@ test.describe.serial('admin applications ui cleanup', () => {
     await page.getByText('Первичный ученик 1').click();
     await expect(page.getByRole('button', { name: 'Подтвердить' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Отправить на доработку' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Отклонить изменение' })).toHaveCount(0);
     await expect(page.getByText('Ожидает администратора')).toBeVisible();
     await page.getByRole('button', { name: 'Назад' }).click();
 
@@ -420,6 +471,18 @@ test.describe.serial('admin applications ui cleanup', () => {
     await expect(page.getByText('Профиль Ученик')).toBeVisible();
     await expect(page.getByText('Преподаватель Профиль')).toBeVisible();
     await expect(page.getByText('Страница 1 из 1')).toBeVisible();
+    await page.getByText('Профиль Ученик').click();
+    await expect(page.getByRole('button', { name: 'Подтвердить изменения' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Отправить на доработку' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Отклонить изменение' })).toBeVisible();
+    await page.getByRole('button', { name: 'Отклонить изменение' }).click();
+    await expect(page.getByRole('heading', { name: 'Отклонить изменение профиля?' })).toBeVisible();
+    await page.getByLabel('Причина отклонения').fill('Недостаточно данных для подтверждения.');
+    await page.getByRole('button', { name: 'Отклонить' }).last().click();
+    await expect(page.getByText('Изменение профиля отклонено.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Отклонить изменение' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Подтвердить изменения' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Назад' }).click();
 
     await page.getByPlaceholder('Поиск по первому слову...').fill('Принятый');
     await expect(page.getByText('Профиль Ученик')).toHaveCount(0);
@@ -457,6 +520,7 @@ test.describe.serial('admin applications ui cleanup', () => {
     await page.getByRole('button', { name: 'Назад' }).click();
 
     await page.getByTestId('admin-application-group-rejected').click();
+    await expect(page.getByText('Профиль Ученик')).toBeVisible();
     await expect(page.getByText('Отклонённый Терминальный')).toBeVisible();
     await expect(page.getByText('Отклонена')).toBeVisible();
 

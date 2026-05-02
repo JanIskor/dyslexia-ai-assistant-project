@@ -11,6 +11,7 @@ import { AdminTeacherAssignmentTabPanel } from '@/components/admin/AdminTeacherA
 import { AdminStudentsDirectoryPanel } from '@/components/admin/AdminStudentsDirectoryPanel';
 import { AdminTeachersDirectoryPanel } from '@/components/admin/AdminTeachersDirectoryPanel';
 import { ConfirmActionModal } from '@/components/admin/ConfirmActionModal';
+import { RejectProfileUpdateModal } from '@/components/admin/RejectProfileUpdateModal';
 import { TeacherAssignmentModal } from '@/components/admin/TeacherAssignmentModal';
 import { useBulkSelection } from '@/components/admin/useBulkSelection';
 import { Header } from '@/components/layout/Header';
@@ -32,6 +33,7 @@ import {
   getAdminApplicationDetail,
   getAdminApplications,
   getAdminTeacherAssignmentOptions,
+  rejectAdminApplication,
   updateAdminApplication,
   requestAdminApplicationChanges,
   type AdminApplication,
@@ -106,6 +108,8 @@ function ApplicationsPanel({
   const [isApplicationsDeleteModalOpen, setIsApplicationsDeleteModalOpen] = useState(false);
   const [applicationsDeleteScope, setApplicationsDeleteScope] = useState<'selected' | 'all' | null>(null);
   const [isDeletingApplications, setIsDeletingApplications] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectComment, setRejectComment] = useState('');
 
   const {
     selectedIds: selectedApplicationIds,
@@ -229,12 +233,14 @@ function ApplicationsPanel({
 
     const loadDetail = async () => {
       if (!selectedApplicationId) {
-        setSelectedApplication(null);
-        setDetailMessage(null);
-        setIsAssignmentModalOpen(false);
-        setAssignmentOptions([]);
-        setSelectedTeacherUserId(null);
-        setAssignmentError(null);
+      setSelectedApplication(null);
+      setDetailMessage(null);
+      setIsAssignmentModalOpen(false);
+      setIsRejectModalOpen(false);
+      setRejectComment('');
+      setAssignmentOptions([]);
+      setSelectedTeacherUserId(null);
+      setAssignmentError(null);
         return;
       }
 
@@ -431,6 +437,51 @@ function ApplicationsPanel({
     }
   };
 
+  const handleOpenRejectModal = () => {
+    if (!selectedApplication) {
+      return;
+    }
+
+    setRejectComment('');
+    setIsRejectModalOpen(true);
+  };
+
+  const handleCloseRejectModal = () => {
+    if (isActing) {
+      return;
+    }
+
+    setIsRejectModalOpen(false);
+    setRejectComment('');
+  };
+
+  const handleRejectProfileUpdate = async () => {
+    if (!selectedApplication) {
+      return;
+    }
+
+    setIsActing(true);
+    setDetailMessage(null);
+
+    try {
+      const updatedApplication = await rejectAdminApplication(token, selectedApplication.id, {
+        admin_comment: rejectComment || null,
+      });
+      setSelectedApplication(updatedApplication);
+      setDetailMessageType('success');
+      setDetailMessage('Изменение профиля отклонено.');
+      setIsRejectModalOpen(false);
+      setRejectComment('');
+      const refreshedApplications = await getAdminApplications(token, '', []);
+      setApplications(refreshedApplications.items);
+    } catch (error) {
+      setDetailMessageType('error');
+      setDetailMessage(error instanceof Error ? error.message : 'Не удалось отклонить изменение профиля.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
   const handleCloseAssignmentModal = () => {
     if (isAssigningTeacher) {
       return;
@@ -498,6 +549,7 @@ function ApplicationsPanel({
           onSave={handleSave}
           onRequestChanges={handleRequestChanges}
           onApprove={handleApprove}
+          onReject={handleOpenRejectModal}
           approveGuardMessage={getApproveGuardMessage(selectedApplication)}
           isSaving={isSaving}
           isActing={isActing || isLoadingAssignmentOptions || isAssigningTeacher}
@@ -514,6 +566,14 @@ function ApplicationsPanel({
           isLoading={isLoadingAssignmentOptions}
           isSubmitting={isAssigningTeacher}
           errorMessage={assignmentError}
+        />
+        <RejectProfileUpdateModal
+          isOpen={isRejectModalOpen}
+          value={rejectComment}
+          onChange={setRejectComment}
+          onCancel={handleCloseRejectModal}
+          onConfirm={() => void handleRejectProfileUpdate()}
+          isSubmitting={isActing}
         />
       </>
     );

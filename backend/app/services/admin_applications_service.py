@@ -18,6 +18,7 @@ from app.schemas.admin_applications import (
     AdminApplicationsBulkDeleteResponse,
     AdminApplicationDetailResponse,
     AdminApplicationListItem,
+    AdminApplicationRejectRequest,
     AdminApplicationsFiltersResponse,
     AdminApplicationStatusFilterOption,
     AdminApplicationsListResponse,
@@ -28,10 +29,12 @@ from app.schemas.admin_applications import (
 from app.services.notifications_service import create_notification
 from app.services.student_profile_update_requests_service import (
     approve_student_profile_update_request,
+    reject_student_profile_update_request,
     request_student_profile_update_changes,
 )
 from app.services.teacher_profile_update_requests_service import (
     approve_teacher_profile_update_request,
+    reject_teacher_profile_update_request,
     request_teacher_profile_update_changes,
 )
 
@@ -72,6 +75,7 @@ VISIBLE_UPDATE_REQUEST_STATUSES = (
     "in_review",
     "revision_requested",
     "approved",
+    "rejected",
 )
 VISIBLE_TEACHER_UPDATE_REQUEST_STATUSES = VISIBLE_UPDATE_REQUEST_STATUSES
 ACTIVE_UPDATE_REQUEST_STATUSES = (
@@ -92,6 +96,7 @@ UPDATE_REQUEST_STATUS_TO_APPLICATION_STATUS = {
     "in_review": "На рассмотрении",
     "revision_requested": "На доработке",
     "approved": "Подтверждена",
+    "rejected": "Отклонена",
     "draft": "Черновик",
 }
 
@@ -611,11 +616,11 @@ def _can_delete_student_profile_application(profile: StudentProfile) -> bool:
 
 
 def _can_delete_student_profile_update_request(update_request: StudentProfileUpdateRequest) -> bool:
-    return update_request.status == "approved"
+    return update_request.status in {"approved", "rejected"}
 
 
 def _can_delete_teacher_profile_update_request(update_request: TeacherProfileUpdateRequest) -> bool:
-    return update_request.status == "approved"
+    return update_request.status in {"approved", "rejected"}
 
 
 def get_admin_application_detail(db: Session, *, application_id) -> AdminApplicationDetailResponse:
@@ -823,6 +828,54 @@ def approve_admin_application(
     return _build_admin_application_detail(profile)
 
 
+def reject_admin_application(
+    db: Session,
+    *,
+    application_id: UUID,
+    payload: AdminApplicationRejectRequest,
+) -> AdminApplicationDetailResponse:
+    teacher_update_request_entry = _get_teacher_profile_update_request_or_none(db, application_id)
+    if teacher_update_request_entry is not None:
+        update_request, profile = teacher_update_request_entry
+
+        if update_request.status not in REVIEWABLE_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be rejected")
+
+        reject_teacher_profile_update_request(
+            db,
+            teacher_profile=profile,
+            update_request=update_request,
+            admin_comment=payload.admin_comment,
+        )
+        db.refresh(profile)
+        db.refresh(update_request)
+        return _build_admin_teacher_profile_update_detail(profile, update_request)
+
+    update_request_entry = _get_profile_update_request_or_none(db, application_id)
+    if update_request_entry is not None:
+        update_request, profile = update_request_entry
+
+        if update_request.status not in REVIEWABLE_APPLICATION_STATUSES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application cannot be rejected")
+
+        reject_student_profile_update_request(
+            db,
+            student_profile=profile,
+            update_request=update_request,
+            admin_comment=payload.admin_comment,
+        )
+        db.refresh(profile)
+        db.refresh(update_request)
+        return _build_admin_profile_update_detail(profile, update_request)
+
+    profile = _get_admin_application_or_404(db, application_id)
+    _ = profile
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Initial student application cannot be rejected",
+    )
+
+
 def assign_teacher_to_application(
     db: Session,
     *,
@@ -972,7 +1025,7 @@ def delete_admin_applications(
         student_update_requests = (
             db.query(StudentProfileUpdateRequest)
             .filter(
-                StudentProfileUpdateRequest.status == "approved",
+                StudentProfileUpdateRequest.status.in_(("approved", "rejected")),
                 StudentProfileUpdateRequest.deleted_at.is_(None),
             )
             .all()
@@ -980,7 +1033,7 @@ def delete_admin_applications(
         teacher_update_requests = (
             db.query(TeacherProfileUpdateRequest)
             .filter(
-                TeacherProfileUpdateRequest.status == "approved",
+                TeacherProfileUpdateRequest.status.in_(("approved", "rejected")),
                 TeacherProfileUpdateRequest.deleted_at.is_(None),
             )
             .all()

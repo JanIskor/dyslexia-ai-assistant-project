@@ -89,5 +89,9 @@ class AdminApplicationUpdateRequest(BaseModel):
     enrollment_date: date | None = None
 
 
+class AdminApplicationRejectRequest(BaseModel):
+    admin_comment: str | None = None
+
+
 class AdminAssignTeacherRequest(BaseModel):
     teacher_user_id: UUID

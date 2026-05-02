@@ -21,6 +21,7 @@ interface AdminApplicationDetailPanelProps {
   onSave: () => void;
   onRequestChanges: () => void;
   onApprove: () => void;
+  onReject: () => void;
   approveGuardMessage: string | null;
   isSaving: boolean;
   isActing: boolean;
@@ -64,6 +65,7 @@ export function AdminApplicationDetailPanel({
   onSave,
   onRequestChanges,
   onApprove,
+  onReject,
   approveGuardMessage,
   isSaving,
   isActing,
@@ -79,6 +81,13 @@ export function AdminApplicationDetailPanel({
   const canRequestChanges = availableActions.includes('request_changes');
   const canApprove = availableActions.includes('approve');
   const canAssignTeacher = availableActions.includes('assign_teacher');
+  const canRejectProfileUpdate = availableActions.includes('reject_profile_update');
+  const approveLabel =
+    canAssignTeacher
+      ? 'Назначить преподавателя'
+      : isStudentProfileUpdate || isTeacherProfileUpdate
+        ? 'Подтвердить изменения'
+        : 'Подтвердить';
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-5 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-7 sm:py-7">
@@ -251,6 +260,16 @@ export function AdminApplicationDetailPanel({
                 Отправить на доработку
               </button>
             ) : null}
+            {canRejectProfileUpdate ? (
+              <button
+                type="button"
+                onClick={onReject}
+                disabled={isSaving || isActing}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Отклонить изменение
+              </button>
+            ) : null}
             {canApprove || canAssignTeacher ? (
               <button
                 type="button"
@@ -259,7 +278,7 @@ export function AdminApplicationDetailPanel({
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Check className="h-4 w-4" />
-                {canAssignTeacher ? 'Назначить преподавателя' : 'Подтвердить'}
+                {approveLabel}
               </button>
             ) : null}
           </div>

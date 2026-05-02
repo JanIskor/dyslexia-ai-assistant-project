@@ -6,7 +6,11 @@ export type ApplicationResponsibleLabel =
   | 'Ожидает преподавателя'
   | 'Завершено';
 
-export type ApplicationAvailableAction = 'approve' | 'request_changes' | 'assign_teacher';
+export type ApplicationAvailableAction =
+  | 'approve'
+  | 'request_changes'
+  | 'assign_teacher'
+  | 'reject_profile_update';
 export interface ApplicationDeleteAvailability {
   canDelete: boolean;
   reason: string | null;
@@ -33,6 +37,14 @@ const APPROVED_STATUSES = new Set(['Подтверждена', 'approved']);
 
 function isTeacherProfileRequest(application: TaskAwareApplication): boolean {
   return application.request_kind === 'teacher_profile_update';
+}
+
+function isProfileUpdateRequest(application: TaskAwareApplication): boolean {
+  return (
+    application.request_kind === 'profile_update' ||
+    application.request_kind === 'student_profile_update' ||
+    application.request_kind === 'teacher_profile_update'
+  );
 }
 
 function isWaitingTeacherReview(application: TaskAwareApplication): boolean {
@@ -149,6 +161,10 @@ export function getApplicationAvailableActions(
   }
 
   if (displayStatus === 'На рассмотрении' && application.request_kind !== 'system_assignment_event') {
+    if (isProfileUpdateRequest(application)) {
+      return ['approve', 'request_changes', 'reject_profile_update'];
+    }
+
     return ['approve', 'request_changes'];
   }
 

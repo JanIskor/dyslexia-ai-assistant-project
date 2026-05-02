@@ -9,7 +9,7 @@ class StudentProfileUpdateRequest(Base):
     __tablename__ = "student_profile_update_requests"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('draft', 'submitted', 'in_review', 'revision_requested', 'approved')",
+            "status IN ('draft', 'submitted', 'in_review', 'revision_requested', 'approved', 'rejected')",
             name="ck_student_profile_update_requests_status",
         ),
     )

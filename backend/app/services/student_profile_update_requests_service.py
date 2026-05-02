@@ -12,8 +12,8 @@ from app.services.notifications_service import create_notification, create_notif
 from app.services.storage_service import build_object_name, delete_object, extract_object_name, upload_image
 
 
-EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
-SUBMITTABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved"}
+EDITABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved", "rejected"}
+SUBMITTABLE_UPDATE_REQUEST_STATUSES = {"draft", "revision_requested", "approved", "rejected"}
 
 
 def _normalize_text(value: str | None) -> str | None:
@@ -232,6 +232,36 @@ def request_student_profile_update_changes(
         type="student_profile_update_revision_requested",
         title="Изменения профиля отправлены на доработку",
         message="Администратор попросил обновить изменения профиля и повторно отправить их на модерацию.",
+        target_view="student_profile_edit",
+        action_key="open_tab",
+    )
+
+    db.commit()
+    db.refresh(update_request)
+    return _build_edit_response(student_profile=student_profile, update_request=update_request)
+
+
+def reject_student_profile_update_request(
+    db: Session,
+    *,
+    student_profile: StudentProfile,
+    update_request: StudentProfileUpdateRequest,
+    admin_comment: str | None = None,
+) -> StudentProfileEditResponse:
+    normalized_comment = _normalize_text(admin_comment)
+    update_request.status = "rejected"
+    update_request.admin_comment = normalized_comment
+
+    create_notification(
+        db,
+        user_id=student_profile.user_id,
+        role="student",
+        type="student_profile_update_rejected",
+        title="Изменение профиля отклонено",
+        message=(
+            "Администратор отклонил изменение профиля."
+            + (f" Комментарий: {normalized_comment}" if normalized_comment else "")
+        ),
         target_view="student_profile_edit",
         action_key="open_tab",
     )
