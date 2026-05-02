@@ -277,10 +277,10 @@ def list_admin_applications(
     teacher_update_requests = teacher_update_query.all()
 
     items = [
-        AdminApplicationListItem(
-            id=profile.id,
-            full_name=profile.full_name,
-            status=map_application_status(profile.profile_status),
+            AdminApplicationListItem(
+                id=profile.id,
+                full_name=profile.full_name,
+                status=map_application_status(profile.profile_status),
             request_kind=(
                 REQUEST_KIND_SYSTEM_ASSIGNMENT_EVENT
                 if profile.profile_status == "needs_assignment"
@@ -291,6 +291,9 @@ def list_admin_applications(
                 if profile.profile_status == "needs_assignment"
                 else "Первичная заявка"
             ),
+            current_teacher_user_id=profile.current_teacher_user_id,
+            teacher_review_status=map_teacher_review_status(profile.teacher_review_status),
+            can_assign_teacher=True,
         )
         for profile in profiles
         if profile.user_id not in update_request_student_ids
@@ -301,6 +304,9 @@ def list_admin_applications(
             status=map_update_request_status(update_request.status),
             request_kind=REQUEST_KIND_STUDENT_PROFILE_UPDATE,
             request_kind_label="Обновление профиля",
+            current_teacher_user_id=profile.current_teacher_user_id,
+            teacher_review_status=map_teacher_review_status(profile.teacher_review_status),
+            can_assign_teacher=False,
         )
         for update_request, profile in update_requests
     ] + [
@@ -310,6 +316,9 @@ def list_admin_applications(
             status=map_update_request_status(update_request.status),
             request_kind=REQUEST_KIND_TEACHER_PROFILE_UPDATE,
             request_kind_label="Обновление профиля преподавателя",
+            current_teacher_user_id=None,
+            teacher_review_status=None,
+            can_assign_teacher=False,
         )
         for update_request, profile in teacher_update_requests
     ]

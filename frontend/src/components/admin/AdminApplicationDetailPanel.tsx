@@ -4,6 +4,11 @@ import { ArrowLeft, Check, RefreshCcw, Save, UserRound } from 'lucide-react';
 import { ModerationEntityBadge } from '@/components/admin/ModerationEntityBadge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { AdminApplicationDetail } from '@/lib/adminApplicationsApi';
+import {
+  getApplicationAvailableActions,
+  getApplicationDisplayStatus,
+  getApplicationResponsibleLabel,
+} from '@/lib/adminApplicationTaskUi';
 import { getAdminModerationStatusUi } from '@/lib/adminModerationStatusUi';
 
 interface AdminApplicationDetailPanelProps {
@@ -67,8 +72,13 @@ export function AdminApplicationDetailPanel({
 }: AdminApplicationDetailPanelProps) {
   const isStudentProfileUpdate = application.request_kind === 'profile_update';
   const isTeacherProfileUpdate = application.request_kind === 'teacher_profile_update';
-  const isSystemAssignmentEvent = application.request_kind === 'system_assignment_event';
-  const statusUi = getAdminModerationStatusUi(application.status);
+  const displayStatus = getApplicationDisplayStatus(application);
+  const statusUi = getAdminModerationStatusUi(displayStatus);
+  const responsibleLabel = getApplicationResponsibleLabel(application);
+  const availableActions = getApplicationAvailableActions(application);
+  const canRequestChanges = availableActions.includes('request_changes');
+  const canApprove = availableActions.includes('approve');
+  const canAssignTeacher = availableActions.includes('assign_teacher');
 
   return (
     <section className="rounded-[30px] border border-orange-100/80 bg-white/92 px-5 py-6 shadow-[0_18px_50px_rgba(221,156,130,0.10)] sm:px-7 sm:py-7">
@@ -103,6 +113,7 @@ export function AdminApplicationDetailPanel({
               toneClassName={statusUi.toneClassName}
               className="mt-4"
             />
+            <p className="mt-3 text-sm text-stone-500 sm:text-base">{responsibleLabel}</p>
           </div>
 
           <dl className="mt-6 divide-y divide-orange-100/80">
@@ -218,7 +229,7 @@ export function AdminApplicationDetailPanel({
           ) : null}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-            {application.can_edit_admin_fields ? (
+            {application.can_edit_admin_fields && (canApprove || canAssignTeacher) ? (
               <button
                 type="button"
                 onClick={onSave}
@@ -229,7 +240,7 @@ export function AdminApplicationDetailPanel({
                 {isSaving ? 'Сохраняем...' : 'Сохранить'}
               </button>
             ) : null}
-            {!isSystemAssignmentEvent ? (
+            {canRequestChanges ? (
               <button
                 type="button"
                 onClick={onRequestChanges}
@@ -237,24 +248,20 @@ export function AdminApplicationDetailPanel({
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-base font-medium text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCcw className="h-4 w-4" />
-                {isStudentProfileUpdate || isTeacherProfileUpdate
-                  ? 'Отправить изменения на доработку'
-                  : 'Отправить на доработку'}
+                Отправить на доработку
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onApprove}
-              disabled={isSaving || isActing || Boolean(approveGuardMessage)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Check className="h-4 w-4" />
-              {isSystemAssignmentEvent
-                ? 'Назначить преподавателя'
-                : isStudentProfileUpdate || isTeacherProfileUpdate
-                  ? 'Подтвердить изменения'
-                  : 'Подтвердить заявку'}
-            </button>
+            {canApprove || canAssignTeacher ? (
+              <button
+                type="button"
+                onClick={onApprove}
+                disabled={isSaving || isActing || Boolean(approveGuardMessage)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-400 via-orange-500 to-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Check className="h-4 w-4" />
+                {canAssignTeacher ? 'Назначить преподавателя' : 'Подтвердить'}
+              </button>
+            ) : null}
           </div>
 
           {approveGuardMessage ? (

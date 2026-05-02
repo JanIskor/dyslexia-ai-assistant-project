@@ -50,7 +50,7 @@ export function TeacherAssignmentModal({
     }
 
     if (reason === 'already_rejected_this_student') {
-      return 'Этот преподаватель уже отклонил ученика';
+      return 'Уже отклонял этого ученика';
     }
 
     return 'Недоступен';
@@ -92,6 +92,7 @@ export function TeacherAssignmentModal({
             <div className="space-y-3">
               {options.map((teacher) => {
                 const isSelected = teacher.teacher_user_id === selectedTeacherUserId;
+                const isRejectedBefore = teacher.unavailable_reason === 'already_rejected_this_student';
 
                 return (
                   <button
@@ -104,7 +105,9 @@ export function TeacherAssignmentModal({
                         ? isSelected
                           ? 'border-orange-300 bg-orange-50/90'
                           : 'border-orange-100/70 bg-white/92 hover:bg-orange-50/70'
-                        : 'cursor-not-allowed border-stone-200 bg-stone-100/80 opacity-70'
+                        : isRejectedBefore
+                          ? 'cursor-not-allowed border-rose-200 bg-rose-50/80 opacity-90'
+                          : 'cursor-not-allowed border-stone-200 bg-stone-100/80 opacity-70'
                     }`}
                   >
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-orange-300 shadow-inner">
@@ -115,7 +118,7 @@ export function TeacherAssignmentModal({
                       <p className="text-base font-medium text-stone-700 sm:text-lg">{teacher.full_name}</p>
                       <p className="mt-1 text-sm text-stone-500 sm:text-base">{teacher.subject_name}</p>
                       {!teacher.is_available ? (
-                        <p className="mt-2 text-sm font-medium text-rose-600">
+                        <p className={`mt-2 text-sm font-medium ${isRejectedBefore ? 'text-rose-700' : 'text-rose-600'}`}>
                           {getUnavailableReasonLabel(teacher.unavailable_reason)}
                         </p>
                       ) : null}

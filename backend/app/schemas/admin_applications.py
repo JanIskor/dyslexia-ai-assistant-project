@@ -10,6 +10,9 @@ class AdminApplicationListItem(BaseModel):
     status: str
     request_kind: str = "initial_profile"
     request_kind_label: str = "Первичная заявка"
+    current_teacher_user_id: UUID | None = None
+    teacher_review_status: str | None = None
+    can_assign_teacher: bool = True
 
 
 class AdminApplicationsListResponse(BaseModel):

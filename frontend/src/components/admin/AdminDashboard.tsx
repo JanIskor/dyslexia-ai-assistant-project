@@ -16,13 +16,18 @@ import { useBulkSelection } from '@/components/admin/useBulkSelection';
 import { Header } from '@/components/layout/Header';
 import { NotificationsBell } from '@/components/layout/NotificationsBell';
 import { Footer } from '@/components/layout/Footer';
+import {
+  filterApplicationsByGroup,
+  getVisibleApplicationGroups,
+  searchApplicationsInGroup,
+  type AdminApplicationGroup,
+} from '@/lib/adminApplicationGroups';
 import { getCurrentUser, type AuthUser } from '@/lib/authApi';
 import { getRoleRedirectPath } from '@/lib/authRedirect';
 import { clearAccessToken, getAccessToken } from '@/lib/authStorage';
 import {
   approveAdminApplication,
   assignTeacherToApplication,
-  getAdminApplicationFilters,
   getAdminApplicationDetail,
   getAdminApplications,
   getAdminTeacherAssignmentOptions,
@@ -30,7 +35,6 @@ import {
   requestAdminApplicationChanges,
   type AdminApplication,
   type AdminApplicationDetail,
-  type AdminApplicationStatusFilterOption,
   type AdminTeacherAssignmentOption,
 } from '@/lib/adminApplicationsApi';
 
@@ -74,12 +78,10 @@ function ApplicationsPanel({
   initialApplicationId: string | null;
 }) {
   const [searchValue, setSearchValue] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [statusOptions, setStatusOptions] = useState<AdminApplicationStatusFilterOption[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
   const [applicationsPage, setApplicationsPage] = useState(1);
+  const [selectedGroup, setSelectedGroup] = useState<AdminApplicationGroup>('INITIAL');
   const [selectedApplication, setSelectedApplication] = useState<AdminApplicationDetail | null>(null);
   const [gradeLabel, setGradeLabel] = useState('');
   const [enrollmentDate, setEnrollmentDate] = useState('');
@@ -113,7 +115,7 @@ function ApplicationsPanel({
 
   useEffect(() => {
     setApplicationsPage(1);
-  }, [searchValue, selectedStatuses]);
+  }, [searchValue, selectedGroup]);
 
   useEffect(() => {
     removeMissingApplicationSelections();
@@ -150,39 +152,31 @@ function ApplicationsPanel({
 
   const canDeleteApplication = (_application: AdminApplication) => false;
 
-  const deletableApplications = applications.filter(canDeleteApplication);
+  const visibleGroups = getVisibleApplicationGroups(applications);
+
+  useEffect(() => {
+    if (visibleGroups.includes(selectedGroup)) {
+      return;
+    }
+
+    setSelectedGroup(visibleGroups[0] ?? 'INITIAL');
+  }, [selectedGroup, visibleGroups]);
+
+  const applicationsInSelectedGroup = filterApplicationsByGroup(applications, selectedGroup);
+  const filteredApplications = searchApplicationsInGroup(applicationsInSelectedGroup, searchValue);
+  const deletableApplications = filteredApplications.filter(canDeleteApplication);
   const applicationsTotalPages = Math.max(
     1,
-    Math.ceil(applications.length / ADMIN_APPLICATIONS_PAGE_SIZE),
+    Math.ceil(filteredApplications.length / ADMIN_APPLICATIONS_PAGE_SIZE),
   );
-  const visibleApplications = applications.slice(
+  const visibleApplications = filteredApplications.slice(
     (applicationsPage - 1) * ADMIN_APPLICATIONS_PAGE_SIZE,
     applicationsPage * ADMIN_APPLICATIONS_PAGE_SIZE,
   );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadFilterOptions = async () => {
-      try {
-        const response = await getAdminApplicationFilters(token);
-
-        if (isMounted) {
-          setStatusOptions(response.statuses);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : 'Не удалось загрузить список заявок.');
-        }
-      }
-    };
-
-    void loadFilterOptions();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [token]);
+  const emptyStateMessage =
+    selectedGroup === 'NEEDS_ASSIGNMENT'
+      ? 'Нет учеников, ожидающих назначения преподавателя.'
+      : 'В этой группе пока нет заявок.';
 
   useEffect(() => {
     let isMounted = true;
@@ -197,7 +191,7 @@ function ApplicationsPanel({
       }
 
       try {
-        const response = await getAdminApplications(token, searchValue, selectedStatuses);
+        const response = await getAdminApplications(token, '', []);
 
         if (isMounted) {
           setApplications(response.items);
@@ -218,7 +212,7 @@ function ApplicationsPanel({
       isMounted = false;
       window.clearTimeout(timeoutId);
     };
-  }, [searchValue, selectedStatuses, token]);
+  }, [token]);
 
   useEffect(() => {
     let isMounted = true;
@@ -266,14 +260,6 @@ function ApplicationsPanel({
     };
   }, [selectedApplicationId, token]);
 
-  const handleToggleStatus = (status: string) => {
-    setSelectedStatuses((currentStatuses) =>
-      currentStatuses.includes(status)
-        ? currentStatuses.filter((currentStatus) => currentStatus !== status)
-        : [...currentStatuses, status]
-    );
-  };
-
   const handleEnterApplicationsSelectionMode = () => {
     clearApplicationSelection();
     setIsApplicationsSelectionMode(true);
@@ -317,7 +303,7 @@ function ApplicationsPanel({
       setEnrollmentDate(updatedApplication.enrollment_date ?? '');
       setDetailMessageType('success');
       setDetailMessage('Поля администратора сохранены.');
-      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      const refreshedApplications = await getAdminApplications(token, '', []);
       setApplications(refreshedApplications.items);
     } catch (error) {
       setDetailMessageType('error');
@@ -340,7 +326,7 @@ function ApplicationsPanel({
       setSelectedApplication(updatedApplication);
       setDetailMessageType('success');
       setDetailMessage('Заявка отправлена на доработку.');
-      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      const refreshedApplications = await getAdminApplications(token, '', []);
       setApplications(refreshedApplications.items);
     } catch (error) {
       setDetailMessageType('error');
@@ -364,7 +350,7 @@ function ApplicationsPanel({
         setSelectedApplication(updatedApplication);
         setDetailMessageType('success');
         setDetailMessage('Изменения профиля подтверждены.');
-        const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+        const refreshedApplications = await getAdminApplications(token, '', []);
         setApplications(refreshedApplications.items);
       } catch (error) {
         setDetailMessageType('error');
@@ -427,7 +413,7 @@ function ApplicationsPanel({
       setDetailMessage('Ученик назначен преподавателю.');
       setIsAssignmentModalOpen(false);
       setSelectedTeacherUserId(null);
-      const refreshedApplications = await getAdminApplications(token, searchValue, selectedStatuses);
+      const refreshedApplications = await getAdminApplications(token, '', []);
       setApplications(refreshedApplications.items);
     } catch (error) {
       setAssignmentError(error instanceof Error ? error.message : 'Не удалось назначить преподавателя.');
@@ -492,12 +478,6 @@ function ApplicationsPanel({
       <AdminApplicationsListPanel
         searchValue={searchValue}
         onSearchChange={setSearchValue}
-        selectedStatuses={selectedStatuses}
-        onToggleStatus={handleToggleStatus}
-        onClearStatuses={() => setSelectedStatuses([])}
-        isFilterOpen={isFilterOpen}
-        onToggleFilterOpen={() => setIsFilterOpen((currentValue) => !currentValue)}
-        statusOptions={statusOptions}
         applications={visibleApplications}
         onSelectApplication={setSelectedApplicationId}
         selectionMode={isApplicationsSelectionMode}
@@ -508,6 +488,11 @@ function ApplicationsPanel({
         onToggleApplicationSelection={toggleApplicationSelection}
         onDeleteSelected={handleDeleteSelectedApplications}
         onDeleteAll={handleDeleteAllApplications}
+        visibleGroups={visibleGroups}
+        selectedGroup={selectedGroup}
+        onSelectGroup={setSelectedGroup}
+        emptyStateMessage={emptyStateMessage}
+        hasGroupItems={applicationsInSelectedGroup.length > 0}
         page={applicationsPage}
         totalPages={applicationsTotalPages}
         onPageChange={setApplicationsPage}

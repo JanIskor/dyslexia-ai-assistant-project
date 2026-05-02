@@ -5,10 +5,22 @@ export interface AdminModerationStatusUi {
 
 const ADMIN_MODERATION_STATUS_MAP: Record<string, AdminModerationStatusUi> = {
   Новая: {
-    label: 'Новая',
-    toneClassName: 'bg-yellow-100 text-yellow-700',
+    label: 'На рассмотрении',
+    toneClassName: 'bg-stone-100 text-stone-600',
   },
   'На рассмотрении': {
+    label: 'На рассмотрении',
+    toneClassName: 'bg-stone-100 text-stone-600',
+  },
+  submitted: {
+    label: 'На рассмотрении',
+    toneClassName: 'bg-stone-100 text-stone-600',
+  },
+  in_review: {
+    label: 'На рассмотрении',
+    toneClassName: 'bg-stone-100 text-stone-600',
+  },
+  NEW: {
     label: 'На рассмотрении',
     toneClassName: 'bg-stone-100 text-stone-600',
   },
@@ -24,12 +36,20 @@ const ADMIN_MODERATION_STATUS_MAP: Record<string, AdminModerationStatusUi> = {
     label: 'Требует назначения',
     toneClassName: 'bg-sky-100 text-sky-700',
   },
+  'Требует назначения': {
+    label: 'Требует назначения',
+    toneClassName: 'bg-sky-100 text-sky-700',
+  },
   'Принята преподавателем': {
     label: 'Принята преподавателем',
     toneClassName: 'bg-green-100 text-green-700',
   },
   'Отклонена преподавателем': {
-    label: 'Отклонена преподавателем',
+    label: 'На рассмотрении',
+    toneClassName: 'bg-stone-100 text-stone-600',
+  },
+  Отклонена: {
+    label: 'Отклонена',
     toneClassName: 'bg-red-100 text-red-700',
   },
   pending: {

@@ -67,6 +67,7 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
 
             self.admin_id = uuid.uuid4()
             self.teacher_id = uuid.uuid4()
+            self.rejected_teacher_id = uuid.uuid4()
             self.student_assigned_id = uuid.uuid4()
             self.student_unassigned_id = uuid.uuid4()
             self.student_submitted_id = uuid.uuid4()
@@ -86,6 +87,13 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
                         id=self.teacher_id,
                         email="teacher.assignmenttab@example.com",
                         password_hash=get_password_hash("TeacherAssignmentTab123!"),
+                        role="teacher",
+                        is_active=True,
+                    ),
+                    User(
+                        id=self.rejected_teacher_id,
+                        email="teacher.rejected.assignmenttab@example.com",
+                        password_hash=get_password_hash("TeacherRejectedAssignmentTab123!"),
                         role="teacher",
                         is_active=True,
                     ),
@@ -113,18 +121,31 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
                 ]
             )
 
-            db.add(
-                TeacherProfile(
-                    id=uuid.uuid4(),
-                    user_id=self.teacher_id,
-                    full_name="Попов Михаил Петрович",
-                    birth_date=date(1985, 11, 17),
-                    gender="Мужской",
-                    position="Преподаватель",
-                    phone="+79000000001",
-                    work_email="teacher.assignmenttab@example.com",
-                    subject_name="Литература",
-                )
+            db.add_all(
+                [
+                    TeacherProfile(
+                        id=uuid.uuid4(),
+                        user_id=self.teacher_id,
+                        full_name="Попов Михаил Петрович",
+                        birth_date=date(1985, 11, 17),
+                        gender="Мужской",
+                        position="Преподаватель",
+                        phone="+79000000001",
+                        work_email="teacher.assignmenttab@example.com",
+                        subject_name="Литература",
+                    ),
+                    TeacherProfile(
+                        id=uuid.uuid4(),
+                        user_id=self.rejected_teacher_id,
+                        full_name="Захарова Ольга Викторовна",
+                        birth_date=date(1987, 7, 8),
+                        gender="Женский",
+                        position="Преподаватель",
+                        phone="+79000000002",
+                        work_email="teacher.rejected.assignmenttab@example.com",
+                        subject_name="Русский язык",
+                    ),
+                ]
             )
 
             db.add_all(
@@ -339,11 +360,45 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200, response.text)
-        item = response.json()["items"][0]
+        item = next(
+            item
+            for item in response.json()["items"]
+            if item["teacher_user_id"] == str(self.teacher_id)
+        )
         self.assertEqual(item["teacher_user_id"], str(self.teacher_id))
         self.assertEqual(item["student_count"], 1)
         self.assertEqual(item["capacity"], 15)
         self.assertTrue(item["is_available"])
+
+    def test_assignment_options_mark_previously_rejected_teacher_as_unavailable(self) -> None:
+        token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")
+
+        with self.SessionLocal() as db:
+            db.add(
+                TeacherStudentRejection(
+                    id=uuid.uuid4(),
+                    teacher_user_id=self.rejected_teacher_id,
+                    student_user_id=self.student_unassigned_id,
+                )
+            )
+            db.commit()
+
+        response = self.client.get(
+            f"/api/v1/admin/teachers/assignment-options?application_id={self.unassigned_application_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        items_by_teacher_id = {
+            item["teacher_user_id"]: item
+            for item in response.json()["items"]
+        }
+        rejected_teacher_item = items_by_teacher_id[str(self.rejected_teacher_id)]
+        self.assertFalse(rejected_teacher_item["is_available"])
+        self.assertEqual(
+            rejected_teacher_item["unavailable_reason"],
+            "already_rejected_this_student",
+        )
 
     def test_admin_can_assign_unassigned_student_to_teacher(self) -> None:
         token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")
@@ -400,6 +455,28 @@ class AdminTeacherAssignmentTabTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 409, response.text)
         self.assertEqual(response.json()["detail"], "Teacher is at full capacity")
+
+    def test_assign_teacher_rejects_previously_rejected_teacher(self) -> None:
+        token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")
+
+        with self.SessionLocal() as db:
+            db.add(
+                TeacherStudentRejection(
+                    id=uuid.uuid4(),
+                    teacher_user_id=self.rejected_teacher_id,
+                    student_user_id=self.student_unassigned_id,
+                )
+            )
+            db.commit()
+
+        response = self.client.post(
+            f"/api/v1/admin/applications/{self.unassigned_application_id}/assign-teacher",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"teacher_user_id": str(self.rejected_teacher_id)},
+        )
+
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()["detail"], "Teacher already rejected this student")
 
     def test_assigned_student_disappears_from_unassigned_list(self) -> None:
         token = self._login("admin.assignmenttab@example.com", "AdminAssignmentTab123!")

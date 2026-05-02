@@ -3,8 +3,10 @@ import { buildApiUrl } from '@/lib/apiBaseUrl';
 export type AdminApplicationRequestKind =
   | 'initial_profile'
   | 'profile_update'
+  | 'student_profile_update'
   | 'teacher_profile_update'
-  | 'system_assignment_event';
+  | 'system_assignment_event'
+  | `system_${string}`;
 
 export interface AdminApplication {
   id: string;
@@ -12,6 +14,9 @@ export interface AdminApplication {
   status: string;
   request_kind: AdminApplicationRequestKind;
   request_kind_label: string;
+  current_teacher_user_id: string | null;
+  teacher_review_status: string | null;
+  can_assign_teacher: boolean;
 }
 
 export interface AdminApplicationDetail {
