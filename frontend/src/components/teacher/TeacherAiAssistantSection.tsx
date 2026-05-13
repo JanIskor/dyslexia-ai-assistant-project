@@ -440,6 +440,15 @@ function AdaptationRationaleCard({
       </div>
 
       <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 sm:text-sm">
+        {rationale.output_contract_title ? (
+          <div>
+            <p className="font-semibold text-stone-700">Тип результата</p>
+            <p className="mt-1">{rationale.output_contract_title}</p>
+            {rationale.output_contract_summary ? (
+              <p className="mt-1 text-stone-500">{rationale.output_contract_summary}</p>
+            ) : null}
+          </div>
+        ) : null}
         <div>
           <p className="font-semibold text-stone-700">Стратегия</p>
           <p className="mt-1">{rationale.adaptation_strategy}</p>

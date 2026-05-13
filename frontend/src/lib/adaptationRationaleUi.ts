@@ -9,6 +9,9 @@ export interface AdaptationRationale {
   methodology_references: string[];
   adaptation_intensity: AdaptationIntensity;
   warnings: string[];
+  output_contract_title?: string | null;
+  output_contract_status?: 'ok' | 'needs_review' | null;
+  output_contract_summary?: string | null;
   is_fallback: boolean;
 }
 

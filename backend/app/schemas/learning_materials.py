@@ -35,6 +35,9 @@ class AdaptationRationaleResponse(BaseModel):
     methodology_references: list[str]
     adaptation_intensity: AdaptationIntensity
     warnings: list[str]
+    output_contract_title: str | None = None
+    output_contract_status: Literal["ok", "needs_review"] | None = None
+    output_contract_summary: str | None = None
     is_fallback: bool = False
 
 

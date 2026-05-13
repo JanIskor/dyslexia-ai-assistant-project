@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from app.services.adaptation_output_contracts import get_adaptation_output_contract
 from app.services.controlled_adaptation_policy_service import build_controlled_adaptation_policy
 from app.services.factual_consistency_service import extract_protected_elements
 
@@ -262,6 +263,12 @@ def build_adaptation_system_prompt(
         original_text=source_text,
         protected_elements=protected_elements,
     )
+    output_contract = get_adaptation_output_contract(
+        product_mode=normalized_product_mode,
+        strategy_mode=normalized_mode,
+        genre=genre,
+        risk_level=policy["risk_level"],
+    )
     prompt_parts = [
         BASE_PROMPT,
         BASE_RAG_GUARDRAILS,
@@ -278,6 +285,11 @@ def build_adaptation_system_prompt(
         _build_operations_block(
             title="Запрещённые операции",
             operations=policy["forbidden_operations"],
+        ),
+        _build_output_contract_block(
+            product_mode=normalized_product_mode,
+            output_contract=output_contract,
+            protected_elements=protected_elements,
         ),
         (
             "Правило неопределённости: если ты не уверен, как безопасно упростить фрагмент, "
@@ -328,3 +340,38 @@ def _build_protected_elements_block(protected_elements: dict[str, list[str]]) ->
 
 def _build_operations_block(*, title: str, operations: list[str]) -> str:
     return f"{title}:\n- " + "\n- ".join(operations)
+
+
+def _build_output_contract_block(
+    *,
+    product_mode: ProductAdaptationMode,
+    output_contract: dict[str, object],
+    protected_elements: dict[str, list[str]],
+) -> str:
+    preserve_categories = [
+        label
+        for label, key in (
+            ("числа", "numbers"),
+            ("даты", "dates"),
+            ("единицы измерения", "units"),
+            ("формулы", "formulas"),
+            ("термины", "important_terms"),
+            ("условия и исключения", "condition_exception_markers"),
+            ("порядок действий", "action_order_markers"),
+        )
+        if protected_elements.get(key)
+    ]
+    preserve_text = ", ".join(preserve_categories) if preserve_categories else "ключевые факты и формулировки"
+    required_structure = "\n- ".join(output_contract["required_structure"])
+    forbidden_patterns = "\n- ".join(output_contract["forbidden_output_patterns"])
+    format_instructions = "\n- ".join(output_contract["format_instructions"])
+    return (
+        "OUTPUT CONTRACT:\n"
+        f"- product mode: {product_mode}\n"
+        f"- output type: {output_contract['title']}\n"
+        f"- purpose: {output_contract['purpose']}\n"
+        f"- required format:\n- {required_structure}\n"
+        f"- do not produce:\n- {forbidden_patterns}\n"
+        f"- preserve: {preserve_text}\n"
+        f"- format instructions:\n- {format_instructions}"
+    )

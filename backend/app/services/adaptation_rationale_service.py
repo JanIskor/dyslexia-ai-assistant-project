@@ -4,6 +4,8 @@ import re
 from typing import Literal
 
 from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode, normalize_adaptation_mode
+from app.services.adaptation_contract_validator import AdaptationContractValidationResult
+from app.services.adaptation_output_contracts import AdaptationOutputContract
 from app.services.controlled_adaptation_policy_service import ControlledAdaptationPolicy
 from app.services.factual_consistency_service import FactualConsistencyReport, get_factual_report_summary_message
 
@@ -20,6 +22,8 @@ def build_adaptation_rationale(
     mode: AdaptationMode | None,
     genre: AdaptationGenre | None,
     controlled_adaptation_policy: ControlledAdaptationPolicy | None = None,
+    output_contract: AdaptationOutputContract | None = None,
+    contract_validation: AdaptationContractValidationResult | None = None,
     factual_consistency_report: FactualConsistencyReport | None = None,
     is_fallback: bool = False,
 ) -> dict[str, object]:
@@ -88,6 +92,14 @@ def build_adaptation_rationale(
                 "После генерации выполнена проверка фактической согласованности.",
             ]
         )
+    if output_contract is not None:
+        semantic_preservation_notes.append("Применён контракт формата результата для выбранного метода адаптации.")
+    if contract_validation is not None:
+        semantic_preservation_notes.append(
+            "Формат результата подтверждён."
+            if contract_validation["contract_status"] == "ok"
+            else "Формат результата требует дополнительной проверки преподавателем."
+        )
     semantic_preservation_notes.append(get_factual_report_summary_message(factual_consistency_report))
 
     warnings: list[str] = []
@@ -115,6 +127,9 @@ def build_adaptation_rationale(
         "methodology_references": methodology_references or ["syntax adaptation"],
         "adaptation_intensity": intensity,
         "warnings": warnings,
+        "output_contract_title": output_contract["title"] if output_contract is not None else None,
+        "output_contract_status": contract_validation["contract_status"] if contract_validation is not None else None,
+        "output_contract_summary": contract_validation["summary"] if contract_validation is not None else None,
         "is_fallback": is_fallback,
     }
 
