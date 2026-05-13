@@ -11,7 +11,11 @@ import {
   uploadKnowledgeDocument,
   type KnowledgeDocument,
 } from '@/lib/adminKnowledgeBaseApi';
-import { ADAPTATION_MODE_OPTIONS, getAdaptationModeLabel } from '@/lib/adaptationModes';
+import {
+  KNOWLEDGE_BASE_GENRE_TAG_OPTIONS,
+  KNOWLEDGE_BASE_MODE_TAG_OPTIONS,
+  getKnowledgeBaseMethodologyTagLabel,
+} from '@/lib/adaptationModes';
 
 type MessageTone = 'success' | 'error';
 
@@ -404,8 +408,8 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
                 </span>
                 <span className="inline-flex rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-xs font-medium text-stone-600">
                   {document.adaptation_modes.length === 0
-                    ? 'Все режимы адаптации'
-                    : document.adaptation_modes.map((mode) => getAdaptationModeLabel(mode)).join(', ')}
+                    ? 'Общие правила для всех стратегий и жанров'
+                    : document.adaptation_modes.map((mode) => getKnowledgeBaseMethodologyTagLabel(mode)).join(', ')}
                 </span>
               </div>
             </button>
@@ -520,14 +524,51 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
 
             <div>
               <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-stone-400">
-                Режимы адаптации
+                Стратегии и жанры
               </h5>
               <p className="mt-2 text-sm leading-6 text-stone-500">
                 Если ничего не выбрано, документ считается общим методическим правилом и доступен
-                для всех режимов.
+                для всех стратегий и жанров.
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {ADAPTATION_MODE_OPTIONS.map((option) => {
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                  Стратегии
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {KNOWLEDGE_BASE_MODE_TAG_OPTIONS.map((option) => {
+                    const isChecked = selectedDocument.adaptation_modes.includes(option.value);
+
+                    return (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-3 rounded-[18px] border border-orange-100 bg-orange-50/35 px-4 py-3 text-sm font-medium text-stone-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isSavingControls || isDeletingDocument}
+                          onChange={(event) => {
+                            const nextModes = event.target.checked
+                              ? [...selectedDocument.adaptation_modes, option.value]
+                              : selectedDocument.adaptation_modes.filter((mode) => mode !== option.value);
+
+                            void handleUpdateControls({ adaptation_modes: nextModes });
+                          }}
+                          data-testid={`admin-knowledge-base-mode-${option.value}`}
+                          className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-400"
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                  Жанры
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {KNOWLEDGE_BASE_GENRE_TAG_OPTIONS.map((option) => {
                   const isChecked = selectedDocument.adaptation_modes.includes(option.value);
 
                   return (
@@ -546,13 +587,14 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
 
                           void handleUpdateControls({ adaptation_modes: nextModes });
                         }}
-                        data-testid={`admin-knowledge-base-mode-${option.value}`}
+                        data-testid={`admin-knowledge-base-genre-${option.value}`}
                         className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-400"
                       />
                       {option.label}
                     </label>
                   );
-                })}
+                  })}
+                </div>
               </div>
             </div>
 

@@ -8,10 +8,17 @@ import {
   saveTeacherAiAssistantMaterial,
   sendTeacherAiAssistantMessage,
   parseTeacherAiAssistantFile,
+  type TeacherAiAssistantGenre,
   type TeacherAiAssistantMode,
   type TeacherAiAssistantMessageResponse,
 } from '@/lib/teacherAiAssistantApi';
-import { ADAPTATION_MODE_OPTIONS } from '@/lib/adaptationModes';
+import {
+  ADAPTATION_GENRE_OPTIONS,
+  ADAPTATION_MODE_OPTIONS,
+  getAdaptationGenreLabel,
+  getAdaptationStrategyExplanation,
+  shouldShowGenreAwareWarning,
+} from '@/lib/adaptationModes';
 import { getTeacherMaterials, type TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
@@ -23,6 +30,7 @@ interface TeacherAiAssistantMessage {
   sourceText?: string;
   source?: TeacherAiAssistantSource;
   adaptationMode?: TeacherAiAssistantMode;
+  adaptationGenre?: TeacherAiAssistantGenre;
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
@@ -30,6 +38,7 @@ interface TeacherAiAssistantSubmissionSnapshot {
   sourceKey: string;
   sourceText: string;
   adaptationMode: TeacherAiAssistantMode;
+  adaptationGenre: TeacherAiAssistantGenre;
 }
 
 interface TeacherAiAssistantSavedSourceStatus {
@@ -342,7 +351,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSavingMaterial, setIsSavingMaterial] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('basic_simplify');
+  const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('mode_a');
+  const [selectedGenre, setSelectedGenre] = useState<TeacherAiAssistantGenre>('educational');
   const [openComposerMenu, setOpenComposerMenu] = useState<ComposerActionMenu>(null);
   const [expandedKnowledgeMessageIds, setExpandedKnowledgeMessageIds] = useState<string[]>([]);
   const [isMaterialSourceModalOpen, setIsMaterialSourceModalOpen] = useState(false);
@@ -442,6 +452,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       const response = await sendTeacherAiAssistantMessage(accessToken, {
         message: trimmedMessage,
         mode: selectedMode,
+        genre: selectedGenre,
       });
 
       const assistantMessage: TeacherAiAssistantMessage = {
@@ -451,6 +462,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         sourceText: trimmedMessage,
         source: currentSource,
         adaptationMode: selectedMode,
+        adaptationGenre: selectedGenre,
         usedKnowledgeChunks: response.used_knowledge_chunks,
       };
 
@@ -459,6 +471,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         sourceKey: buildAssistantSourceKey(currentSource),
         sourceText: trimmedMessage,
         adaptationMode: selectedMode,
+        adaptationGenre: selectedGenre,
       });
     } catch (error) {
       setErrorMessage(
@@ -770,8 +783,9 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   };
 
   const selectedModeLabel =
-    ADAPTATION_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.label ??
-    'Упростить текст';
+    ADAPTATION_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.shortLabel ??
+    'Mode A';
+  const selectedGenreLabel = getAdaptationGenreLabel(selectedGenre);
   const currentSourceText = draftMessage.trim();
   const currentSourceKey = buildAssistantSourceKey(currentSource);
   const isCollapsibleSourcePreview = currentSource.kind !== 'manual';
@@ -779,12 +793,14 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const isDuplicateSubmissionInSession =
     lastSubmittedSnapshot?.sourceKey === currentSourceKey &&
     lastSubmittedSnapshot.sourceText === currentSourceText &&
-    lastSubmittedSnapshot.adaptationMode === selectedMode;
+    lastSubmittedSnapshot.adaptationMode === selectedMode &&
+    lastSubmittedSnapshot.adaptationGenre === selectedGenre;
   const isSendDisabled =
     isSubmitting ||
     isParsingFileSource ||
     currentSourceText.length === 0 ||
     isDuplicateSubmissionInSession;
+  const shouldShowGenreWarning = shouldShowGenreAwareWarning(selectedMode, selectedGenre);
 
   return (
     <>
@@ -882,6 +898,32 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                             </div>
                           ) : null}
 
+                          {message.adaptationMode && message.adaptationGenre ? (
+                            <div
+                              data-testid="teacher-ai-assistant-strategy-explanation"
+                              className="mt-2 w-full rounded-[20px] border border-orange-100 bg-white/90 px-3 py-3 text-stone-600 shadow-sm"
+                            >
+                              <div className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm">
+                                <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-orange-700">
+                                  {ADAPTATION_MODE_OPTIONS.find((option) => option.value === message.adaptationMode)?.label ?? message.adaptationMode}
+                                </span>
+                                <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-stone-600">
+                                  {getAdaptationGenreLabel(message.adaptationGenre)}
+                                </span>
+                              </div>
+                              <ul className="mt-2 space-y-1 text-xs sm:text-sm">
+                                {getAdaptationStrategyExplanation(
+                                  message.adaptationMode,
+                                  message.adaptationGenre,
+                                ).map((item) => (
+                                  <li key={`${message.id}-${item}`} className="break-words">
+                                    • {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+
                           <button
                             type="button"
                             onClick={() => handleOpenSaveModal(message)}
@@ -932,6 +974,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               className="mb-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-stone-600"
             >
               Файл обрабатывается...
+            </p>
+          ) : null}
+
+          {shouldShowGenreWarning ? (
+            <p
+              data-testid="teacher-ai-assistant-genre-warning"
+              className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+            >
+              Для выбранного жанра сильное упрощение может изменить исходный смысл или стиль текста.
             </p>
           ) : null}
 
@@ -1110,6 +1161,23 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                     </div>
                   ) : null}
                 </div>
+
+                <label className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-600 shadow-sm sm:text-sm">
+                  <span className="text-stone-500">Жанр</span>
+                  <select
+                    value={selectedGenre}
+                    onChange={(event) => setSelectedGenre(event.target.value as TeacherAiAssistantGenre)}
+                    data-testid="teacher-ai-assistant-genre-select"
+                    className="bg-transparent text-stone-700 outline-none"
+                    aria-label="Выбрать жанр адаптации"
+                  >
+                    {ADAPTATION_GENRE_OPTIONS.map((genreOption) => (
+                      <option key={genreOption.value} value={genreOption.value}>
+                        {genreOption.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
 
               <button
@@ -1122,6 +1190,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
               >
                 <ArrowUp className="h-5 w-5" />
               </button>
+            </div>
+            <div className="mt-3 px-2 text-xs text-stone-500 sm:text-sm">
+              <span className="font-medium text-stone-600">Текущая стратегия:</span>{' '}
+              {selectedModeLabel}, {selectedGenreLabel}.
             </div>
           </div>
         </div>

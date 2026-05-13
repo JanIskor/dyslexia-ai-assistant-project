@@ -37,6 +37,7 @@ def create_teacher_ai_assistant_reply(
             query_text=payload.message.strip(),
             top_k=3,
             selected_mode=payload.mode,
+            selected_genre=payload.genre,
         )
     except HTTPException:
         retrieved_chunks = []
@@ -45,6 +46,7 @@ def create_teacher_ai_assistant_reply(
         PlainTextAdaptationRequest(
             source_text=payload.message.strip(),
             mode=payload.mode,
+            genre=payload.genre,
             retrieved_chunks=[
                 RetrievedKnowledgeChunkPromptContext(
                     document_title=chunk.document_title,

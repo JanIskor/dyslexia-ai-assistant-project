@@ -3,7 +3,9 @@ from typing import Protocol
 
 from app.core.config import settings
 from app.services.adaptation_prompt_builder import (
+    AdaptationGenre,
     AdaptationMode,
+    DEFAULT_ADAPTATION_GENRE,
     RetrievedKnowledgeChunkPromptContext,
     build_adaptation_system_prompt,
 )
@@ -32,6 +34,7 @@ class LlmProvider(Protocol):
 class PlainTextAdaptationRequest:
     source_text: str
     mode: AdaptationMode
+    genre: AdaptationGenre = DEFAULT_ADAPTATION_GENRE
     retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None
 
 
@@ -51,6 +54,7 @@ class LlmService:
             source_text=request.source_text,
             system_prompt=build_adaptation_system_prompt(
                 request.mode,
+                genre=request.genre,
                 retrieved_chunks=request.retrieved_chunks,
             ),
         )

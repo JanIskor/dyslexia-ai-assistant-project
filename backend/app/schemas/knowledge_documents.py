@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.services.adaptation_prompt_builder import AdaptationMode
+from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode, MethodologyAdaptationTag
 
 
 class KnowledgeDocumentResponse(BaseModel):
@@ -17,7 +17,7 @@ class KnowledgeDocumentResponse(BaseModel):
     status: str
     extracted_text: str | None
     use_in_rag: bool
-    adaptation_modes: list[AdaptationMode]
+    adaptation_modes: list[MethodologyAdaptationTag]
     chunks_count: int
     embedded_chunks_count: int
     created_at: datetime
@@ -43,7 +43,7 @@ class KnowledgeDocumentChunksListResponse(BaseModel):
 
 class KnowledgeDocumentControlsUpdateRequest(BaseModel):
     use_in_rag: bool | None = None
-    adaptation_modes: list[AdaptationMode] | None = None
+    adaptation_modes: list[MethodologyAdaptationTag] | None = None
 
 
 class KnowledgeDocumentDeleteResponse(BaseModel):
@@ -56,6 +56,7 @@ class KnowledgeBaseRetrieveRequest(BaseModel):
     query: str
     top_k: int = Field(default=5, ge=1, le=10)
     adaptation_mode: AdaptationMode | None = None
+    genre: AdaptationGenre | None = None
 
 
 class KnowledgeBaseRetrievedChunkResponse(BaseModel):

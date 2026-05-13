@@ -85,6 +85,7 @@ class AdminRagRulesControlsTests(unittest.TestCase):
 
             self.general_document_id = uuid.uuid4()
             self.mode_specific_document_id = uuid.uuid4()
+            self.legal_mode_b_document_id = uuid.uuid4()
             self.disabled_document_id = uuid.uuid4()
             self.deleted_document_id = uuid.uuid4()
 
@@ -105,16 +106,29 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     ),
                     KnowledgeDocument(
                         id=self.mode_specific_document_id,
-                        title="Пошаговые рекомендации",
-                        original_filename="structured.md",
+                        title="Mode A рекомендации",
+                        original_filename="mode-a.md",
                         mime_type="text/markdown",
                         file_size=100,
                         storage_object_key="knowledge-base/structured.md",
                         uploaded_by_user_id=self.admin_id,
                         status="embedded",
                         use_in_rag=True,
-                        adaptation_modes=["structured_explanation"],
-                        extracted_text="Правила для пошагового режима.",
+                        adaptation_modes=["mode_a"],
+                        extracted_text="Правила для сильного упрощения.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.legal_mode_b_document_id,
+                        title="Юридическая бережная адаптация",
+                        original_filename="legal-mode-b.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/legal-mode-b.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=["mode_b", "legal"],
+                        extracted_text="Правила для юридических текстов в строгом режиме.",
                     ),
                     KnowledgeDocument(
                         id=self.disabled_document_id,
@@ -160,8 +174,16 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                         id=uuid.uuid4(),
                         document_id=self.mode_specific_document_id,
                         chunk_index=0,
-                        content="Chunk только для structured mode.",
-                        char_count=33,
+                        content="Chunk только для mode A.",
+                        char_count=24,
+                        embedding=EMBEDDING_A,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.legal_mode_b_document_id,
+                        chunk_index=0,
+                        content="Chunk для legal + mode B.",
+                        char_count=26,
                         embedding=EMBEDDING_A,
                     ),
                     KnowledgeDocumentChunk(
@@ -205,13 +227,13 @@ class AdminRagRulesControlsTests(unittest.TestCase):
         response = self.client.patch(
             f"/api/v1/admin/knowledge-base/documents/{self.general_document_id}",
             headers={"Authorization": f"Bearer {token}"},
-            json={"use_in_rag": False, "adaptation_modes": ["key_points_focus"]},
+            json={"use_in_rag": False, "adaptation_modes": ["mode_b", "legal"]},
         )
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
         self.assertFalse(payload["use_in_rag"])
-        self.assertEqual(payload["adaptation_modes"], ["key_points_focus"])
+        self.assertEqual(payload["adaptation_modes"], ["mode_b", "legal"])
         self.assertEqual(payload["status"], "embedded")
         self.assertEqual(payload["chunks_count"], 1)
         self.assertEqual(payload["embedded_chunks_count"], 1)
@@ -223,7 +245,7 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="basic_simplify",
+                    selected_mode="mode_a",
                 )
 
         self.assertNotIn("Выключенный документ", [item.document_title for item in items])
@@ -235,13 +257,13 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="basic_simplify",
+                    selected_mode="mode_a",
                 )
                 structured_items = retrieve_relevant_chunks(
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="structured_explanation",
+                    selected_mode="mode_b",
                 )
 
         self.assertIn("Общие рекомендации", [item.document_title for item in basic_items])
@@ -254,10 +276,10 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="structured_explanation",
+                    selected_mode="mode_a",
                 )
 
-        self.assertIn("Пошаговые рекомендации", [item.document_title for item in items])
+        self.assertIn("Mode A рекомендации", [item.document_title for item in items])
 
     def test_mode_specific_document_does_not_participate_for_other_mode(self) -> None:
         with self.SessionLocal() as db:
@@ -266,10 +288,37 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="basic_simplify",
+                    selected_mode="mode_b",
                 )
 
-        self.assertNotIn("Пошаговые рекомендации", [item.document_title for item in items])
+        self.assertNotIn("Mode A рекомендации", [item.document_title for item in items])
+
+    def test_genre_specific_document_participates_only_for_matching_genre_and_mode(self) -> None:
+        with self.SessionLocal() as db:
+            with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
+                matching_items = retrieve_relevant_chunks(
+                    db,
+                    query_text="любой запрос",
+                    top_k=10,
+                    selected_mode="mode_b",
+                    selected_genre="legal",
+                )
+                non_matching_items = retrieve_relevant_chunks(
+                    db,
+                    query_text="любой запрос",
+                    top_k=10,
+                    selected_mode="mode_a",
+                    selected_genre="legal",
+                )
+
+        self.assertIn(
+            "Юридическая бережная адаптация",
+            [item.document_title for item in matching_items],
+        )
+        self.assertNotIn(
+            "Юридическая бережная адаптация",
+            [item.document_title for item in non_matching_items],
+        )
 
     def test_teacher_assistant_endpoint_no_longer_returns_500(self) -> None:
         token = self._login_teacher()
@@ -287,15 +336,16 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     headers={"Authorization": f"Bearer {token}"},
                     json={
                         "message": "Проверь адаптацию",
-                        "mode": "structured_explanation",
+                        "mode": "mode_b",
+                        "genre": "legal",
                     },
                 )
 
         self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertEqual(payload["reply"], "ok:structured_explanation")
+        self.assertEqual(payload["reply"], "ok:mode_b")
         self.assertIn(
-            "Пошаговые рекомендации",
+            "Юридическая бережная адаптация",
             [item["document_title"] for item in payload["used_knowledge_chunks"]],
         )
 
@@ -332,7 +382,7 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="basic_simplify",
+                    selected_mode="mode_a",
                 )
 
         self.assertNotIn("Удаляемый документ", [item.document_title for item in items])

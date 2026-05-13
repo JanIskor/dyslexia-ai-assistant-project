@@ -236,6 +236,7 @@ def retrieve_knowledge_base_chunks(
         query_text=payload.query,
         top_k=payload.top_k,
         selected_mode=payload.adaptation_mode,
+        selected_genre=payload.genre,
     )
     return KnowledgeBaseRetrieveResponse(
         query=payload.query,

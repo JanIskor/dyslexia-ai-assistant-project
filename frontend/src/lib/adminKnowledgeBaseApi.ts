@@ -1,7 +1,7 @@
 'use client';
 
 import { buildApiUrl } from '@/lib/apiBaseUrl';
-import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
+import type { KnowledgeBaseMethodologyTag } from '@/lib/teacherAiAssistantApi';
 
 export interface KnowledgeDocument {
   id: string;
@@ -14,7 +14,7 @@ export interface KnowledgeDocument {
   status: string;
   extracted_text: string | null;
   use_in_rag: boolean;
-  adaptation_modes: TeacherAiAssistantMode[];
+  adaptation_modes: KnowledgeBaseMethodologyTag[];
   chunks_count: number;
   embedded_chunks_count: number;
   created_at: string;
@@ -168,7 +168,7 @@ export async function updateKnowledgeDocumentControls(
   documentId: string,
   payload: {
     use_in_rag?: boolean;
-    adaptation_modes?: TeacherAiAssistantMode[];
+    adaptation_modes?: KnowledgeBaseMethodologyTag[];
   },
 ): Promise<KnowledgeDocument> {
   const response = await fetch(buildApiUrl(`/api/v1/admin/knowledge-base/documents/${documentId}`), {

@@ -4,13 +4,17 @@ import math
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
-from sqlalchemy import cast, func, or_
 from sqlalchemy.orm import Session
-from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.knowledge_document import KnowledgeDocument
 from app.models.knowledge_document_chunk import KnowledgeDocumentChunk
-from app.services.adaptation_prompt_builder import AdaptationMode
+from app.services.adaptation_prompt_builder import (
+    ALL_GENRE_TAGS,
+    ALL_MODE_TAGS,
+    AdaptationGenre,
+    AdaptationMode,
+    resolve_mode_filter_tags,
+)
 from app.services.embedding_service import EmbeddingServiceError, embed_text
 
 
@@ -59,6 +63,7 @@ def retrieve_relevant_chunks(
     query_text: str,
     top_k: int = 5,
     selected_mode: AdaptationMode | None = None,
+    selected_genre: AdaptationGenre | None = None,
 ) -> list[RetrievedChunk]:
     if top_k < 1 or top_k > MAX_RETRIEVAL_TOP_K:
         raise HTTPException(
@@ -73,6 +78,7 @@ def retrieve_relevant_chunks(
             query_embedding=query_embedding,
             top_k=top_k,
             selected_mode=selected_mode,
+            selected_genre=selected_genre,
         )
 
     distance_expression = KnowledgeDocumentChunk.embedding.cosine_distance(query_embedding)
@@ -89,12 +95,23 @@ def retrieve_relevant_chunks(
             KnowledgeDocument.status == "embedded",
             KnowledgeDocument.use_in_rag.is_(True),
         )
-        .filter(_build_mode_filter(selected_mode))
         .order_by(distance_expression.asc(), KnowledgeDocumentChunk.chunk_index.asc())
-        .limit(top_k)
         .all()
     )
 
+    filtered_rows: list[tuple[KnowledgeDocumentChunk, str, float]] = []
+    for chunk, document_title, distance in rows:
+        document = chunk.document
+        adaptation_tags = list(document.adaptation_modes or []) if document is not None else []
+        if not _document_matches_selected_tags(
+            adaptation_tags,
+            selected_mode=selected_mode,
+            selected_genre=selected_genre,
+        ):
+            continue
+        filtered_rows.append((chunk, document_title, float(distance)))
+
+    filtered_rows.sort(key=lambda row: (row[2], row[0].chunk_index))
     return [
         RetrievedChunk(
             id=chunk.id,
@@ -105,30 +122,35 @@ def retrieve_relevant_chunks(
             distance=float(distance),
             similarity=max(0.0, 1.0 - float(distance)),
         )
-        for chunk, document_title, distance in rows
+        for chunk, document_title, distance in filtered_rows[:top_k]
     ]
 
 
-def _build_mode_filter(selected_mode: AdaptationMode | None):
-    adaptation_modes_jsonb = cast(KnowledgeDocument.adaptation_modes, JSONB)
-    is_general_document = or_(
-        KnowledgeDocument.adaptation_modes.is_(None),
-        func.jsonb_array_length(
-            func.coalesce(
-                adaptation_modes_jsonb,
-                cast("[]", JSONB),
-            )
-        )
-        == 0,
-    )
+def _document_matches_selected_tags(
+    document_tags: list[str] | None,
+    *,
+    selected_mode: AdaptationMode | None,
+    selected_genre: AdaptationGenre | None,
+) -> bool:
+    normalized_tags = [tag for tag in (document_tags or []) if isinstance(tag, str) and tag.strip()]
+    if not normalized_tags:
+        return True
 
-    if selected_mode is None:
-        return is_general_document
+    allowed_mode_tags = resolve_mode_filter_tags(selected_mode)
+    for tag in normalized_tags:
+        if tag in ALL_MODE_TAGS:
+            if not allowed_mode_tags or tag not in allowed_mode_tags:
+                return False
+            continue
 
-    return or_(
-        is_general_document,
-        adaptation_modes_jsonb.contains([selected_mode]),
-    )
+        if tag in ALL_GENRE_TAGS:
+            if selected_genre is None or tag != selected_genre:
+                return False
+            continue
+
+        return False
+
+    return True
 
 
 def _retrieve_relevant_chunks_sqlite(
@@ -137,6 +159,7 @@ def _retrieve_relevant_chunks_sqlite(
     query_embedding: list[float],
     top_k: int,
     selected_mode: AdaptationMode | None,
+    selected_genre: AdaptationGenre | None,
 ) -> list[RetrievedChunk]:
     rows = (
         db.query(KnowledgeDocumentChunk, KnowledgeDocument.title.label("document_title"), KnowledgeDocument)
@@ -152,9 +175,11 @@ def _retrieve_relevant_chunks_sqlite(
     filtered_rows: list[tuple[KnowledgeDocumentChunk, str, float]] = []
     for chunk, document_title, document in rows:
         adaptation_modes = list(document.adaptation_modes or [])
-        if adaptation_modes and selected_mode is not None and selected_mode not in adaptation_modes:
-            continue
-        if adaptation_modes and selected_mode is None:
+        if not _document_matches_selected_tags(
+            adaptation_modes,
+            selected_mode=selected_mode,
+            selected_genre=selected_genre,
+        ):
             continue
 
         distance = _cosine_distance(query_embedding, list(chunk.embedding))

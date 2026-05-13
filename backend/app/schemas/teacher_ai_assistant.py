@@ -4,12 +4,18 @@ from uuid import UUID
 from pydantic import BaseModel, StringConstraints
 
 from app.schemas.learning_materials import LearningMaterialResponse
-from app.services.adaptation_prompt_builder import DEFAULT_ADAPTATION_MODE, AdaptationMode
+from app.services.adaptation_prompt_builder import (
+    DEFAULT_ADAPTATION_GENRE,
+    DEFAULT_ADAPTATION_MODE,
+    AdaptationGenre,
+    AdaptationMode,
+)
 
 
 class TeacherAiAssistantMessageRequest(BaseModel):
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     mode: AdaptationMode = DEFAULT_ADAPTATION_MODE
+    genre: AdaptationGenre = DEFAULT_ADAPTATION_GENRE
 
 
 class TeacherAiAssistantUsedKnowledgeChunk(BaseModel):

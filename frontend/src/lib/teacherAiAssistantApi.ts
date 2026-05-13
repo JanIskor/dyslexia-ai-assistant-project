@@ -1,14 +1,29 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 import type { TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
-export type TeacherAiAssistantMode =
+export type TeacherAiAssistantStrategyMode = 'mode_a' | 'mode_b';
+
+export type TeacherAiAssistantLegacyMode =
   | 'basic_simplify'
   | 'structured_explanation'
   | 'key_points_focus';
 
+export type TeacherAiAssistantMode = TeacherAiAssistantStrategyMode | TeacherAiAssistantLegacyMode;
+
+export type TeacherAiAssistantGenre =
+  | 'educational'
+  | 'scientific_popular'
+  | 'fiction'
+  | 'legal'
+  | 'instruction'
+  | 'other';
+
+export type KnowledgeBaseMethodologyTag = TeacherAiAssistantMode | TeacherAiAssistantGenre;
+
 export interface TeacherAiAssistantMessagePayload {
   message: string;
   mode: TeacherAiAssistantMode;
+  genre: TeacherAiAssistantGenre;
 }
 
 export interface TeacherAiAssistantMessageResponse {

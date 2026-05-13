@@ -58,8 +58,10 @@ test('admin manages knowledge base documents from dedicated admin tab', async ({
     'Настройки документа',
   );
 
-  const structuredModeCheckbox = page.getByTestId('admin-knowledge-base-mode-structured_explanation');
-  await structuredModeCheckbox.click();
+  const modeBCheckbox = page.getByTestId('admin-knowledge-base-mode-mode_b');
+  await modeBCheckbox.click();
+  const legalGenreCheckbox = page.getByTestId('admin-knowledge-base-genre-legal');
+  await legalGenreCheckbox.click();
   await expect(page.getByTestId('admin-knowledge-base-success')).toContainText(
     'Настройки документа',
   );
