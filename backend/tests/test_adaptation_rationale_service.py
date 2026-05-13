@@ -121,6 +121,7 @@ class AdaptationRationaleServiceTests(unittest.TestCase):
             assert detail is not None
             self.assertIsNotNone(detail.adaptation_rationale)
             self.assertTrue(detail.adaptation_rationale.is_fallback)
+            self.assertIsNone(detail.factual_consistency_report)
             self.assertEqual(
                 detail.adaptation_rationale.adaptation_strategy,
                 "Адаптация выполнена по сохранённой версии материала.",

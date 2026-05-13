@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from app.services.controlled_adaptation_policy_service import build_controlled_adaptation_policy
+from app.services.factual_consistency_service import extract_protected_elements
 
+
+ProductAdaptationMode = Literal["basic_simplify", "structured_explanation", "key_points_focus"]
 StrategyAdaptationMode = Literal["mode_a", "mode_b"]
-LegacyAdaptationMode = Literal["basic_simplify", "structured_explanation", "key_points_focus"]
 AdaptationMode = Literal[
     "mode_a",
     "mode_b",
@@ -20,11 +23,11 @@ AdaptationGenre = Literal[
     "other",
 ]
 MethodologyAdaptationTag = Literal[
-    "mode_a",
-    "mode_b",
     "basic_simplify",
     "structured_explanation",
     "key_points_focus",
+    "mode_a",
+    "mode_b",
     "educational",
     "scientific_popular",
     "fiction",
@@ -33,8 +36,10 @@ MethodologyAdaptationTag = Literal[
     "other",
 ]
 
-DEFAULT_ADAPTATION_MODE: Final[StrategyAdaptationMode] = "mode_a"
+DEFAULT_PRODUCT_ADAPTATION_MODE: Final[ProductAdaptationMode] = "basic_simplify"
+DEFAULT_ADAPTATION_MODE: Final[ProductAdaptationMode] = DEFAULT_PRODUCT_ADAPTATION_MODE
 DEFAULT_ADAPTATION_GENRE: Final[AdaptationGenre] = "educational"
+GENERAL_RETRIEVAL_TAG: Final[str] = "general"
 ALL_GENRE_TAGS: Final[set[str]] = {
     "educational",
     "scientific_popular",
@@ -43,13 +48,14 @@ ALL_GENRE_TAGS: Final[set[str]] = {
     "instruction",
     "other",
 }
-ALL_MODE_TAGS: Final[set[str]] = {
-    "mode_a",
-    "mode_b",
+ALL_PRODUCT_MODE_TAGS: Final[set[str]] = {
     "basic_simplify",
     "structured_explanation",
     "key_points_focus",
 }
+ALL_STRATEGY_MODE_TAGS: Final[set[str]] = {"mode_a", "mode_b"}
+ALL_MODE_TAGS: Final[set[str]] = ALL_PRODUCT_MODE_TAGS | ALL_STRATEGY_MODE_TAGS
+ALL_METHODOLOGY_TAGS: Final[set[str]] = ALL_MODE_TAGS | ALL_GENRE_TAGS
 
 
 @dataclass(frozen=True)
@@ -64,6 +70,9 @@ BASE_PROMPT: Final[str] = (
     "для обучающегося с дислексией. "
     "Сохраняй смысл, факты, учебную точность и коммуникативную задачу исходного текста. "
     "Не придумывай новую информацию и не добавляй того, чего нет в исходном материале. "
+    "Не изменяй числа, даты, единицы измерения, формулы, имена, технические обозначения и ключевые термины. "
+    "Не добавляй факты, которых нет в исходном тексте. "
+    "Если в тексте есть сложная формула, сохрани её и при необходимости поясни словами, не меняя саму запись. "
     "Верни только готовый адаптированный текст без вводных комментариев от себя."
 )
 
@@ -74,6 +83,7 @@ BASE_RAG_GUARDRAILS: Final[str] = (
     "не добавляй новые предметные факты, которых нет в исходном тексте; "
     "не расширяй содержание исходного материала за счёт внешних знаний; "
     "не подменяй смысл исходного текста новым содержанием; "
+    "не меняй числа, даты, единицы измерения, формулы и технические обозначения; "
     "не используй контекст из базы знаний как источник предметной информации; "
     "используй его только для выбора формы подачи, например: "
     "деление длинных предложений, визуальная сегментация, "
@@ -93,24 +103,28 @@ MODE_PROMPT_BLOCKS: Final[dict[StrategyAdaptationMode, str]] = {
         "Стратегия адаптации: mode B, минимальное семантическое вмешательство. "
         "Приоритет: максимально точное сохранение смысла, фактов, терминологии и стиля исходного текста. "
         "Сильное переписывание запрещено. Замена терминов на другие слова запрещена. "
+        "Сохраняй исходные числа, даты, единицы измерения, формулы, имена и технические обозначения без изменений. "
         "Предпочитай поддержку читаемости через деление перегруженных фрагментов, "
         "визуальную сегментацию, аккуратные абзацы, маркированные структуры и выделение опорных элементов "
         "без агрессивного перефразирования."
     ),
 }
 
-LEGACY_MODE_PROMPT_SUFFIXES: Final[dict[LegacyAdaptationMode, str]] = {
+PRODUCT_MODE_PROMPT_BLOCKS: Final[dict[ProductAdaptationMode, str]] = {
     "basic_simplify": (
-        "Совместимость со старым режимом basic_simplify: "
-        "сделай основной акцент на общем упрощении формулировок."
+        "Метод адаптации: basic_simplify. "
+        "Главная педагогическая цель — сделать текст проще и легче для чтения, "
+        "снижая перегрузку формулировок."
     ),
     "structured_explanation": (
-        "Совместимость со старым режимом structured_explanation: "
-        "сделай основной акцент на пошаговой и последовательной структуре."
+        "Метод адаптации: structured_explanation. "
+        "Главная педагогическая цель — сделать объяснение пошаговым, "
+        "последовательным и прозрачным по структуре."
     ),
     "key_points_focus": (
-        "Совместимость со старым режимом key_points_focus: "
-        "сделай основной акцент на опорных идеях и краткой структуре."
+        "Метод адаптации: key_points_focus. "
+        "Главная педагогическая цель — выделить главное, опорные идеи и "
+        "не перегружать второстепенными деталями."
     ),
 }
 
@@ -142,23 +156,66 @@ GENRE_PROMPT_BLOCKS: Final[dict[AdaptationGenre, str]] = {
 }
 
 
-def normalize_adaptation_mode(mode: AdaptationMode) -> StrategyAdaptationMode:
+def is_strategy_mode(mode: str | None) -> bool:
+    return mode in ALL_STRATEGY_MODE_TAGS
+
+
+def is_product_mode(mode: str | None) -> bool:
+    return mode in ALL_PRODUCT_MODE_TAGS
+
+
+def resolve_strategy_mode(
+    mode: AdaptationMode | None,
+    genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE,
+) -> StrategyAdaptationMode:
     if mode == "mode_b":
+        return "mode_b"
+    if mode == "mode_a":
+        return "mode_a"
+
+    effective_mode = mode or DEFAULT_PRODUCT_ADAPTATION_MODE
+    effective_genre = genre or DEFAULT_ADAPTATION_GENRE
+
+    if effective_genre in {"legal", "fiction"}:
+        return "mode_b"
+    if effective_mode == "key_points_focus":
         return "mode_b"
     return "mode_a"
 
 
-def resolve_mode_filter_tags(mode: AdaptationMode | None) -> set[str]:
+def normalize_adaptation_mode(
+    mode: AdaptationMode | None,
+    genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE,
+) -> StrategyAdaptationMode:
+    return resolve_strategy_mode(mode, genre)
+
+
+def build_retrieval_tags(
+    mode: AdaptationMode | None,
+    genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE,
+) -> list[str]:
+    effective_genre = genre or DEFAULT_ADAPTATION_GENRE
+    resolved_strategy = resolve_strategy_mode(mode, effective_genre)
+    tags: list[str] = []
+
+    if mode and is_product_mode(mode):
+        tags.append(mode)
+
+    if mode and is_strategy_mode(mode):
+        tags.append(mode)
+
+    tags.extend([resolved_strategy, effective_genre, GENERAL_RETRIEVAL_TAG])
+    return list(dict.fromkeys(tags))
+
+
+def resolve_mode_filter_tags(
+    mode: AdaptationMode | None,
+    *,
+    genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE,
+) -> set[str]:
     if mode is None:
         return set()
-
-    if mode == "mode_b":
-        return {"mode_b"}
-
-    if mode == "mode_a":
-        return {"mode_a", "basic_simplify", "structured_explanation", "key_points_focus"}
-
-    return {"mode_a", mode}
+    return set(build_retrieval_tags(mode, genre))
 
 
 def _build_knowledge_context_block(
@@ -191,22 +248,83 @@ def build_adaptation_system_prompt(
     mode: AdaptationMode,
     *,
     genre: AdaptationGenre = DEFAULT_ADAPTATION_GENRE,
+    source_text: str,
     retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None,
 ) -> str:
-    normalized_mode = normalize_adaptation_mode(mode)
+    normalized_product_mode = mode if is_product_mode(mode) else DEFAULT_PRODUCT_ADAPTATION_MODE
+    normalized_mode = normalize_adaptation_mode(mode, genre)
+    retrieval_tags = build_retrieval_tags(mode, genre)
+    protected_elements = extract_protected_elements(source_text)
+    policy = build_controlled_adaptation_policy(
+        product_mode=normalized_product_mode,
+        strategy_mode=normalized_mode,
+        genre=genre,
+        original_text=source_text,
+        protected_elements=protected_elements,
+    )
     prompt_parts = [
         BASE_PROMPT,
         BASE_RAG_GUARDRAILS,
+        PRODUCT_MODE_PROMPT_BLOCKS.get(normalized_product_mode),
         MODE_PROMPT_BLOCKS[normalized_mode],
         GENRE_PROMPT_BLOCKS[genre],
+        f"Уровень риска адаптации: {policy['risk_level']}.",
+        policy["policy_summary"],
+        _build_protected_elements_block(protected_elements),
+        _build_operations_block(
+            title="Разрешённые операции",
+            operations=policy["allowed_operations"],
+        ),
+        _build_operations_block(
+            title="Запрещённые операции",
+            operations=policy["forbidden_operations"],
+        ),
+        (
+            "Правило неопределённости: если ты не уверен, как безопасно упростить фрагмент, "
+            "сохрани исходную формулировку. Не придумывай объяснения и не добавляй факты, "
+            "которых нет в источнике. Защищённые элементы можно только визуально структурировать "
+            "или пояснить после сохранения их исходной формы."
+        ),
+        f"Связанные теги применения: {', '.join(retrieval_tags)}.",
     ]
-
-    legacy_mode_suffix = LEGACY_MODE_PROMPT_SUFFIXES.get(mode)
-    if legacy_mode_suffix:
-        prompt_parts.append(legacy_mode_suffix)
 
     knowledge_context_block = _build_knowledge_context_block(retrieved_chunks)
     if knowledge_context_block:
         prompt_parts.append(knowledge_context_block)
 
-    return "\n\n".join(prompt_parts)
+    return "\n\n".join(part for part in prompt_parts if part)
+
+
+def _build_protected_elements_block(protected_elements: dict[str, list[str]]) -> str:
+    visible_items: list[str] = []
+    for label, key in (
+        ("Числа", "numbers"),
+        ("Проценты", "percentages"),
+        ("Даты", "dates"),
+        ("Диапазоны", "ranges"),
+        ("Единицы измерения", "units"),
+        ("Формулы", "formulas"),
+        ("Технические обозначения", "technical_symbols"),
+        ("Имена и сущности", "named_entities"),
+        ("Цитируемые термины", "quoted_terms"),
+        ("Термины предметной области", "domain_terms"),
+        ("Юридические маркеры", "legal_markers"),
+        ("Маркеры порядка действий", "action_order_markers"),
+        ("Маркеры условий и исключений", "condition_exception_markers"),
+    ):
+        values = protected_elements.get(key) or []
+        if not values:
+            continue
+        preview = ", ".join(values[:6])
+        if len(values) > 6:
+            preview += ", ..."
+        visible_items.append(f"{label}: {preview}")
+
+    if not visible_items:
+        return "Защищённые элементы: явных чувствительных элементов не найдено, но факты всё равно нельзя менять."
+
+    return "Защищённые элементы, которые нужно сохранить без изменения:\n- " + "\n- ".join(visible_items)
+
+
+def _build_operations_block(*, title: str, operations: list[str]) -> str:
+    return f"{title}:\n- " + "\n- ".join(operations)

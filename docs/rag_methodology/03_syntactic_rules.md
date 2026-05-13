@@ -69,7 +69,40 @@
 - когда дробление ломает точную формулировку определения, правила или цитаты;
 - когда пассивная конструкция нужна для сохранения предметного акцента.
 
-## Связанные режимы адаптации
+## Разрешённые синтаксические операции
+
+- split long sentence;
+- convert participial phrase into separate sentence;
+- convert passive to active only if agent is explicit;
+- make hidden logical relation explicit;
+- move insertion into separate sentence.
+
+## Запрещённые синтаксические операции
+
+- менять причинно-временную связь;
+- удалять условие;
+- удалять исключение;
+- менять порядок действий в инструкции;
+- дробить терминологически цельную формулировку;
+- превращать зависимый фрагмент в самостоятельное утверждение, если без контекста оно теряет смысл.
+
+## Связанные теги применения
+
+### Методы адаптации
 
 - `basic_simplify`
 - `structured_explanation`
+
+### Стратегии адаптации
+
+- `mode_a`
+- `mode_b`
+
+### Жанры
+
+- `educational`
+- `scientific_popular`
+- `fiction`
+- `legal`
+- `instruction`
+- `other`

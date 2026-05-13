@@ -6,7 +6,13 @@ from fastapi import UploadFile
 
 from app.schemas.learning_materials import TeacherLearningMaterialCreateRequest
 from app.services.adaptation_rationale_service import build_adaptation_rationale
-from app.services.adaptation_prompt_builder import RetrievedKnowledgeChunkPromptContext
+from app.services.adaptation_prompt_builder import (
+    RetrievedKnowledgeChunkPromptContext,
+    is_product_mode,
+    resolve_strategy_mode,
+)
+from app.services.controlled_adaptation_policy_service import build_controlled_adaptation_policy
+from app.services.factual_consistency_service import build_factual_consistency_report, extract_protected_elements
 from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
@@ -28,14 +34,27 @@ from app.services.retrieval_service import retrieve_relevant_chunks
 MAX_ASSISTANT_INPUT_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 
+def _resolve_product_mode(mode: str) -> str:
+    return mode if is_product_mode(mode) else "basic_simplify"
+
+
 def create_teacher_ai_assistant_reply(
     db: Session,
     payload: TeacherAiAssistantMessageRequest,
 ) -> TeacherAiAssistantMessageResponse:
+    source_text = payload.message.strip()
+    protected_elements = extract_protected_elements(source_text)
+    controlled_adaptation_policy = build_controlled_adaptation_policy(
+        product_mode=_resolve_product_mode(payload.mode),
+        strategy_mode=resolve_strategy_mode(payload.mode, payload.genre),
+        genre=payload.genre,
+        original_text=source_text,
+        protected_elements=protected_elements,
+    )
     try:
         retrieved_chunks = retrieve_relevant_chunks(
             db,
-            query_text=payload.message.strip(),
+            query_text=source_text,
             top_k=3,
             selected_mode=payload.mode,
             selected_genre=payload.genre,
@@ -45,7 +64,7 @@ def create_teacher_ai_assistant_reply(
 
     adaptation_result = get_llm_service().adapt_plain_text(
         PlainTextAdaptationRequest(
-            source_text=payload.message.strip(),
+            source_text=source_text,
             mode=payload.mode,
             genre=payload.genre,
             retrieved_chunks=[
@@ -58,11 +77,17 @@ def create_teacher_ai_assistant_reply(
             ],
         )
     )
+    factual_consistency_report = build_factual_consistency_report(
+        source_text=source_text,
+        adapted_text=adaptation_result.adapted_text,
+    )
     adaptation_rationale = build_adaptation_rationale(
-        source_text=payload.message.strip(),
+        source_text=source_text,
         adapted_text=adaptation_result.adapted_text,
         mode=payload.mode,
         genre=payload.genre,
+        controlled_adaptation_policy=controlled_adaptation_policy,
+        factual_consistency_report=factual_consistency_report,
     )
 
     return TeacherAiAssistantMessageResponse(
@@ -75,6 +100,7 @@ def create_teacher_ai_assistant_reply(
             for chunk in retrieved_chunks
         ],
         adaptation_rationale=adaptation_rationale,
+        factual_consistency_report=factual_consistency_report,
     )
 
 
@@ -84,6 +110,22 @@ def save_teacher_ai_assistant_material(
     teacher_user_id: UUID,
     payload: TeacherAiAssistantSaveMaterialRequest,
 ) -> TeacherAiAssistantSaveMaterialResponse:
+    protected_elements = extract_protected_elements(payload.original_text)
+    controlled_adaptation_policy = build_controlled_adaptation_policy(
+        product_mode=_resolve_product_mode(payload.adaptation_mode),
+        strategy_mode=resolve_strategy_mode(payload.adaptation_mode, payload.adaptation_genre),
+        genre=payload.adaptation_genre or "educational",
+        original_text=payload.original_text,
+        protected_elements=protected_elements,
+    )
+    factual_consistency_report_payload = (
+        payload.factual_consistency_report.model_dump()
+        if payload.factual_consistency_report is not None
+        else build_factual_consistency_report(
+            source_text=payload.original_text,
+            adapted_text=payload.adapted_text,
+        )
+    )
     material, save_type = save_or_update_adapted_learning_material(
         db,
         teacher_user_id=teacher_user_id,
@@ -104,8 +146,11 @@ def save_teacher_ai_assistant_material(
                     adapted_text=payload.adapted_text,
                     mode=payload.adaptation_mode,
                     genre=payload.adaptation_genre,
+                    controlled_adaptation_policy=controlled_adaptation_policy,
+                    factual_consistency_report=factual_consistency_report_payload,
                 )
             ),
+            factual_consistency_report=factual_consistency_report_payload,
         ),
     )
 

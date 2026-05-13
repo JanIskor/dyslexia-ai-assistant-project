@@ -6,6 +6,7 @@ from pydantic import BaseModel, StringConstraints
 
 from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode
 from app.services.adaptation_rationale_service import AdaptationIntensity
+from app.services.factual_consistency_service import FactualIssueSeverity, FactualIssueType, FactualSummaryStatus
 
 
 AssistantMaterialSourceType = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -22,6 +23,7 @@ class TeacherLearningMaterialCreateRequest(BaseModel):
     adaptation_mode: AdaptationMode | None = None
     adaptation_genre: AdaptationGenre | None = None
     adaptation_rationale: dict[str, object] | None = None
+    factual_consistency_report: dict[str, object] | None = None
 
 
 class AdaptationRationaleResponse(BaseModel):
@@ -34,6 +36,21 @@ class AdaptationRationaleResponse(BaseModel):
     adaptation_intensity: AdaptationIntensity
     warnings: list[str]
     is_fallback: bool = False
+
+
+class FactualConsistencyIssueResponse(BaseModel):
+    type: FactualIssueType
+    severity: FactualIssueSeverity
+    source_value: str | None = None
+    adapted_value: str | None = None
+    message: str
+
+
+class FactualConsistencyReportResponse(BaseModel):
+    summary_status: FactualSummaryStatus
+    summary_message: str
+    strict_mode: bool
+    issues: list[FactualConsistencyIssueResponse]
 
 
 class LearningMaterialResponse(BaseModel):
@@ -50,6 +67,7 @@ class LearningMaterialResponse(BaseModel):
     adaptation_mode: AdaptationMode | None = None
     adaptation_genre: AdaptationGenre | None = None
     adaptation_rationale: AdaptationRationaleResponse | None = None
+    factual_consistency_report: FactualConsistencyReportResponse | None = None
     adaptation_group_key: str | None = None
     created_at: datetime
     updated_at: datetime

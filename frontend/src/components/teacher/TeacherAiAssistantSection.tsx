@@ -8,6 +8,12 @@ import {
   type AdaptationRationale,
 } from '@/lib/adaptationRationaleUi';
 import {
+  getCompactFactualConsistencyStatus,
+  getFactualConsistencyStatusTone,
+  getMissingFactualReportMessage,
+  type FactualConsistencyReport,
+} from '@/lib/factualConsistencyUi';
+import {
   MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES,
   getTeacherAiAssistantSourceStatus,
   saveTeacherAiAssistantMaterial,
@@ -19,9 +25,12 @@ import {
 } from '@/lib/teacherAiAssistantApi';
 import {
   ADAPTATION_GENRE_OPTIONS,
-  ADAPTATION_MODE_OPTIONS,
+  ADAPTATION_PRODUCT_MODE_OPTIONS,
+  getAdaptationModeLabel,
   getAdaptationGenreLabel,
   getAdaptationStrategyExplanation,
+  getStrategyModeLabel,
+  resolveStrategyMode,
   shouldShowGenreAwareWarning,
 } from '@/lib/adaptationModes';
 import { getTeacherMaterials, type TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
@@ -37,6 +46,7 @@ interface TeacherAiAssistantMessage {
   adaptationMode?: TeacherAiAssistantMode;
   adaptationGenre?: TeacherAiAssistantGenre;
   adaptationRationale?: AdaptationRationale;
+  factualConsistencyReport?: FactualConsistencyReport;
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
@@ -213,6 +223,73 @@ function SaveMaterialModal({
             >
               {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
               {isSubmitting ? 'Сохраняем...' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CriticalFactsConfirmModal({
+  isOpen,
+  isSubmitting,
+  onClose,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-stone-950/20 px-4 py-6 backdrop-blur-[2px] sm:px-6 sm:py-8">
+      <div className="w-full max-w-xl rounded-[32px] border border-amber-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,250,240,0.96))] shadow-[0_20px_60px_rgba(150,92,46,0.18)]">
+        <div className="border-b border-amber-100/70 px-5 py-5 sm:px-7 sm:py-6">
+          <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">
+            Сохранить материал с предупреждением?
+          </h2>
+          <p className="mt-2 text-sm text-stone-500 sm:text-base">
+            В адаптации обнаружены возможные изменения фактов. Сохранить материал всё равно?
+          </p>
+        </div>
+
+        <div className="border-t border-amber-100/70 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-white px-5 py-3 text-base font-medium text-stone-600 shadow-sm transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              data-testid="teacher-ai-factual-confirm-submit"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-base font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+              Сохранить всё равно
             </button>
           </div>
         </div>
@@ -408,6 +485,32 @@ function AdaptationRationaleCard({
   );
 }
 
+function FactualConsistencyCard({
+  report,
+}: {
+  report: FactualConsistencyReport | null | undefined;
+}) {
+  if (!report) {
+    return (
+      <div
+        data-testid="teacher-ai-assistant-factual-report"
+        className="mt-2 w-full rounded-[20px] border border-stone-200 bg-stone-50/90 px-3 py-3 text-sm text-stone-600 shadow-sm"
+      >
+        {getMissingFactualReportMessage()}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="teacher-ai-assistant-factual-report"
+      className={`mt-2 w-full rounded-[20px] border px-3 py-3 text-sm shadow-sm ${getFactualConsistencyStatusTone(report.summary_status)}`}
+    >
+      <p className="font-semibold">{getCompactFactualConsistencyStatus(report.summary_status)}</p>
+    </div>
+  );
+}
+
 export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSectionProps) {
   const [draftMessage, setDraftMessage] = useState('');
   const [messages, setMessages] = useState<TeacherAiAssistantMessage[]>([]);
@@ -423,8 +526,9 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   const [selectedAssistantMessageId, setSelectedAssistantMessageId] = useState<string | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isCriticalFactsModalOpen, setIsCriticalFactsModalOpen] = useState(false);
   const [isSavingMaterial, setIsSavingMaterial] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('mode_a');
+  const [selectedMode, setSelectedMode] = useState<TeacherAiAssistantMode>('basic_simplify');
   const [selectedGenre, setSelectedGenre] = useState<TeacherAiAssistantGenre>('educational');
   const [openComposerMenu, setOpenComposerMenu] = useState<ComposerActionMenu>(null);
   const [expandedKnowledgeMessageIds, setExpandedKnowledgeMessageIds] = useState<string[]>([]);
@@ -537,6 +641,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         adaptationMode: selectedMode,
         adaptationGenre: selectedGenre,
         adaptationRationale: response.adaptation_rationale,
+        factualConsistencyReport: response.factual_consistency_report,
         usedKnowledgeChunks: response.used_knowledge_chunks,
       };
 
@@ -645,6 +750,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
       adaptation_mode: message.adaptationMode ?? selectedMode,
       adaptation_genre: message.adaptationGenre ?? selectedGenre,
       adaptation_rationale: message.adaptationRationale,
+      factual_consistency_report: message.factualConsistencyReport,
     });
 
     cacheSavedSourceStatus(message, response.adaptation_group_key, response.title);
@@ -657,7 +763,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     return response;
   };
 
-  const handleOpenSaveModal = async (message: TeacherAiAssistantMessage) => {
+  const proceedToSaveFlow = async (message: TeacherAiAssistantMessage) => {
     if (!message.sourceText?.trim()) {
       setErrorMessage('Не удалось определить исходный текст для сохранения материала.');
       return;
@@ -692,6 +798,27 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     }
   };
 
+  const handleOpenSaveModal = async (message: TeacherAiAssistantMessage) => {
+    const hasCriticalFacts = message.factualConsistencyReport?.summary_status === 'critical';
+    setSelectedAssistantMessageId(message.id);
+
+    if (hasCriticalFacts) {
+      setIsCriticalFactsModalOpen(true);
+      return;
+    }
+
+    await proceedToSaveFlow(message);
+  };
+
+  const handleConfirmCriticalSave = async () => {
+    if (!selectedAssistantMessage) {
+      return;
+    }
+
+    setIsCriticalFactsModalOpen(false);
+    await proceedToSaveFlow(selectedAssistantMessage);
+  };
+
   const handleCloseSaveModal = () => {
     if (isSavingMaterial) {
       return;
@@ -701,6 +828,15 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
     setSelectedAssistantMessageId(null);
     setMaterialTitle('');
     setSaveErrorMessage(null);
+  };
+
+  const handleCloseCriticalFactsModal = () => {
+    if (isSavingMaterial) {
+      return;
+    }
+
+    setIsCriticalFactsModalOpen(false);
+    setSelectedAssistantMessageId(null);
   };
 
   const handleSaveMaterial = async () => {
@@ -859,8 +995,10 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   };
 
   const selectedModeLabel =
-    ADAPTATION_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.shortLabel ??
-    'Mode A';
+    ADAPTATION_PRODUCT_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.shortLabel ??
+    'Упростить текст';
+  const selectedStrategyMode = resolveStrategyMode(selectedMode, selectedGenre);
+  const selectedStrategyLabel = getStrategyModeLabel(selectedStrategyMode);
   const selectedGenreLabel = getAdaptationGenreLabel(selectedGenre);
   const currentSourceText = draftMessage.trim();
   const currentSourceKey = buildAssistantSourceKey(currentSource);
@@ -981,7 +1119,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                                 className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm"
                               >
                                 <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-orange-700">
-                                  {ADAPTATION_MODE_OPTIONS.find((option) => option.value === message.adaptationMode)?.label ?? message.adaptationMode}
+                                  {getAdaptationModeLabel(message.adaptationMode)}
                                 </span>
                                 <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-stone-600">
                                   {getAdaptationGenreLabel(message.adaptationGenre)}
@@ -1003,6 +1141,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                                   </ul>
                                 </div>
                               )}
+                              <FactualConsistencyCard report={message.factualConsistencyReport} />
                             </div>
                           ) : null}
 
@@ -1216,7 +1355,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                       data-testid="teacher-ai-assistant-mode-menu"
                       className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-60 rounded-[24px] border border-orange-100/90 bg-white p-2 shadow-[0_16px_40px_rgba(221,156,130,0.16)]"
                     >
-                      {ADAPTATION_MODE_OPTIONS.map((mode) => {
+                      {ADAPTATION_PRODUCT_MODE_OPTIONS.map((mode) => {
                         const isSelected = mode.value === selectedMode;
 
                         return (
@@ -1275,7 +1414,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
             </div>
             <div className="mt-3 px-2 text-xs text-stone-500 sm:text-sm">
               <span className="font-medium text-stone-600">Текущая стратегия:</span>{' '}
-              {selectedModeLabel}, {selectedGenreLabel}.
+              {selectedStrategyLabel}, {selectedGenreLabel}.
             </div>
           </div>
         </div>
@@ -1298,6 +1437,13 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         onSubmit={() => void handleSaveMaterial()}
         isSubmitting={isSavingMaterial}
         errorMessage={saveErrorMessage}
+      />
+
+      <CriticalFactsConfirmModal
+        isOpen={isCriticalFactsModalOpen}
+        isSubmitting={isSavingMaterial}
+        onClose={handleCloseCriticalFactsModal}
+        onConfirm={() => void handleConfirmCriticalSave()}
       />
 
       <MaterialSourceModal

@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 from app.models.knowledge_document import KnowledgeDocument
 from app.models.knowledge_document_chunk import KnowledgeDocumentChunk
 from app.services.adaptation_prompt_builder import (
+    ALL_METHODOLOGY_TAGS,
     ALL_GENRE_TAGS,
-    ALL_MODE_TAGS,
     AdaptationGenre,
     AdaptationMode,
-    resolve_mode_filter_tags,
+    build_retrieval_tags,
 )
 from app.services.embedding_service import EmbeddingServiceError, embed_text
 
@@ -136,15 +136,15 @@ def _document_matches_selected_tags(
     if not normalized_tags:
         return True
 
-    allowed_mode_tags = resolve_mode_filter_tags(selected_mode)
+    allowed_tags = set(build_retrieval_tags(selected_mode, selected_genre)) if selected_mode else set()
     for tag in normalized_tags:
-        if tag in ALL_MODE_TAGS:
-            if not allowed_mode_tags or tag not in allowed_mode_tags:
-                return False
+        if tag == "general":
             continue
 
-        if tag in ALL_GENRE_TAGS:
-            if selected_genre is None or tag != selected_genre:
+        if tag in ALL_METHODOLOGY_TAGS:
+            if tag in ALL_GENRE_TAGS and selected_genre is None:
+                return False
+            if tag not in allowed_tags:
                 return False
             continue
 

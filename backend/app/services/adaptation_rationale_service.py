@@ -4,6 +4,8 @@ import re
 from typing import Literal
 
 from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode, normalize_adaptation_mode
+from app.services.controlled_adaptation_policy_service import ControlledAdaptationPolicy
+from app.services.factual_consistency_service import FactualConsistencyReport, get_factual_report_summary_message
 
 
 AdaptationIntensity = Literal["low", "medium", "high"]
@@ -17,9 +19,11 @@ def build_adaptation_rationale(
     adapted_text: str,
     mode: AdaptationMode | None,
     genre: AdaptationGenre | None,
+    controlled_adaptation_policy: ControlledAdaptationPolicy | None = None,
+    factual_consistency_report: FactualConsistencyReport | None = None,
     is_fallback: bool = False,
 ) -> dict[str, object]:
-    normalized_mode = normalize_adaptation_mode(mode or "mode_a")
+    normalized_mode = normalize_adaptation_mode(mode or "basic_simplify", genre)
     effective_genre = genre
 
     source_metrics = _collect_text_metrics(source_text)
@@ -75,6 +79,16 @@ def build_adaptation_rationale(
         semantic_preservation_notes.append("Сохранён предметный смысл при более доступной подаче.")
         if effective_genre in {"scientific_popular", "legal", "instruction"}:
             semantic_preservation_notes.append("Ключевые факты и операционные элементы оставлены без смысловой подмены.")
+    if controlled_adaptation_policy is not None:
+        semantic_preservation_notes.extend(
+            [
+                "Защищённые элементы были извлечены до генерации.",
+                "Разрешены только контролируемые операции адаптации.",
+                "Добавление внешних фактов было запрещено политикой адаптации.",
+                "После генерации выполнена проверка фактической согласованности.",
+            ]
+        )
+    semantic_preservation_notes.append(get_factual_report_summary_message(factual_consistency_report))
 
     warnings: list[str] = []
     if normalized_mode == "mode_a" and effective_genre in {"fiction", "legal"}:

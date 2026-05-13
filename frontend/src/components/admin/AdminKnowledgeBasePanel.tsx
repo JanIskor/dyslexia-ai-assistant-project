@@ -13,7 +13,8 @@ import {
 } from '@/lib/adminKnowledgeBaseApi';
 import {
   KNOWLEDGE_BASE_GENRE_TAG_OPTIONS,
-  KNOWLEDGE_BASE_MODE_TAG_OPTIONS,
+  KNOWLEDGE_BASE_PRODUCT_MODE_TAG_OPTIONS,
+  KNOWLEDGE_BASE_STRATEGY_MODE_TAG_OPTIONS,
   getKnowledgeBaseMethodologyTagLabel,
 } from '@/lib/adaptationModes';
 
@@ -524,18 +525,51 @@ export function AdminKnowledgeBasePanel({ token }: { token: string }) {
 
             <div>
               <h5 className="text-sm font-semibold uppercase tracking-[0.16em] text-stone-400">
-                Стратегии и жанры
+                Теги применения
               </h5>
               <p className="mt-2 text-sm leading-6 text-stone-500">
                 Если ничего не выбрано, документ считается общим методическим правилом и доступен
-                для всех стратегий и жанров.
+                для всех методов, стратегий и жанров.
               </p>
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                  Стратегии
+                  Методы адаптации
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {KNOWLEDGE_BASE_MODE_TAG_OPTIONS.map((option) => {
+                  {KNOWLEDGE_BASE_PRODUCT_MODE_TAG_OPTIONS.map((option) => {
+                    const isChecked = selectedDocument.adaptation_modes.includes(option.value);
+
+                    return (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-3 rounded-[18px] border border-orange-100 bg-orange-50/35 px-4 py-3 text-sm font-medium text-stone-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isSavingControls || isDeletingDocument}
+                          onChange={(event) => {
+                            const nextModes = event.target.checked
+                              ? [...selectedDocument.adaptation_modes, option.value]
+                              : selectedDocument.adaptation_modes.filter((mode) => mode !== option.value);
+
+                            void handleUpdateControls({ adaptation_modes: nextModes });
+                          }}
+                          data-testid={`admin-knowledge-base-product-mode-${option.value}`}
+                          className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-400"
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
+                  Стратегии адаптации
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {KNOWLEDGE_BASE_STRATEGY_MODE_TAG_OPTIONS.map((option) => {
                     const isChecked = selectedDocument.adaptation_modes.includes(option.value);
 
                     return (

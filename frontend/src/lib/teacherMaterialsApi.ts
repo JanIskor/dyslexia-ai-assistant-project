@@ -1,5 +1,6 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 import type { AdaptationRationale } from '@/lib/adaptationRationaleUi';
+import type { FactualConsistencyReport } from '@/lib/factualConsistencyUi';
 
 import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
 
@@ -19,6 +20,7 @@ export interface TeacherLearningMaterial {
   adaptation_mode?: TeacherAiAssistantMode | null;
   adaptation_genre?: string | null;
   adaptation_rationale?: AdaptationRationale | null;
+  factual_consistency_report?: FactualConsistencyReport | null;
   adaptation_group_key?: string | null;
   created_at: string;
   updated_at: string;

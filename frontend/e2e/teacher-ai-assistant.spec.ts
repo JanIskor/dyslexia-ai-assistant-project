@@ -320,6 +320,12 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
           warnings: [],
           is_fallback: false,
         },
+        factual_consistency_report: {
+          summary_status: 'ok',
+          summary_message: 'Проверка фактов: критических расхождений не найдено.',
+          strict_mode: false,
+          issues: [],
+        },
       }),
     });
   });
@@ -330,7 +336,7 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
   const modeButton = page.getByTestId('teacher-ai-assistant-mode-button');
 
   await expect(actionsButton).toBeVisible();
-  await expect(modeButton).toContainText('Mode A');
+  await expect(modeButton).toContainText('Упростить текст');
 
   await actionsButton.click();
   await expect(page.getByTestId('teacher-ai-assistant-actions-menu')).toBeVisible();
@@ -339,17 +345,20 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
 
   await modeButton.click();
   await expect(page.getByTestId('teacher-ai-assistant-mode-menu')).toBeVisible();
-  await page.getByTestId('teacher-ai-assistant-mode-option-mode_b').click();
-  await expect(modeButton).toContainText('Mode B');
+  await page.getByTestId('teacher-ai-assistant-mode-option-key_points_focus').click();
+  await expect(modeButton).toContainText('Выделить главное');
 
   await page.getByTestId('teacher-ai-assistant-input').fill('Проверка отправки после смены режима');
   await page.getByTestId('teacher-ai-assistant-submit').click();
 
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
-    'Mode received: mode_b',
+    'Mode received: key_points_focus',
   );
   await expect(page.getByTestId('teacher-ai-assistant-rationale').first()).toContainText(
     'Сохранены ключевые термины.',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-factual-report').first()).toContainText(
+    'Критических расхождений не найдено.',
   );
 
   console.log(
@@ -397,17 +406,17 @@ test('teacher ai assistant disables unchanged re-submit in current session and r
   await submitButton.click();
 
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
-    'Mode received: mode_a',
+    'Mode received: basic_simplify',
   );
   await expect(submitButton).toBeDisabled();
 
   await page.getByTestId('teacher-ai-assistant-mode-button').click();
-  await page.getByTestId('teacher-ai-assistant-mode-option-mode_b').click();
+  await page.getByTestId('teacher-ai-assistant-mode-option-structured_explanation').click();
   await expect(submitButton).toBeEnabled();
 
   await submitButton.click();
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
-    'Mode received: mode_b',
+    'Mode received: structured_explanation',
   );
   await expect(submitButton).toBeDisabled();
 
@@ -644,7 +653,7 @@ test('teacher can save assistant reply as material', async ({ page }) => {
   expect(capturedSavePayload?.source_type).toBe('manual');
   expect(capturedSavePayload?.source_material_id ?? null).toBeNull();
   expect(capturedSavePayload?.source_filename ?? null).toBeNull();
-  expect(capturedSavePayload?.adaptation_mode).toBe('mode_a');
+  expect(capturedSavePayload?.adaptation_mode).toBe('basic_simplify');
   expect(sourceStatusRequestCount).toBe(1);
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -1031,7 +1040,7 @@ test('teacher ai assistant skips title modal for existing adaptation group and s
 
   await page.getByTestId('teacher-ai-assistant-submit').click();
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
-    'Новая версия для режима mode_a.',
+    'Новая версия для режима basic_simplify.',
   );
 
   await page.getByTestId('teacher-ai-assistant-save-material-trigger').last().click();
@@ -1041,10 +1050,10 @@ test('teacher ai assistant skips title modal for existing adaptation group and s
   );
 
   await page.getByTestId('teacher-ai-assistant-mode-button').click();
-  await page.getByTestId('teacher-ai-assistant-mode-option-mode_b').click();
+  await page.getByTestId('teacher-ai-assistant-mode-option-structured_explanation').click();
   await page.getByTestId('teacher-ai-assistant-submit').click();
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').last()).toContainText(
-    'Новая версия для режима mode_b.',
+    'Новая версия для режима structured_explanation.',
   );
 
   await page.getByTestId('teacher-ai-assistant-save-material-trigger').last().click();
@@ -1066,8 +1075,8 @@ test('teacher ai assistant skips title modal for existing adaptation group and s
   expect(saveRequests).toHaveLength(2);
   expect(saveRequests[0]?.title).toBe('Общая группа адаптаций');
   expect(saveRequests[1]?.title).toBe('Общая группа адаптаций');
-  expect(saveRequests[0]?.adaptation_mode).toBe('mode_a');
-  expect(saveRequests[1]?.adaptation_mode).toBe('mode_b');
+  expect(saveRequests[0]?.adaptation_mode).toBe('basic_simplify');
+  expect(saveRequests[1]?.adaptation_mode).toBe('structured_explanation');
 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

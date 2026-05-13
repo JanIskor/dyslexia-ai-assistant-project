@@ -55,6 +55,7 @@ class LlmService:
             system_prompt=build_adaptation_system_prompt(
                 request.mode,
                 genre=request.genre,
+                source_text=request.source_text,
                 retrieved_chunks=request.retrieved_chunks,
             ),
         )

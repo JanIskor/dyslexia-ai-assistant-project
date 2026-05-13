@@ -8,6 +8,12 @@ import {
   type AdaptationRationale,
 } from '@/lib/adaptationRationaleUi';
 import {
+  getCompactFactualConsistencyStatus,
+  getFactualConsistencyStatusTone,
+  getMissingFactualReportMessage,
+  type FactualConsistencyReport,
+} from '@/lib/factualConsistencyUi';
+import {
   assignTeacherMaterial,
   createTeacherMaterial,
   deleteTeacherMaterial,
@@ -204,6 +210,26 @@ function AdaptationRationalePanel({
           </ul>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function FactualConsistencyPanel({
+  report,
+}: {
+  report: FactualConsistencyReport | null | undefined;
+}) {
+  if (!report) {
+    return (
+      <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50/90 px-4 py-5 text-sm text-stone-600 sm:px-5 sm:py-6 sm:text-base">
+        {getMissingFactualReportMessage()}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mt-5 rounded-[24px] border px-4 py-5 shadow-sm sm:px-5 sm:py-6 ${getFactualConsistencyStatusTone(report.summary_status)}`}>
+      <p className="text-base font-semibold sm:text-lg">{getCompactFactualConsistencyStatus(report.summary_status)}</p>
     </div>
   );
 }
@@ -616,6 +642,8 @@ function TeacherAdaptedMaterialDetail({
           {material.adaptation_rationale ? (
             <AdaptationRationalePanel rationale={material.adaptation_rationale} />
           ) : null}
+
+          <FactualConsistencyPanel report={material.factual_consistency_report} />
 
           <div className="mt-5 flex justify-end">
             <button

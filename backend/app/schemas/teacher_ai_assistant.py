@@ -3,8 +3,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, StringConstraints
 
-from app.schemas.learning_materials import LearningMaterialResponse
-from app.schemas.learning_materials import AdaptationRationaleResponse
+from app.schemas.learning_materials import (
+    AdaptationRationaleResponse,
+    FactualConsistencyReportResponse,
+    LearningMaterialResponse,
+)
 from app.services.adaptation_prompt_builder import (
     DEFAULT_ADAPTATION_GENRE,
     DEFAULT_ADAPTATION_MODE,
@@ -28,6 +31,7 @@ class TeacherAiAssistantMessageResponse(BaseModel):
     reply: str
     used_knowledge_chunks: list[TeacherAiAssistantUsedKnowledgeChunk]
     adaptation_rationale: AdaptationRationaleResponse
+    factual_consistency_report: FactualConsistencyReportResponse
 
 
 class TeacherAiAssistantSaveMaterialRequest(BaseModel):
@@ -40,6 +44,7 @@ class TeacherAiAssistantSaveMaterialRequest(BaseModel):
     adaptation_mode: AdaptationMode = DEFAULT_ADAPTATION_MODE
     adaptation_genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE
     adaptation_rationale: AdaptationRationaleResponse | None = None
+    factual_consistency_report: FactualConsistencyReportResponse | None = None
 
 
 class TeacherAiAssistantSaveMaterialResponse(LearningMaterialResponse):

@@ -13,6 +13,7 @@ from app.schemas.learning_materials import (
     AdaptedLearningMaterialDetailResponse,
     AdaptedMaterialSourceInfo,
     AdaptationRationaleResponse,
+    FactualConsistencyReportResponse,
     LearningMaterialResponse,
     LearningMaterialKind,
     TeacherLearningMaterialAssignmentResponse,
@@ -89,12 +90,14 @@ def _to_learning_material_response(
     override_title: str | None = None,
 ) -> LearningMaterialResponse:
     adaptation_rationale_payload = material.adaptation_rationale
+    factual_consistency_report_payload = material.factual_consistency_report
     if material.adapted_text is not None and not adaptation_rationale_payload:
         adaptation_rationale_payload = build_adaptation_rationale(
             source_text=material.original_text,
             adapted_text=material.adapted_text,
             mode=material.adaptation_mode,
             genre=material.adaptation_genre,
+            factual_consistency_report=factual_consistency_report_payload,
             is_fallback=True,
         )
 
@@ -114,6 +117,11 @@ def _to_learning_material_response(
         adaptation_rationale=(
             AdaptationRationaleResponse.model_validate(adaptation_rationale_payload)
             if adaptation_rationale_payload
+            else None
+        ),
+        factual_consistency_report=(
+            FactualConsistencyReportResponse.model_validate(factual_consistency_report_payload)
+            if factual_consistency_report_payload
             else None
         ),
         adaptation_group_key=_build_adaptation_group_key(material),
@@ -219,6 +227,7 @@ def create_learning_material(
         adaptation_mode=payload.adaptation_mode,
         adaptation_genre=payload.adaptation_genre,
         adaptation_rationale=payload.adaptation_rationale,
+        factual_consistency_report=payload.factual_consistency_report,
     )
     db.add(material)
     db.commit()
@@ -283,6 +292,7 @@ def save_or_update_adapted_learning_material(
         existing_version.adaptation_mode = payload.adaptation_mode
         existing_version.adaptation_genre = payload.adaptation_genre
         existing_version.adaptation_rationale = payload.adaptation_rationale
+        existing_version.factual_consistency_report = payload.factual_consistency_report
         existing_version.title = _get_group_title(grouped_siblings) or existing_version.title
         db.add(existing_version)
         db.commit()
@@ -300,6 +310,7 @@ def save_or_update_adapted_learning_material(
         adaptation_mode=payload.adaptation_mode,
         adaptation_genre=payload.adaptation_genre,
         adaptation_rationale=payload.adaptation_rationale,
+        factual_consistency_report=payload.factual_consistency_report,
     )
     return (
         create_learning_material(

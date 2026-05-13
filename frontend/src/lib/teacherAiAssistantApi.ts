@@ -1,5 +1,6 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
 import type { AdaptationRationale } from '@/lib/adaptationRationaleUi';
+import type { FactualConsistencyReport } from '@/lib/factualConsistencyUi';
 import type { TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 export type TeacherAiAssistantStrategyMode = 'mode_a' | 'mode_b';
@@ -34,6 +35,7 @@ export interface TeacherAiAssistantMessageResponse {
     chunk_index: number;
   }>;
   adaptation_rationale: AdaptationRationale;
+  factual_consistency_report: FactualConsistencyReport;
 }
 
 export interface TeacherAiAssistantSaveMaterialPayload {
@@ -46,6 +48,7 @@ export interface TeacherAiAssistantSaveMaterialPayload {
   adaptation_mode: TeacherAiAssistantMode;
   adaptation_genre?: TeacherAiAssistantGenre;
   adaptation_rationale?: AdaptationRationale;
+  factual_consistency_report?: FactualConsistencyReport;
 }
 
 export interface TeacherAiAssistantSourceStatusPayload {
