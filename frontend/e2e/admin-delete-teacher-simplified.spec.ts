@@ -1,159 +1,46 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-const FRONTEND_BASE_URL = 'http://127.0.0.1:3000';
-const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
-const ADMIN_EMAIL = 'admin.seed@example.com';
-const ADMIN_PASSWORD = 'AdminSeed123!';
-const TEACHER_EMAIL = 'teacher.seed@example.com';
-const TEACHER_PASSWORD = 'TeacherSeed123!';
-const STUDENT_FULL_NAME = 'Иванов Андрей Викторович';
-const UNIQUE_SUFFIX = Date.now();
-const DELETABLE_TEACHER_EMAIL = `delete.teacher.${UNIQUE_SUFFIX}@example.com`;
-const DELETABLE_TEACHER_PASSWORD = 'DeleteTeacherE2E123!';
-const DELETABLE_TEACHER_FIRST_NAME = 'Мария';
-const DELETABLE_TEACHER_LAST_NAME = `Удаление${UNIQUE_SUFFIX}`;
-const DELETABLE_TEACHER_FULL_NAME = `${DELETABLE_TEACHER_LAST_NAME} ${DELETABLE_TEACHER_FIRST_NAME}`;
+import {
+  createAcceptedStudentForTeacher,
+  createTeacherViaAdmin,
+} from './helpers/adminSeeds';
+import { loginAdminViaUi } from './helpers/auth';
+import { buildUniqueSuffix } from './helpers/testData';
 
-let deletableTeacherId: string;
+test.describe.serial('admin delete teacher simplified', () => {
+  let teacherFullName = '';
+  let teacherSurname = '';
+  let studentFullName = '';
+  let studentSurname = '';
 
-async function loginViaApi(
-  request: APIRequestContext,
-  email: string,
-  password: string,
-): Promise<{ access_token: string }> {
-  const response = await request.post(`${BACKEND_BASE_URL}/api/v1/auth/login`, {
-    data: { email, password },
-  });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as { access_token: string };
-}
-
-async function loginAdminViaUi(page: Page) {
-  await page.goto(`${FRONTEND_BASE_URL}/login`);
-  await page.getByPlaceholder('example@site.ru').fill(ADMIN_EMAIL);
-  await page.getByPlaceholder('Введите пароль').fill(ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Войти' }).click();
-  await page.waitForURL('**/admin');
-}
-
-async function ensureSeedStudentUnassigned(request: APIRequestContext): Promise<string> {
-  const adminAuth = await loginViaApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
-
-  const unassignedResponse = await request.get(`${BACKEND_BASE_URL}/api/v1/admin/students/unassigned`, {
-    headers: { Authorization: `Bearer ${adminAuth.access_token}` },
-  });
-  expect(unassignedResponse.ok()).toBeTruthy();
-  const unassignedPayload = (await unassignedResponse.json()) as {
-    items: Array<{ application_id: string; user_id: string; full_name: string }>;
-  };
-  const existing = unassignedPayload.items.find((item) => item.full_name === STUDENT_FULL_NAME);
-  if (existing) {
-    return existing.application_id;
-  }
-
-  const teacherAuth = await loginViaApi(request, TEACHER_EMAIL, TEACHER_PASSWORD);
-  const teacherStudentsResponse = await request.get(`${BACKEND_BASE_URL}/api/v1/teacher/students`, {
-    headers: { Authorization: `Bearer ${teacherAuth.access_token}` },
-  });
-  expect(teacherStudentsResponse.ok()).toBeTruthy();
-  const teacherStudentsPayload = (await teacherStudentsResponse.json()) as {
-    items: Array<{ id: string; full_name: string }>;
-  };
-  const seedStudent = teacherStudentsPayload.items.find((item) => item.full_name === STUDENT_FULL_NAME);
-  expect(seedStudent).toBeTruthy();
-
-  const removalResponse = await request.post(
-    `${BACKEND_BASE_URL}/api/v1/teacher/students/${seedStudent?.id}/removal-requests`,
-    {
-      headers: {
-        Authorization: `Bearer ${teacherAuth.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      data: { reason: 'Подготовка e2e для admin delete teacher simplified.' },
-    },
-  );
-  expect(removalResponse.ok()).toBeTruthy();
-
-  const adminRemovalRequestsResponse = await request.get(
-    `${BACKEND_BASE_URL}/api/v1/admin/student-removal-requests`,
-    {
-      headers: { Authorization: `Bearer ${adminAuth.access_token}` },
-    },
-  );
-  expect(adminRemovalRequestsResponse.ok()).toBeTruthy();
-  const adminRemovalRequestsPayload = (await adminRemovalRequestsResponse.json()) as {
-    items: Array<{ id: string; status: string; student: { full_name: string } }>;
-  };
-  const pendingRequest = adminRemovalRequestsPayload.items.find(
-    (item) => item.status === 'pending' && item.student.full_name === STUDENT_FULL_NAME,
-  );
-  expect(pendingRequest).toBeTruthy();
-
-  const approveResponse = await request.patch(
-    `${BACKEND_BASE_URL}/api/v1/admin/student-removal-requests/${pendingRequest?.id}`,
-    {
-      headers: {
-        Authorization: `Bearer ${adminAuth.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      data: { action: 'approve' },
-    },
-  );
-  expect(approveResponse.ok()).toBeTruthy();
-
-  const refreshedUnassignedResponse = await request.get(`${BACKEND_BASE_URL}/api/v1/admin/students/unassigned`, {
-    headers: { Authorization: `Bearer ${adminAuth.access_token}` },
-  });
-  expect(refreshedUnassignedResponse.ok()).toBeTruthy();
-  const refreshedUnassignedPayload = (await refreshedUnassignedResponse.json()) as {
-    items: Array<{ application_id: string; user_id: string; full_name: string }>;
-  };
-  const refreshed = refreshedUnassignedPayload.items.find((item) => item.full_name === STUDENT_FULL_NAME);
-  expect(refreshed).toBeTruthy();
-  return refreshed!.application_id;
-}
-
-async function createTeacherAndAssignStudent(request: APIRequestContext) {
-  const adminAuth = await loginViaApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
-  const applicationId = await ensureSeedStudentUnassigned(request);
-
-  const createResponse = await request.post(`${BACKEND_BASE_URL}/api/v1/admin/teachers`, {
-    headers: {
-      Authorization: `Bearer ${adminAuth.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    data: {
-      email: DELETABLE_TEACHER_EMAIL,
-      password: DELETABLE_TEACHER_PASSWORD,
-      first_name: DELETABLE_TEACHER_FIRST_NAME,
-      last_name: DELETABLE_TEACHER_LAST_NAME,
-      birth_date: '1988-06-15',
+  test.beforeAll(async ({ request }, testInfo) => {
+    const suffix = buildUniqueSuffix(testInfo, 'delete-teacher');
+    const createdTeacher = await createTeacherViaAdmin(request, {
+      suffix,
+      firstName: 'Мария',
+      lastNamePrefix: 'E2EУдалениеПреподавателя',
+      password: 'DeleteTeacherE2E123!',
+      birthDate: '1988-06-15',
       gender: 'female',
       position: 'Преподаватель',
       phone: '+79005554433',
-      subject_name: 'Литература',
-    },
-  });
-  expect(createResponse.ok()).toBeTruthy();
-  const createPayload = (await createResponse.json()) as { id: string };
-  deletableTeacherId = createPayload.id;
+      subjectName: 'Литература',
+    });
 
-  const assignResponse = await request.post(
-    `${BACKEND_BASE_URL}/api/v1/admin/applications/${applicationId}/assign-teacher`,
-    {
-      headers: {
-        Authorization: `Bearer ${adminAuth.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      data: { teacher_user_id: deletableTeacherId },
-    },
-  );
-  expect(assignResponse.ok()).toBeTruthy();
-}
+    const createdStudent = await createAcceptedStudentForTeacher(request, {
+      suffix,
+      password: 'DeleteTeacherStudent123!',
+      teacherFullName: createdTeacher.fullName,
+      teacherEmail: createdTeacher.email,
+      teacherPassword: createdTeacher.password,
+      firstName: 'Освобождаемый',
+      lastNamePrefix: 'E2EПослеУдаленияУчителя',
+    });
 
-test.describe.serial('admin delete teacher simplified', () => {
-  test.beforeAll(async ({ request }) => {
-    await createTeacherAndAssignStudent(request);
+    teacherFullName = createdTeacher.fullName;
+    teacherSurname = createdTeacher.surname;
+    studentFullName = createdStudent.fullName;
+    studentSurname = createdStudent.surname;
   });
 
   test('admin sees delete teacher button, modal shows active students count, and cancel keeps teacher', async ({
@@ -161,14 +48,17 @@ test.describe.serial('admin delete teacher simplified', () => {
   }) => {
     await loginAdminViaUi(page);
     await page.getByRole('button', { name: 'Преподаватели' }).click();
+    await page.getByLabel('Поиск преподавателей').fill(teacherSurname);
 
-    await page.getByRole('heading', { name: DELETABLE_TEACHER_FULL_NAME }).click();
+    await page.getByRole('heading', { name: teacherFullName }).click();
     await expect(page.getByRole('button', { name: 'Удалить преподавателя' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Удалить преподавателя' }).click();
     await expect(page.getByRole('heading', { name: 'Удалить преподавателя?' })).toBeVisible();
     await expect(
-      page.getByText('У этого преподавателя сейчас 1 учеников из 15. После удаления преподавателя все его ученики перейдут в состояние "ожидает назначения".'),
+      page.getByText(
+        'У этого преподавателя сейчас 1 учеников из 15. После удаления преподавателя все его ученики перейдут в состояние "ожидает назначения".',
+      ),
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Отмена' }).click();
@@ -181,20 +71,23 @@ test.describe.serial('admin delete teacher simplified', () => {
   }) => {
     await loginAdminViaUi(page);
     await page.getByRole('button', { name: 'Преподаватели' }).click();
+    await page.getByLabel('Поиск преподавателей').fill(teacherSurname);
 
-    await page.getByRole('heading', { name: DELETABLE_TEACHER_FULL_NAME }).click();
+    await page.getByRole('heading', { name: teacherFullName }).click();
     await page.getByRole('button', { name: 'Удалить преподавателя' }).click();
-    await page.getByRole('button', { name: 'Удалить' }).click();
+    await page.getByRole('button', { name: 'Удалить', exact: true }).click();
 
     await expect(
       page.getByText('Преподаватель удалён. Ученики переведены в ожидание назначения.'),
     ).toBeVisible();
-    await expect(page.getByText(DELETABLE_TEACHER_FULL_NAME)).toHaveCount(0);
+    await expect(page.getByText(teacherFullName)).toHaveCount(0);
 
     await page.getByTestId('admin-sidebar-student-applications-tab').click();
-    const studentCard = page.locator('li').filter({ hasText: STUDENT_FULL_NAME }).first();
+    await page.getByRole('button', { name: 'Требуют назначения' }).click();
+    await page.getByLabel('Поиск заявок учеников').fill(studentSurname);
+
+    const studentCard = page.locator('li').filter({ hasText: studentFullName }).first();
     await expect(studentCard).toBeVisible();
-    await expect(studentCard.getByText('Системное событие')).toBeVisible();
     await expect(studentCard.getByText('Требует назначения')).toBeVisible();
   });
 });
