@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ChevronDown, FilePlus2, Trash2 } from 'lucide-react';
 import {
+  getAdaptationIntensityLabel,
+  getMethodologyReferenceLabel,
+  type AdaptationRationale,
+} from '@/lib/adaptationRationaleUi';
+import {
   assignTeacherMaterial,
   createTeacherMaterial,
   deleteTeacherMaterial,
@@ -143,6 +148,63 @@ function MaterialStatusBadge({ status }: { status: string }) {
     <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-orange-600 sm:text-sm">
       {status}
     </span>
+  );
+}
+
+function AdaptationRationalePanel({
+  rationale,
+}: {
+  rationale: AdaptationRationale;
+}) {
+  return (
+    <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50/90 px-4 py-5 sm:px-5 sm:py-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-lg font-medium text-stone-700 sm:text-xl">Педагогическое обоснование</h4>
+        <span className="inline-flex rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 sm:text-sm">
+          Интенсивность: {getAdaptationIntensityLabel(rationale.adaptation_intensity)}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-4 text-sm text-stone-600 sm:grid-cols-2 sm:text-base">
+        <div>
+          <p className="font-semibold text-stone-700">Стратегия адаптации</p>
+          <p className="mt-1">{rationale.adaptation_strategy}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-stone-700">Методические опоры</p>
+          <p className="mt-1">
+            {rationale.methodology_references.map((item) => getMethodologyReferenceLabel(item)).join(', ')}
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold text-stone-700">Применённые изменения</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.applied_transformations.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-stone-700">Сохранение смысла</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.semantic_preservation_notes.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {rationale.warnings.length > 0 ? (
+        <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Риски и ограничения</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.warnings.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -550,6 +612,10 @@ function TeacherAdaptedMaterialDetail({
           >
             <p className="whitespace-pre-wrap">{material.adapted_text}</p>
           </div>
+
+          {material.adaptation_rationale ? (
+            <AdaptationRationalePanel rationale={material.adaptation_rationale} />
+          ) : null}
 
           <div className="mt-5 flex justify-end">
             <button

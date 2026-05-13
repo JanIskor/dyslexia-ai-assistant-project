@@ -1,0 +1,41 @@
+export type AdaptationIntensity = 'low' | 'medium' | 'high';
+
+export interface AdaptationRationale {
+  mode?: string | null;
+  genre?: string | null;
+  adaptation_strategy: string;
+  applied_transformations: string[];
+  semantic_preservation_notes: string[];
+  methodology_references: string[];
+  adaptation_intensity: AdaptationIntensity;
+  warnings: string[];
+  is_fallback: boolean;
+}
+
+export function getAdaptationIntensityLabel(intensity: AdaptationIntensity): string {
+  switch (intensity) {
+    case 'low':
+      return 'Низкая';
+    case 'medium':
+      return 'Средняя';
+    case 'high':
+      return 'Высокая';
+    default:
+      return intensity;
+  }
+}
+
+export function getMethodologyReferenceLabel(reference: string): string {
+  switch (reference) {
+    case 'lexical adaptation':
+      return 'Лексическая адаптация';
+    case 'syntax adaptation':
+      return 'Синтаксическая адаптация';
+    case 'visual segmentation':
+      return 'Визуальная сегментация';
+    case 'genre restrictions':
+      return 'Жанровые ограничения';
+    default:
+      return reference;
+  }
+}

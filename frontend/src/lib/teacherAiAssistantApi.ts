@@ -1,4 +1,5 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
+import type { AdaptationRationale } from '@/lib/adaptationRationaleUi';
 import type { TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
 
 export type TeacherAiAssistantStrategyMode = 'mode_a' | 'mode_b';
@@ -32,6 +33,7 @@ export interface TeacherAiAssistantMessageResponse {
     document_title: string;
     chunk_index: number;
   }>;
+  adaptation_rationale: AdaptationRationale;
 }
 
 export interface TeacherAiAssistantSaveMaterialPayload {
@@ -42,6 +44,8 @@ export interface TeacherAiAssistantSaveMaterialPayload {
   source_material_id?: string;
   source_filename?: string;
   adaptation_mode: TeacherAiAssistantMode;
+  adaptation_genre?: TeacherAiAssistantGenre;
+  adaptation_rationale?: AdaptationRationale;
 }
 
 export interface TeacherAiAssistantSourceStatusPayload {

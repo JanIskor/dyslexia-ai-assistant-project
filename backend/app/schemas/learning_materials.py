@@ -4,7 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, StringConstraints
 
-from app.services.adaptation_prompt_builder import AdaptationMode
+from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode
+from app.services.adaptation_rationale_service import AdaptationIntensity
 
 
 AssistantMaterialSourceType = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -19,6 +20,20 @@ class TeacherLearningMaterialCreateRequest(BaseModel):
     source_material_id: UUID | None = None
     source_filename: str | None = None
     adaptation_mode: AdaptationMode | None = None
+    adaptation_genre: AdaptationGenre | None = None
+    adaptation_rationale: dict[str, object] | None = None
+
+
+class AdaptationRationaleResponse(BaseModel):
+    mode: AdaptationMode | None = None
+    genre: AdaptationGenre | None = None
+    adaptation_strategy: str
+    applied_transformations: list[str]
+    semantic_preservation_notes: list[str]
+    methodology_references: list[str]
+    adaptation_intensity: AdaptationIntensity
+    warnings: list[str]
+    is_fallback: bool = False
 
 
 class LearningMaterialResponse(BaseModel):
@@ -33,6 +48,8 @@ class LearningMaterialResponse(BaseModel):
     source_material_id: UUID | None = None
     source_filename: str | None = None
     adaptation_mode: AdaptationMode | None = None
+    adaptation_genre: AdaptationGenre | None = None
+    adaptation_rationale: AdaptationRationaleResponse | None = None
     adaptation_group_key: str | None = None
     created_at: datetime
     updated_at: datetime

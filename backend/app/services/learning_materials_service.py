@@ -12,6 +12,7 @@ from app.schemas.learning_materials import (
     AdaptationVersionSummary,
     AdaptedLearningMaterialDetailResponse,
     AdaptedMaterialSourceInfo,
+    AdaptationRationaleResponse,
     LearningMaterialResponse,
     LearningMaterialKind,
     TeacherLearningMaterialAssignmentResponse,
@@ -20,6 +21,7 @@ from app.schemas.learning_materials import (
     TeacherLearningMaterialDeleteResponse,
     TeacherLearningMaterialsListResponse,
 )
+from app.services.adaptation_rationale_service import build_adaptation_rationale
 from app.services.notifications_service import create_notification
 
 
@@ -86,6 +88,16 @@ def _to_learning_material_response(
     *,
     override_title: str | None = None,
 ) -> LearningMaterialResponse:
+    adaptation_rationale_payload = material.adaptation_rationale
+    if material.adapted_text is not None and not adaptation_rationale_payload:
+        adaptation_rationale_payload = build_adaptation_rationale(
+            source_text=material.original_text,
+            adapted_text=material.adapted_text,
+            mode=material.adaptation_mode,
+            genre=material.adaptation_genre,
+            is_fallback=True,
+        )
+
     return LearningMaterialResponse(
         id=material.id,
         title=override_title or material.title,
@@ -98,6 +110,12 @@ def _to_learning_material_response(
         source_material_id=material.source_material_id,
         source_filename=material.source_filename,
         adaptation_mode=material.adaptation_mode,
+        adaptation_genre=material.adaptation_genre,
+        adaptation_rationale=(
+            AdaptationRationaleResponse.model_validate(adaptation_rationale_payload)
+            if adaptation_rationale_payload
+            else None
+        ),
         adaptation_group_key=_build_adaptation_group_key(material),
         created_at=material.created_at,
         updated_at=material.updated_at,
@@ -199,6 +217,8 @@ def create_learning_material(
         source_material_id=payload.source_material_id,
         source_filename=normalized_source_filename,
         adaptation_mode=payload.adaptation_mode,
+        adaptation_genre=payload.adaptation_genre,
+        adaptation_rationale=payload.adaptation_rationale,
     )
     db.add(material)
     db.commit()
@@ -236,6 +256,8 @@ def save_or_update_adapted_learning_material(
         source_material_id=payload.source_material_id,
         source_filename=normalized_source_filename,
         adaptation_mode=payload.adaptation_mode,
+        adaptation_genre=payload.adaptation_genre,
+        adaptation_rationale=payload.adaptation_rationale,
     )
     material_group_key = _build_adaptation_group_key(group_probe)
     grouped_siblings = _get_group_sibling_materials(
@@ -259,6 +281,8 @@ def save_or_update_adapted_learning_material(
         existing_version.source_material_id = payload.source_material_id
         existing_version.source_filename = normalized_source_filename
         existing_version.adaptation_mode = payload.adaptation_mode
+        existing_version.adaptation_genre = payload.adaptation_genre
+        existing_version.adaptation_rationale = payload.adaptation_rationale
         existing_version.title = _get_group_title(grouped_siblings) or existing_version.title
         db.add(existing_version)
         db.commit()
@@ -274,6 +298,8 @@ def save_or_update_adapted_learning_material(
         source_material_id=payload.source_material_id,
         source_filename=normalized_source_filename,
         adaptation_mode=payload.adaptation_mode,
+        adaptation_genre=payload.adaptation_genre,
+        adaptation_rationale=payload.adaptation_rationale,
     )
     return (
         create_learning_material(

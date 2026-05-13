@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile
 
 from app.schemas.learning_materials import TeacherLearningMaterialCreateRequest
+from app.services.adaptation_rationale_service import build_adaptation_rationale
 from app.services.adaptation_prompt_builder import RetrievedKnowledgeChunkPromptContext
 from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
 from app.schemas.teacher_ai_assistant import (
@@ -57,6 +58,12 @@ def create_teacher_ai_assistant_reply(
             ],
         )
     )
+    adaptation_rationale = build_adaptation_rationale(
+        source_text=payload.message.strip(),
+        adapted_text=adaptation_result.adapted_text,
+        mode=payload.mode,
+        genre=payload.genre,
+    )
 
     return TeacherAiAssistantMessageResponse(
         reply=adaptation_result.adapted_text,
@@ -67,6 +74,7 @@ def create_teacher_ai_assistant_reply(
             }
             for chunk in retrieved_chunks
         ],
+        adaptation_rationale=adaptation_rationale,
     )
 
 
@@ -87,6 +95,17 @@ def save_teacher_ai_assistant_material(
             source_material_id=payload.source_material_id,
             source_filename=payload.source_filename,
             adaptation_mode=payload.adaptation_mode,
+            adaptation_genre=payload.adaptation_genre,
+            adaptation_rationale=(
+                payload.adaptation_rationale.model_dump()
+                if payload.adaptation_rationale is not None
+                else build_adaptation_rationale(
+                    source_text=payload.original_text,
+                    adapted_text=payload.adapted_text,
+                    mode=payload.adaptation_mode,
+                    genre=payload.adaptation_genre,
+                )
+            ),
         ),
     )
 

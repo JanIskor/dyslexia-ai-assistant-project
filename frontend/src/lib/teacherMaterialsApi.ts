@@ -1,4 +1,5 @@
 import { buildApiUrl } from '@/lib/apiBaseUrl';
+import type { AdaptationRationale } from '@/lib/adaptationRationaleUi';
 
 import type { TeacherAiAssistantMode } from '@/lib/teacherAiAssistantApi';
 
@@ -16,6 +17,8 @@ export interface TeacherLearningMaterial {
   source_material_id?: string | null;
   source_filename?: string | null;
   adaptation_mode?: TeacherAiAssistantMode | null;
+  adaptation_genre?: string | null;
+  adaptation_rationale?: AdaptationRationale | null;
   adaptation_group_key?: string | null;
   created_at: string;
   updated_at: string;

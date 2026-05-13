@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text, Uuid, func
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -29,6 +29,8 @@ class LearningMaterial(Base):
     )
     source_filename = Column(String, nullable=True)
     adaptation_mode = Column(String, nullable=True)
+    adaptation_genre = Column(String, nullable=True)
+    adaptation_rationale = Column(JSON, nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

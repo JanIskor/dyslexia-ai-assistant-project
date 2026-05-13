@@ -309,6 +309,17 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
       contentType: 'application/json',
       body: JSON.stringify({
         reply: `Mode received: ${requestBody.mode}`,
+        adaptation_rationale: {
+          mode: requestBody.mode,
+          genre: requestBody.genre,
+          adaptation_strategy: 'Минимальное вмешательство с приоритетом сохранения смысла и терминологии.',
+          applied_transformations: ['Сохранены ключевые термины.'],
+          semantic_preservation_notes: ['Сохранена терминология.'],
+          methodology_references: ['visual segmentation'],
+          adaptation_intensity: 'low',
+          warnings: [],
+          is_fallback: false,
+        },
       }),
     });
   });
@@ -336,6 +347,9 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
 
   await expect(page.getByTestId('teacher-ai-assistant-message-assistant').first()).toContainText(
     'Mode received: mode_b',
+  );
+  await expect(page.getByTestId('teacher-ai-assistant-rationale').first()).toContainText(
+    'Сохранены ключевые термины.',
   );
 
   console.log(

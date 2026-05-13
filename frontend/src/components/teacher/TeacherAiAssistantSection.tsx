@@ -3,6 +3,11 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ArrowUp, BookOpenText, ChevronDown, FileText, LoaderCircle, Plus, X } from 'lucide-react';
 import {
+  getAdaptationIntensityLabel,
+  getMethodologyReferenceLabel,
+  type AdaptationRationale,
+} from '@/lib/adaptationRationaleUi';
+import {
   MAX_TEACHER_AI_ASSISTANT_FILE_SIZE_BYTES,
   getTeacherAiAssistantSourceStatus,
   saveTeacherAiAssistantMaterial,
@@ -31,6 +36,7 @@ interface TeacherAiAssistantMessage {
   source?: TeacherAiAssistantSource;
   adaptationMode?: TeacherAiAssistantMode;
   adaptationGenre?: TeacherAiAssistantGenre;
+  adaptationRationale?: AdaptationRationale;
   usedKnowledgeChunks?: TeacherAiAssistantMessageResponse['used_knowledge_chunks'];
 }
 
@@ -335,6 +341,73 @@ function TypingIndicator() {
   );
 }
 
+function AdaptationRationaleCard({
+  rationale,
+}: {
+  rationale: AdaptationRationale;
+}) {
+  return (
+    <div
+      data-testid="teacher-ai-assistant-rationale"
+      className="mt-2 w-full rounded-[20px] border border-orange-100 bg-white/90 px-3 py-3 text-stone-600 shadow-sm"
+    >
+      <div className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm">
+        <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-orange-700">
+          Интенсивность: {getAdaptationIntensityLabel(rationale.adaptation_intensity)}
+        </span>
+        {rationale.is_fallback ? (
+          <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-stone-600">
+            Архивная версия
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 sm:text-sm">
+        <div>
+          <p className="font-semibold text-stone-700">Стратегия</p>
+          <p className="mt-1">{rationale.adaptation_strategy}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-stone-700">Методические группы</p>
+          <p className="mt-1">
+            {rationale.methodology_references.map((item) => getMethodologyReferenceLabel(item)).join(', ')}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2 sm:text-sm">
+        <div>
+          <p className="font-semibold text-stone-700">Применённые изменения</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.applied_transformations.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-stone-700">Сохранение смысла</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.semantic_preservation_notes.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {rationale.warnings.length > 0 ? (
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:text-sm">
+          <p className="font-semibold">Риски и ограничения</p>
+          <ul className="mt-1 space-y-1">
+            {rationale.warnings.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSectionProps) {
   const [draftMessage, setDraftMessage] = useState('');
   const [messages, setMessages] = useState<TeacherAiAssistantMessage[]>([]);
@@ -463,6 +536,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
         source: currentSource,
         adaptationMode: selectedMode,
         adaptationGenre: selectedGenre,
+        adaptationRationale: response.adaptation_rationale,
         usedKnowledgeChunks: response.used_knowledge_chunks,
       };
 
@@ -569,6 +643,8 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
           ? message.source.filename
           : undefined,
       adaptation_mode: message.adaptationMode ?? selectedMode,
+      adaptation_genre: message.adaptationGenre ?? selectedGenre,
+      adaptation_rationale: message.adaptationRationale,
     });
 
     cacheSavedSourceStatus(message, response.adaptation_group_key, response.title);
@@ -899,11 +975,11 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                           ) : null}
 
                           {message.adaptationMode && message.adaptationGenre ? (
-                            <div
-                              data-testid="teacher-ai-assistant-strategy-explanation"
-                              className="mt-2 w-full rounded-[20px] border border-orange-100 bg-white/90 px-3 py-3 text-stone-600 shadow-sm"
-                            >
-                              <div className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm">
+                            <div className="mt-2 w-full">
+                              <div
+                                data-testid="teacher-ai-assistant-strategy-explanation"
+                                className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm"
+                              >
                                 <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-orange-700">
                                   {ADAPTATION_MODE_OPTIONS.find((option) => option.value === message.adaptationMode)?.label ?? message.adaptationMode}
                                 </span>
@@ -911,16 +987,22 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                                   {getAdaptationGenreLabel(message.adaptationGenre)}
                                 </span>
                               </div>
-                              <ul className="mt-2 space-y-1 text-xs sm:text-sm">
-                                {getAdaptationStrategyExplanation(
-                                  message.adaptationMode,
-                                  message.adaptationGenre,
-                                ).map((item) => (
-                                  <li key={`${message.id}-${item}`} className="break-words">
-                                    • {item}
-                                  </li>
-                                ))}
-                              </ul>
+                              {message.adaptationRationale ? (
+                                <AdaptationRationaleCard rationale={message.adaptationRationale} />
+                              ) : (
+                                <div className="mt-2 w-full rounded-[20px] border border-orange-100 bg-white/90 px-3 py-3 text-stone-600 shadow-sm">
+                                  <ul className="space-y-1 text-xs sm:text-sm">
+                                    {getAdaptationStrategyExplanation(
+                                      message.adaptationMode,
+                                      message.adaptationGenre,
+                                    ).map((item) => (
+                                      <li key={`${message.id}-${item}`} className="break-words">
+                                        • {item}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                           ) : null}
 

@@ -62,7 +62,7 @@ export function getAdaptationModeLabel(mode: string | null | undefined): string 
 
 export function getAdaptationGenreLabel(genre: string | null | undefined): string {
   if (!genre) {
-    return 'Все жанры';
+    return 'Не указан';
   }
 
   return ADAPTATION_GENRE_OPTIONS.find((option) => option.value === genre)?.label ?? genre;
