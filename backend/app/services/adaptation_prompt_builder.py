@@ -104,13 +104,12 @@ MODE_PROMPT_BLOCKS: Final[dict[StrategyAdaptationMode, str]] = {
         "Можно сокращать второстепенные детали, если смысл и учебная точность сохраняются."
     ),
     "mode_b": (
-        "Стратегия адаптации: mode B, минимальное семантическое вмешательство. "
-        "Приоритет: максимально точное сохранение смысла, фактов, терминологии и стиля исходного текста. "
-        "Сильное переписывание запрещено. Замена терминов на другие слова запрещена. "
-        "Сохраняй исходные числа, даты, единицы измерения, формулы, имена и технические обозначения без изменений. "
-        "Предпочитай поддержку читаемости через деление перегруженных фрагментов, "
-        "визуальную сегментацию, аккуратные абзацы, маркированные структуры и выделение опорных элементов "
-        "без агрессивного перефразирования."
+        "Стратегия адаптации: mode B, только структурная адаптация без смыслового переписывания. "
+        "Приоритет: максимально точное сохранение смысла, фактов, терминологии, субъектов действия, модальности и ключевых формулировок исходного текста. "
+        "Разрешены только: деление длинных предложений, заголовки, маркированные списки, абзацы и визуальная сегментация при сохранении исходного порядка смысла. "
+        "Запрещены: синонимическая замена, лексическое упрощение, семантический парафраз, интерпретация, пересказ, суммаризация и добавление примеров. "
+        "Нельзя менять субъектов действия, модальность, юридические условия, причинно-следственные связи, эмоциональные или сюжетные импликации. "
+        "Сохраняй исходные числа, даты, единицы измерения, формулы, имена, сроки и технические обозначения без изменений."
     ),
 }
 
@@ -325,12 +324,9 @@ def build_adaptation_repair_prompt(
     genre: AdaptationGenre,
     retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None,
 ) -> str:
-    protected_lines = "\n".join(
-        f"- [{span['severity']}/{span['preservation_mode']}] {span['span_type']}: {span['text']}"
-        for span in protected_spans[:20]
-    ) or "- Явные защищённые фрагменты не найдены, но смысловые ограничения всё равно действуют."
+    protected_lines = _build_protected_spans_block(protected_spans)
     issue_lines = "\n".join(
-        f"- {issue['issue_type']}: {issue['message']} | repair: {issue['repair_instruction']}"
+        f"- Проблема: {issue['message']}\n  Что исправить: {issue['repair_instruction']}"
         for issue in validation_issues[:12]
     ) or "- Явные ошибки не перечислены."
 
@@ -343,12 +339,10 @@ def build_adaptation_repair_prompt(
         "Исправь только те места, где были потеряны или искажены защищённые фрагменты.",
         "Не добавляй новые факты, новые субъекты, новые признаки, новые причины, новые выводы и новые интерпретации.",
         "Если читаемость конфликтует с сохранением защищённого фрагмента, сохрани защищённый фрагмент.",
+        "Никогда не копируй во внешний ответ служебные маркеры, внутренние типы фрагментов, уровни серьёзности и технические подписи проверки.",
         f"Product mode: {mode}",
         f"Genre: {genre}",
-        (
-            "Protected spans extracted from source text. Preserve these spans according to preservation mode.\n"
-            f"{protected_lines}"
-        ),
+        protected_lines,
         f"Validation issues that must be repaired:\n{issue_lines}",
         (
             "Исходный текст:\n"
@@ -406,13 +400,34 @@ def _build_protected_elements_block(protected_elements: dict[str, list[str]]) ->
 
 def _build_protected_spans_block(protected_spans: list[dict[str, str]]) -> str:
     if not protected_spans:
-        return "Protected spans extracted from source text: явных protected spans не найдено, но факты и значимые формулировки всё равно нельзя менять."
+        return (
+            "Protected spans extracted from source text.\n"
+            "Защищённые фрагменты источника: явных списков не найдено, "
+            "но факты и значимые формулировки всё равно нельзя менять. "
+            "Никогда не выводи служебные названия категорий и внутренние метки в итоговом тексте."
+        )
 
-    lines = [
-        f"[{span['severity']}/{span['preservation_mode']}] {span['span_type']}: {span['text']}"
-        for span in protected_spans[:20]
+    visible_spans = protected_spans[:20]
+    exact_spans = [span["text"] for span in visible_spans if span["preservation_mode"] == "exact"]
+    near_exact_spans = [
+        span["text"] for span in visible_spans if span["preservation_mode"] == "near_exact"
     ]
-    return "Protected spans extracted from source text. Preserve these spans according to preservation mode.\n- " + "\n- ".join(lines)
+    semantic_spans = [span["text"] for span in visible_spans if span["preservation_mode"] == "semantic"]
+    lines: list[str] = [
+        "Protected spans extracted from source text.",
+        "Защищённые фрагменты источника. Сохраняй их по степени строгости.",
+        "Никогда не копируй во внешний ответ служебные названия категорий, уровни серьёзности и технические метки.",
+    ]
+    if exact_spans:
+        lines.append("Сохрани без изменения:")
+        lines.extend(f"- {item}" for item in exact_spans)
+    if near_exact_spans:
+        lines.append("Сохрани максимально близко к исходной формулировке:")
+        lines.extend(f"- {item}" for item in near_exact_spans)
+    if semantic_spans:
+        lines.append("Сохрани смысл и функцию без расширения значения:")
+        lines.extend(f"- {item}" for item in semantic_spans)
+    return "\n".join(lines)
 
 
 def _build_operations_block(*, title: str, operations: list[str]) -> str:
@@ -427,8 +442,8 @@ def _build_genre_specific_guardrails_block(*, genre: AdaptationGenre) -> str:
             "- Адаптируй через структуру, а не через свободный парафраз.\n"
             "- Не меняй юридический субъект, модальность, условия, исключения, сроки, адресатов и порядок действий.\n"
             "- Не меняй направление действия: тот, кто выполняет действие в исходнике, должен оставаться тем же субъектом в адаптации.\n"
-            "- Бережно сохраняй формулировки и маркеры вроде «вправе», «обязан», «допускается», «не допускается», «если иное», «в течение».\n"
-            "- Не заменяй юридически значимые формулировки бытовыми аналогами вроде «законный представитель» -> «родитель» или «образовательная организация» -> «школа».\n"
+            "- Бережно сохраняй формулировки и маркеры вроде «вправе», «обязан», «допускается», «не допускается», «исключительно», «за исключением», «если иное», «не более», «в течение», «с даты», «до момента», «письменный отзыв», «письменное поручение».\n"
+            "- Не заменяй юридически значимые формулировки бытовыми аналогами вроде «законный представитель» -> «родители», «образовательная организация» -> «школа», «обработка данных» -> «сбор и использование», «письменный отзыв» -> «отказ».\n"
             "- Не добавляй примеры, пояснения и выводы, которых нет в исходнике.\n"
             "- Если юридическую фразу трудно упростить безопасно, сохрани её в исходной формулировке и улучши структуру вокруг неё."
         )
@@ -446,7 +461,9 @@ def _build_genre_specific_guardrails_block(*, genre: AdaptationGenre) -> str:
             "FICTION PRESERVATION RULES:\n"
             "- Улучшай читаемость без разрушения narrative structure.\n"
             "- Сохраняй атмосферу, образность, эмоциональную динамику и tone.\n"
-            "- Не добавляй новые признаки, цвета, оценки, причины, эмоции и интерпретации, которых нет в исходнике.\n"
+            "- Не добавляй новые признаки, цвета, размеры, мотивации, оценки, причины, эмоции и интерпретации, которых нет в исходнике.\n"
+            "- Не вводи новых персонажей, ролей, гендера, отношений и идентичностей.\n"
+            "- Не превращай «не стала спорить» в «согласилась» и не меняй предметные детали вроде «кораблик» на более общий аналог.\n"
             "- Не объясняй символы и подтекст внутри адаптированного текста.\n"
             "- Не пересказывай сюжет вместо художественной сцены.\n"
             "- Не уничтожай метафоры и не превращай fiction в informational summary."
@@ -488,7 +505,8 @@ def _build_genre_aware_method_behavior_block(
             "GENRE-AWARE METHOD BEHAVIOR:\n"
             "- structured_explanation + educational = process/logic steps.\n"
             "- Шаги должны отражать реальную учебную или причинно-следственную логику текста.\n"
-            "- Не смешивай markdown heading и bold в одной строке. Нельзя писать «**### Шаг 1.**»."
+            "- Не смешивай markdown heading и bold в одной строке. Нельзя писать «**### Шаг 1.**».\n"
+            "- Используй отдельные заголовки формата «### Шаг 1. Название шага»."
         )
     if product_mode == "structured_explanation" and genre == "legal":
         return (
@@ -519,7 +537,8 @@ def _build_genre_aware_method_behavior_block(
             "GENRE-AWARE METHOD BEHAVIOR:\n"
             "- structured_explanation + fiction = episode-aware scene guidance.\n"
             "- Делай эпизоды и диалоги читаемее, но не превращай сцену в техническую инструкцию.\n"
-            "- Для fiction используй эпизоды, а не шаги."
+            "- Для fiction используй эпизоды, а не шаги.\n"
+            "- Используй форму «### Эпизод 1. ...», а не технические шаги."
         )
     if product_mode == "key_points_focus" and genre == "fiction":
         return (

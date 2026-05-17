@@ -64,6 +64,38 @@ class AdaptationRationaleServiceTests(unittest.TestCase):
             rationale["warnings"],
         )
 
+    def test_legal_rationale_uses_clean_teacher_facing_validation_messages(self) -> None:
+        rationale = build_adaptation_rationale(
+            source_text="Организация вправе рассмотреть заявление в течение 30 календарных дней.",
+            adapted_text="Организация вправе рассмотреть заявление в течение 30 календарных дней.",
+            mode="basic_simplify",
+            genre="legal",
+            factual_consistency_report={
+                "summary_status": "critical",
+                "summary_message": "Проверка фактов: обнаружены критические расхождения.",
+                "strict_mode": True,
+                "issues": [],
+                "protected_span_report": {
+                    "status": "critical",
+                    "issues": [],
+                    "critical_count": 1,
+                    "warning_count": 0,
+                    "repair_required": True,
+                    "summary": "Обнаружены критические искажения защищённых фрагментов: 1.",
+                },
+            },
+        )
+
+        self.assertIn(
+            "Ключевые элементы текста были дополнительно проверены.",
+            rationale["semantic_preservation_notes"],
+        )
+        self.assertIn(
+            "Рекомендуется преподавательская проверка для профессиональных текстов.",
+            rationale["semantic_preservation_notes"],
+        )
+        self.assertFalse(any("критичес" in item.lower() for item in rationale["semantic_preservation_notes"]))
+
     def test_save_persists_rationale_for_adapted_material_history(self) -> None:
         with self.SessionLocal() as db:
             response, save_type = save_or_update_adapted_learning_material(

@@ -35,7 +35,7 @@ import {
   type ProfileEditReadOnlyField,
 } from '@/components/profile/ProfileEditForm';
 
-type StudentDashboardSection = 'profile' | 'materials' | 'tests' | 'messages';
+type StudentDashboardSection = 'profile' | 'materials' | 'messages';
 type StudentProfileViewMode = 'view' | 'edit';
 
 interface StudentProfileFormState {
@@ -59,7 +59,6 @@ const REGULAR_MENU_ITEMS: Array<{ id: StudentDashboardSection; label: string }> 
   { id: 'profile', label: 'Мой профиль' },
   { id: 'messages', label: 'Сообщения' },
   { id: 'materials', label: 'Учебные материалы' },
-  { id: 'tests', label: 'Мои тесты' },
 ];
 
 type StudentMessagesViewState =
@@ -323,17 +322,6 @@ function StudentSectionContent({
 
   if (activeSection === 'materials') {
     return <StudentMaterialsSection accessToken={accessToken} />;
-  }
-
-  if (activeSection === 'tests') {
-    return (
-      <section className="rounded-[30px] border border-orange-100/80 bg-white/90 px-7 py-9 shadow-[0_18px_50px_rgba(221,156,130,0.12)]">
-        <h2 className="text-2xl font-medium text-stone-700 sm:text-3xl">Мои тесты</h2>
-        <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-          Здесь будут отображаться тесты
-        </p>
-      </section>
-    );
   }
 
   if (activeSection === 'profile' && isRegularMode && profileViewMode === 'view') {
@@ -861,13 +849,6 @@ export function StudentDashboard() {
         return;
       }
 
-      if (requestedTab === 'tests' && profile.student_mode === 'regular') {
-        setActiveSection('tests');
-        setProfileViewMode('view');
-        setMessagesViewState({ mode: 'list' });
-        return;
-      }
-
       if (requestedTab === 'edit-profile' || requestedTab === 'profile-edit') {
         setActiveSection('profile');
         setProfileViewMode(profile.student_mode === 'regular' ? 'edit' : 'view');
@@ -916,12 +897,10 @@ export function StudentDashboard() {
       ? 'Редактирование профиля'
       : activeSection === 'messages' && messagesViewState.mode === 'detail'
         ? 'Сообщение'
-        : activeSection === 'messages'
+      : activeSection === 'messages'
           ? 'Сообщения'
       : activeSection === 'materials'
         ? 'Учебные материалы'
-        : activeSection === 'tests'
-          ? 'Мои тесты'
           : 'Мой профиль';
 
   return (

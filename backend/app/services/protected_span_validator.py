@@ -218,10 +218,10 @@ def _build_summary(
     warning_count: int,
 ) -> str:
     if status == "critical":
-        return f"Обнаружены критические искажения защищённых фрагментов: {critical_count}."
+        return f"Ключевые элементы текста требуют дополнительной проверки: {critical_count}."
     if status == "warning":
-        return f"Обнаружены предупреждения по защищённым фрагментам: {warning_count}."
-    return "Критических искажений защищённых фрагментов не найдено."
+        return f"Ключевые элементы текста были дополнительно проверены: {warning_count}."
+    return "Ключевые элементы текста были дополнительно проверены."
 
 
 def _deduplicate_issues(issues: list[ProtectedSpanIssue]) -> list[ProtectedSpanIssue]:

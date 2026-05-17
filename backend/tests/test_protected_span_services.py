@@ -102,7 +102,8 @@ class ProtectedSpanServicesTests(unittest.TestCase):
         )
 
         self.assertIn("Protected spans extracted from source text", prompt)
-        self.assertIn("legal_actor", prompt)
+        self.assertIn("Законный представитель", prompt)
+        self.assertNotIn("legal_actor", prompt)
         self.assertIn("Верни исходный юридический субъект", prompt)
         self.assertIn("LEGAL REPAIR RULES", prompt)
 

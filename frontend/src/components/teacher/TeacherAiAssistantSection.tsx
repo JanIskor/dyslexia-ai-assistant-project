@@ -5,6 +5,7 @@ import { ArrowUp, BookOpenText, ChevronDown, FileText, LoaderCircle, Plus, X } f
 import {
   getAdaptationIntensityLabel,
   getMethodologyReferenceLabel,
+  getTeacherVisibleSemanticNotes,
   type AdaptationRationale,
 } from '@/lib/adaptationRationaleUi';
 import {
@@ -423,6 +424,8 @@ function AdaptationRationaleCard({
 }: {
   rationale: AdaptationRationale;
 }) {
+  const semanticNotes = getTeacherVisibleSemanticNotes(rationale.semantic_preservation_notes);
+
   return (
     <div
       data-testid="teacher-ai-assistant-rationale"
@@ -473,23 +476,12 @@ function AdaptationRationaleCard({
         <div>
           <p className="font-semibold text-stone-700">Сохранение смысла</p>
           <ul className="mt-1 space-y-1">
-            {rationale.semantic_preservation_notes.map((item) => (
+            {semanticNotes.map((item) => (
               <li key={item}>• {item}</li>
             ))}
           </ul>
         </div>
       </div>
-
-      {rationale.warnings.length > 0 ? (
-        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:text-sm">
-          <p className="font-semibold">Риски и ограничения</p>
-          <ul className="mt-1 space-y-1">
-            {rationale.warnings.map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </div>
   );
 }

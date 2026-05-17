@@ -13,6 +13,19 @@ AdaptationGenre = Literal[
     "other",
 ]
 
+INTERNAL_SPAN_LABELS = (
+    "legal_actor",
+    "legal_modality",
+    "legal_condition",
+    "legal_procedure",
+    "legal_deadline",
+    "scientific_term",
+    "causal_relation",
+    "character",
+    "narrative_action",
+    "object_detail",
+)
+
 
 def post_polish_adaptation_output(
     *,
@@ -25,6 +38,7 @@ def post_polish_adaptation_output(
         return polished
 
     polished = polished.replace("\r\n", "\n")
+    polished = _sanitize_internal_validation_markers(polished)
     polished = re.sub(r"[ \t]{2,}", " ", polished)
     polished = re.sub(r"\n{3,}", "\n\n", polished)
     polished = _remove_duplicated_service_labels(polished)
@@ -34,6 +48,35 @@ def post_polish_adaptation_output(
         polished = _normalize_structured_headings(polished, genre=genre)
 
     return polished.strip()
+
+
+def _sanitize_internal_validation_markers(text: str) -> str:
+    sanitized = re.sub(
+        r"(?im)^\s*\[(?:critical|warning|info)/(?:exact|near_exact|semantic)\]\s*[a-z_]+:\s*",
+        "",
+        text,
+    )
+    sanitized = re.sub(
+        rf"(?im)^\s*(?:{'|'.join(INTERNAL_SPAN_LABELS)}):\s*",
+        "",
+        sanitized,
+    )
+    sanitized = re.sub(
+        rf"(?im)^\s*(?:{'|'.join(INTERNAL_SPAN_LABELS)})\s*$",
+        "",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?im)^\s*protected spans extracted from source text\.?.*$",
+        "",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?im)^\s*preserve these spans according to preservation mode\.?.*$",
+        "",
+        sanitized,
+    )
+    return sanitized
 
 
 def _remove_duplicated_service_labels(text: str) -> str:

@@ -37,8 +37,6 @@ export const ADAPTATION_GENRE_OPTIONS: ReadonlyArray<AdaptationGenreOption> = [
   { value: 'scientific_popular', label: 'Научно-популярный' },
   { value: 'fiction', label: 'Художественный' },
   { value: 'legal', label: 'Юридический' },
-  { value: 'instruction', label: 'Инструкция' },
-  { value: 'other', label: 'Другое' },
 ];
 
 export const KNOWLEDGE_BASE_PRODUCT_MODE_TAG_OPTIONS: ReadonlyArray<MethodologyTagOption> =
@@ -118,7 +116,11 @@ export function getAdaptationGenreLabel(genre: string | null | undefined): strin
     return 'Не указан';
   }
 
-  return ADAPTATION_GENRE_OPTIONS.find((option) => option.value === genre)?.label ?? genre;
+  if (genre === 'instruction' || genre === 'other') {
+    return 'Жанр не указан';
+  }
+
+  return ADAPTATION_GENRE_OPTIONS.find((option) => option.value === genre)?.label ?? 'Жанр не указан';
 }
 
 export function getKnowledgeBaseMethodologyTagLabel(tag: string | null | undefined): string {
@@ -187,8 +189,6 @@ export function getAdaptationStrategyExplanation(
         return 'Учитывается риск потери авторского стиля и интонации.';
       case 'legal':
         return 'Особый контроль точности формулировок и нормативного смысла.';
-      case 'instruction':
-        return 'Сохраняются порядок действий, условия и предупреждения.';
       default:
         return 'Стратегия подстраивается под функцию текста без смены его назначения.';
     }

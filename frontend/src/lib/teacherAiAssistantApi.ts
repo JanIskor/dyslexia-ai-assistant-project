@@ -16,9 +16,7 @@ export type TeacherAiAssistantGenre =
   | 'educational'
   | 'scientific_popular'
   | 'fiction'
-  | 'legal'
-  | 'instruction'
-  | 'other';
+  | 'legal';
 
 export type KnowledgeBaseMethodologyTag = TeacherAiAssistantMode | TeacherAiAssistantGenre;
 

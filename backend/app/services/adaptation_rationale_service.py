@@ -7,7 +7,7 @@ from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMo
 from app.services.adaptation_contract_validator import AdaptationContractValidationResult
 from app.services.adaptation_output_contracts import AdaptationOutputContract
 from app.services.controlled_adaptation_policy_service import ControlledAdaptationPolicy
-from app.services.factual_consistency_service import FactualConsistencyReport, get_factual_report_summary_message
+from app.services.factual_consistency_service import FactualConsistencyReport
 
 
 AdaptationIntensity = Literal["low", "medium", "high"]
@@ -87,12 +87,11 @@ def build_adaptation_rationale(
         semantic_preservation_notes.extend(
             [
                 "Защищённые элементы были извлечены до генерации.",
-                "Защищённые фрагменты были выделены до генерации.",
                 "Применены жанровые правила сохранения смысла и формулировок.",
                 "Разрешены только контролируемые операции адаптации.",
-                "Добавление внешних фактов, примеров, причин, терминов, объяснений и выводов было запрещено.",
-                "Формат результата был аккуратно отполирован без смыслового переписывания.",
-                "После генерации выполнена проверка фактической согласованности.",
+                "Добавление внешних фактов было запрещено.",
+                "Формат результата был аккуратно приведён к читаемой структуре.",
+                "Выполнена автоматическая проверка структуры и согласованности текста.",
             ]
         )
     if output_contract is not None:
@@ -111,22 +110,14 @@ def build_adaptation_rationale(
         else None
     )
     if protected_span_report is not None:
-        semantic_preservation_notes.append("После генерации выполнена проверка защищённых фрагментов.")
-        if protected_span_report.get("status") == "critical":
-            semantic_preservation_notes.append("Обнаружены критические искажения защищённых фрагментов.")
-        elif protected_span_report.get("status") == "warning":
-            semantic_preservation_notes.append("Защищённые фрагменты требуют проверки преподавателем.")
+        semantic_preservation_notes.append("Ключевые элементы текста были дополнительно проверены.")
     if factual_consistency_report is not None and factual_consistency_report.get("repair_attempted"):
-        semantic_preservation_notes.append("После генерации был выполнен автоматический repair-pass.")
-    semantic_preservation_notes.append(get_factual_report_summary_message(factual_consistency_report))
+        semantic_preservation_notes.append("После генерации была выполнена дополнительная автоматическая корректировка структуры.")
+    if effective_genre in {"legal", "scientific_popular"}:
+        semantic_preservation_notes.append("Рекомендуется преподавательская проверка для профессиональных текстов.")
+    semantic_preservation_notes.append(_get_teacher_visible_validation_note(factual_consistency_report))
 
     warnings: list[str] = []
-    if normalized_mode == "mode_a" and effective_genre in {"fiction", "legal"}:
-        warnings.append(
-            "Для выбранного жанра сильное упрощение может изменить исходный смысл или стиль текста."
-        )
-    if protected_span_report is not None and protected_span_report.get("status") == "critical":
-        warnings.append("Даже после автоматической проверки защищённые фрагменты требуют ручной верификации.")
 
     intensity = _calculate_intensity(
         normalized_mode=normalized_mode,
@@ -217,3 +208,13 @@ def _calculate_intensity(
     if score <= 3:
         return "medium"
     return "high"
+
+
+def _get_teacher_visible_validation_note(report: FactualConsistencyReport | None) -> str:
+    if not report:
+        return "Проверка фактов не выполнялась для этой версии."
+
+    if report.get("summary_status") == "ok":
+        return "Выполнена автоматическая проверка структуры и согласованности текста."
+
+    return "Ключевые элементы текста были дополнительно проверены."

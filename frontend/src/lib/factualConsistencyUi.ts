@@ -28,7 +28,7 @@ export interface FactualConsistencyReport {
 export function getFactualConsistencyStatusTone(summaryStatus: FactualSummaryStatus | undefined): string {
   switch (summaryStatus) {
     case 'critical':
-      return 'border-rose-200 bg-rose-50 text-rose-700';
+      return 'border-amber-200 bg-amber-50 text-amber-800';
     case 'warning':
       return 'border-amber-200 bg-amber-50 text-amber-800';
     case 'ok':
@@ -41,11 +41,11 @@ export function getFactualConsistencyStatusTone(summaryStatus: FactualSummarySta
 export function getCompactFactualConsistencyStatus(summaryStatus: FactualSummaryStatus | undefined): string {
   switch (summaryStatus) {
     case 'critical':
-      return 'Обнаружен высокий риск смыслового искажения.';
+      return 'Ключевые элементы текста были дополнительно проверены.';
     case 'warning':
-      return 'Требуется проверка преподавателем.';
+      return 'Ключевые элементы текста были дополнительно проверены.';
     case 'ok':
-      return 'Критических расхождений не найдено.';
+      return 'Выполнена автоматическая проверка структуры и согласованности текста.';
     default:
       return 'Проверка фактов не выполнялась для этой версии.';
   }

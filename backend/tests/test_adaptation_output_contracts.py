@@ -411,6 +411,25 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertIn("### Шаг 1. Подготовьте материал.", polished)
         self.assertNotIn("**###", polished)
 
+    def test_post_polish_removes_internal_protected_span_labels(self) -> None:
+        polished = post_polish_adaptation_output(
+            adapted_text=(
+                "[critical/exact] legal_actor: обучающийся\n"
+                "[critical/near_exact] legal_modality: допускается\n"
+                "legal_condition\n"
+                "Текст должен остаться читабельным."
+            ),
+            product_mode="basic_simplify",
+            genre="legal",
+        )
+
+        self.assertNotIn("[critical/exact]", polished)
+        self.assertNotIn("legal_actor:", polished)
+        self.assertNotIn("legal_condition", polished)
+        self.assertIn("обучающийся", polished)
+        self.assertIn("допускается", polished)
+        self.assertIn("Текст должен остаться читабельным.", polished)
+
     def test_validator_flags_mixed_markdown_heading_markup(self) -> None:
         contract = get_adaptation_output_contract(
             product_mode="structured_explanation",

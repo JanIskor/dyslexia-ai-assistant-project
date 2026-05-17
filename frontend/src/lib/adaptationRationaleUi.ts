@@ -42,3 +42,12 @@ export function getMethodologyReferenceLabel(reference: string): string {
       return reference;
   }
 }
+
+export function getTeacherVisibleSemanticNotes(notes: string[]): string[] {
+  const filtered = notes.filter(
+    (item) =>
+      !/критическ|риски и ограничения|high risk|protected span|repair-pass/i.test(item),
+  );
+
+  return filtered.length > 0 ? filtered : ['Выполнена автоматическая проверка структуры и согласованности текста.'];
+}

@@ -358,7 +358,7 @@ test('teacher ai assistant composer shows one plus menu and sends selected mode'
     'Сохранены ключевые термины.',
   );
   await expect(page.getByTestId('teacher-ai-assistant-factual-report').first()).toContainText(
-    'Критических расхождений не найдено.',
+    'Выполнена автоматическая проверка структуры и согласованности текста.',
   );
 
   console.log(

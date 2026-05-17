@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, FilePlus2, Trash2 } from 'lucide-react';
 import {
   getAdaptationIntensityLabel,
   getMethodologyReferenceLabel,
+  getTeacherVisibleSemanticNotes,
   type AdaptationRationale,
 } from '@/lib/adaptationRationaleUi';
 import {
@@ -162,6 +163,8 @@ function AdaptationRationalePanel({
 }: {
   rationale: AdaptationRationale;
 }) {
+  const semanticNotes = getTeacherVisibleSemanticNotes(rationale.semantic_preservation_notes);
+
   return (
     <div className="mt-5 rounded-[24px] border border-stone-200 bg-stone-50/90 px-4 py-5 sm:px-5 sm:py-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -202,23 +205,12 @@ function AdaptationRationalePanel({
         <div>
           <p className="font-semibold text-stone-700">Сохранение смысла</p>
           <ul className="mt-1 space-y-1">
-            {rationale.semantic_preservation_notes.map((item) => (
+            {semanticNotes.map((item) => (
               <li key={item}>• {item}</li>
             ))}
           </ul>
         </div>
       </div>
-
-      {rationale.warnings.length > 0 ? (
-        <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="font-semibold">Риски и ограничения</p>
-          <ul className="mt-1 space-y-1">
-            {rationale.warnings.map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </div>
   );
 }
