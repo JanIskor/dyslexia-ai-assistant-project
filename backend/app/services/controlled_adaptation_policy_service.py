@@ -197,8 +197,22 @@ def _build_policy_summary(
     genre: AdaptationGenre,
     risk_level: RiskLevel,
 ) -> str:
-    return (
+    summary = (
         f"Controlled adaptation policy: product mode {product_mode}, "
         f"strategy {strategy_mode}, genre {genre}, risk {risk_level}. "
-        "Protected elements must be preserved, external facts are forbidden."
+        "Protected elements must be preserved, external facts are forbidden. "
+        "Do not add facts, examples, causes, terms, explanations or conclusions absent from the original text."
     )
+
+    if genre == "legal":
+        summary += (
+            " Legal near-source rule: preserve legally significant wording as close to the source as possible. "
+            "Do not change modality, conditions, exceptions, deadlines, recipients or action order. "
+            "If a legal phrase is hard to simplify safely, keep the original phrase and improve structure around it."
+        )
+    if genre == "educational":
+        summary += (
+            " Educational no-new-notation rule: do not introduce new notation, abbreviations, symbols, formulas "
+            "or broad unsupported generalizations absent from the source."
+        )
+    return summary

@@ -73,6 +73,7 @@ BASE_PROMPT: Final[str] = (
     "Не придумывай новую информацию и не добавляй того, чего нет в исходном материале. "
     "Не изменяй числа, даты, единицы измерения, формулы, имена, технические обозначения и ключевые термины. "
     "Не добавляй факты, которых нет в исходном тексте. "
+    "Не добавляй примеры, причины, термины, объяснения или выводы, которых нет в исходном тексте, даже если они правдоподобны или верны. "
     "Если в тексте есть сложная формула, сохрани её и при необходимости поясни словами, не меняя саму запись. "
     "Верни только готовый адаптированный текст без вводных комментариев от себя."
 )
@@ -84,6 +85,7 @@ BASE_RAG_GUARDRAILS: Final[str] = (
     "не добавляй новые предметные факты, которых нет в исходном тексте; "
     "не расширяй содержание исходного материала за счёт внешних знаний; "
     "не подменяй смысл исходного текста новым содержанием; "
+    "не добавляй примеры, причины, термины, объяснения или выводы, которых нет в исходном тексте, даже если они кажутся полезными; "
     "не меняй числа, даты, единицы измерения, формулы и технические обозначения; "
     "не используй контекст из базы знаний как источник предметной информации; "
     "используй его только для выбора формы подачи, например: "
@@ -277,6 +279,7 @@ def build_adaptation_system_prompt(
         GENRE_PROMPT_BLOCKS[genre],
         f"Уровень риска адаптации: {policy['risk_level']}.",
         policy["policy_summary"],
+        _build_genre_specific_guardrails_block(genre=genre),
         _build_protected_elements_block(protected_elements),
         _build_operations_block(
             title="Разрешённые операции",
@@ -294,7 +297,7 @@ def build_adaptation_system_prompt(
         (
             "Правило неопределённости: если ты не уверен, как безопасно упростить фрагмент, "
             "сохрани исходную формулировку. Не придумывай объяснения и не добавляй факты, "
-            "которых нет в источнике. Защищённые элементы можно только визуально структурировать "
+            "примеры, причины, термины или выводы, которых нет в источнике. Защищённые элементы можно только визуально структурировать "
             "или пояснить после сохранения их исходной формы."
         ),
         f"Связанные теги применения: {', '.join(retrieval_tags)}.",
@@ -342,6 +345,28 @@ def _build_operations_block(*, title: str, operations: list[str]) -> str:
     return f"{title}:\n- " + "\n- ".join(operations)
 
 
+def _build_genre_specific_guardrails_block(*, genre: AdaptationGenre) -> str:
+    if genre == "legal":
+        return (
+            "LEGAL NEAR-SOURCE RULES:\n"
+            "- Сильно предпочитай сохранение исходной формулировки.\n"
+            "- Адаптируй через структуру, а не через свободный парафраз.\n"
+            "- Не меняй юридический субъект, модальность, условия, исключения, сроки, адресатов и порядок действий.\n"
+            "- Бережно сохраняй формулировки и маркеры вроде «вправе», «обязан», «допускается», «не допускается», «если иное», «в течение».\n"
+            "- Не добавляй примеры, пояснения и выводы, которых нет в исходнике.\n"
+            "- Если юридическую фразу трудно упростить безопасно, сохрани её в исходной формулировке и улучши структуру вокруг неё."
+        )
+    if genre == "educational":
+        return (
+            "EDUCATIONAL NO-NEW-NOTATION RULES:\n"
+            "- Не вводи новые обозначения, символы, формулы, аббревиатуры и технические ярлыки, если их нет в исходнике.\n"
+            "- Не заменяй слова символами или формулами.\n"
+            "- Не добавляй внешние примеры, причины и широкие выводы.\n"
+            "- Не расширяй сферу утверждений словами вроде «все», «всегда», «полностью», «главный», «единственный», если этого нет в источнике."
+        )
+    return ""
+
+
 def _build_output_contract_block(
     *,
     product_mode: ProductAdaptationMode,
@@ -365,6 +390,21 @@ def _build_output_contract_block(
     required_structure = "\n- ".join(output_contract["required_structure"])
     forbidden_patterns = "\n- ".join(output_contract["forbidden_output_patterns"])
     format_instructions = "\n- ".join(output_contract["format_instructions"])
+    golden_template_title = output_contract.get("golden_template_title")
+    golden_template_structure = output_contract.get("golden_template_structure") or []
+    golden_template_rules = output_contract.get("golden_template_rules") or []
+    golden_template_block = ""
+    if golden_template_title:
+        template_structure_lines = "\n- ".join(golden_template_structure)
+        template_rule_lines = "\n- ".join(golden_template_rules)
+        golden_template_block = (
+            f"\n- golden template: {golden_template_title}\n"
+            f"- golden template structure:\n- {template_structure_lines}\n"
+            f"- golden template rules:\n- {template_rule_lines}\n"
+            "- do not invent missing sections:\n"
+            "- Не придумывай отсутствующие разделы.\n"
+            "- Используй только те разделы, которые действительно поддержаны исходным текстом."
+        )
     return (
         "OUTPUT CONTRACT:\n"
         f"- product mode: {product_mode}\n"
@@ -374,4 +414,5 @@ def _build_output_contract_block(
         f"- do not produce:\n- {forbidden_patterns}\n"
         f"- preserve: {preserve_text}\n"
         f"- format instructions:\n- {format_instructions}"
+        f"{golden_template_block}"
     )

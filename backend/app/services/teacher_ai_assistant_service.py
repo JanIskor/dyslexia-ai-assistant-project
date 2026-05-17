@@ -13,6 +13,7 @@ from app.services.adaptation_prompt_builder import (
 )
 from app.services.adaptation_contract_validator import validate_adaptation_output_contract
 from app.services.adaptation_output_contracts import get_adaptation_output_contract
+from app.services.adaptation_post_polish_service import post_polish_adaptation_output
 from app.services.controlled_adaptation_policy_service import build_controlled_adaptation_policy
 from app.services.factual_consistency_service import build_factual_consistency_report, extract_protected_elements
 from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
@@ -85,18 +86,23 @@ def create_teacher_ai_assistant_reply(
             ],
         )
     )
+    polished_adapted_text = post_polish_adaptation_output(
+        adapted_text=adaptation_result.adapted_text,
+        product_mode=_resolve_product_mode(payload.mode),
+        genre=payload.genre,
+    )
     factual_consistency_report = build_factual_consistency_report(
         source_text=source_text,
-        adapted_text=adaptation_result.adapted_text,
+        adapted_text=polished_adapted_text,
     )
     contract_validation = validate_adaptation_output_contract(
         contract=output_contract,
         source_text=source_text,
-        adapted_text=adaptation_result.adapted_text,
+        adapted_text=polished_adapted_text,
     )
     adaptation_rationale = build_adaptation_rationale(
         source_text=source_text,
-        adapted_text=adaptation_result.adapted_text,
+        adapted_text=polished_adapted_text,
         mode=payload.mode,
         genre=payload.genre,
         controlled_adaptation_policy=controlled_adaptation_policy,
@@ -106,7 +112,7 @@ def create_teacher_ai_assistant_reply(
     )
 
     return TeacherAiAssistantMessageResponse(
-        reply=adaptation_result.adapted_text,
+        reply=polished_adapted_text,
         used_knowledge_chunks=[
             {
                 "document_title": chunk.document_title,
@@ -144,13 +150,22 @@ def save_teacher_ai_assistant_material(
         if payload.factual_consistency_report is not None
         else build_factual_consistency_report(
             source_text=payload.original_text,
-            adapted_text=payload.adapted_text,
+            adapted_text=post_polish_adaptation_output(
+                adapted_text=payload.adapted_text,
+                product_mode=_resolve_product_mode(payload.adaptation_mode),
+                genre=payload.adaptation_genre or "educational",
+            ),
         )
+    )
+    polished_adapted_text = post_polish_adaptation_output(
+        adapted_text=payload.adapted_text,
+        product_mode=_resolve_product_mode(payload.adaptation_mode),
+        genre=payload.adaptation_genre or "educational",
     )
     contract_validation = validate_adaptation_output_contract(
         contract=output_contract,
         source_text=payload.original_text,
-        adapted_text=payload.adapted_text,
+        adapted_text=polished_adapted_text,
     )
     material, save_type = save_or_update_adapted_learning_material(
         db,
@@ -158,7 +173,7 @@ def save_teacher_ai_assistant_material(
         payload=TeacherLearningMaterialCreateRequest(
             title=payload.title,
             original_text=payload.original_text,
-            adapted_text=payload.adapted_text,
+            adapted_text=polished_adapted_text,
             source_type=payload.source_type,
             source_material_id=payload.source_material_id,
             source_filename=payload.source_filename,
@@ -169,7 +184,7 @@ def save_teacher_ai_assistant_material(
                 if payload.adaptation_rationale is not None
                 else build_adaptation_rationale(
                     source_text=payload.original_text,
-                    adapted_text=payload.adapted_text,
+                    adapted_text=polished_adapted_text,
                     mode=payload.adaptation_mode,
                     genre=payload.adaptation_genre,
                     controlled_adaptation_policy=controlled_adaptation_policy,
