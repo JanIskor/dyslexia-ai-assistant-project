@@ -557,7 +557,10 @@ def _build_genre_aware_method_behavior_block(
             "GENRE-AWARE METHOD BEHAVIOR:\n"
             "- structured_explanation + scientific_popular = process/logic explanation.\n"
             "- Разбивай объяснение на понятные causal steps без scientific distortion.\n"
-            "- Группируй материал в 3-5 крупных смысловых блоков, а не в микрошаги."
+            "- Группируй материал в 3-5 крупных смысловых блоков, а не в микрошаги.\n"
+            "- Используй только один формат заголовков шагов: «### Шаг 1. Название шага».\n"
+            "- Сначала дай краткий заголовок темы, затем блок «## Короткое объяснение», затем шаги, затем блок «## Почему это важно».\n"
+            "- Нельзя писать «## ### Шаг», «# ### Шаг» и нельзя оборачивать markdown-заголовки шагов в жирный шрифт."
         )
     if product_mode == "key_points_focus" and genre == "scientific_popular":
         return (

@@ -34,6 +34,7 @@ def validate_adaptation_output_contract(
         adapted_text,
     )
     mixed_heading_markup_detected = _detect_mixed_heading_markup(adapted_text)
+    nested_step_heading_detected = re.search(r"(?im)^#{1,2}\s+###\s+шаг\s*\d+", adapted_text)
     expects_episode_markers = any("Эпизод 1" in hint for hint in contract["validation_hints"])
     legal_informal_substitution_detected = _detect_legal_informal_substitution(
         source_text=source_text,
@@ -85,6 +86,8 @@ def validate_adaptation_output_contract(
             issues.append("Результат для structured_explanation не должен объединять несколько шагов в одном заголовке.")
         if mixed_heading_markup_detected:
             issues.append("Markdown-заголовки должны быть оформлены единообразно: не смешивайте heading syntax и bold в одной строке.")
+        if nested_step_heading_detected:
+            issues.append("Markdown-заголовки шагов не должны быть вложенными: используйте только формат «### Шаг 1. ...».")
         if expects_episode_markers and re.search(r"\bшаг\s*\d+\b", adapted_text, flags=re.IGNORECASE):
             issues.append("Для fiction в structured_explanation ожидаются маркеры «Эпизод 1», а не технические шаги.")
         long_paragraphs = [paragraph for paragraph in paragraphs if _count_words(paragraph) >= 60]
@@ -94,6 +97,10 @@ def validate_adaptation_output_contract(
             issues.append("Учебный structured_explanation должен содержать отдельные заголовки шагов.")
         if has_scientific_popular_template and len(step_heading_matches) > 5:
             issues.append("Scientific-popular structured_explanation не должен дробить текст на слишком много микрошагов.")
+        if has_scientific_popular_template and not re.search(r"(?im)^##\s+короткое объяснение\b", adapted_text):
+            issues.append("Scientific-popular structured_explanation должен содержать вводный блок «## Короткое объяснение».")
+        if has_scientific_popular_template and not re.search(r"(?im)^##\s+почему это важно\b", adapted_text):
+            issues.append("Scientific-popular structured_explanation должен содержать итоговый блок «## Почему это важно».")
 
     else:
         if bullet_lines and len(paragraphs) <= 1:

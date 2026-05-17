@@ -67,6 +67,19 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertEqual(template["template_id"], "educational_structured_explanation")
         self.assertIn("## Шаг 1. ...", template["structure"])
 
+    def test_scientific_popular_structured_template_resolved(self) -> None:
+        template = resolve_golden_template(
+            product_mode="structured_explanation",
+            strategy_mode="mode_a",
+            genre="scientific_popular",
+        )
+
+        self.assertIsNotNone(template)
+        assert template is not None
+        self.assertEqual(template["template_id"], "scientific_popular_structured_explanation")
+        self.assertIn("## Короткое объяснение", template["structure"])
+        self.assertIn("### Шаг 1. Исходное условие", template["structure"])
+
     def test_educational_key_points_template_resolved(self) -> None:
         template = resolve_golden_template(
             product_mode="key_points_focus",
@@ -411,6 +424,26 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertIn("### Шаг 1. Подготовьте материал.", polished)
         self.assertNotIn("**###", polished)
 
+    def test_scientific_popular_post_polish_removes_nested_step_heading_markup(self) -> None:
+        polished = post_polish_adaptation_output(
+            adapted_text="## ### Шаг 1. Как начинается процесс",
+            product_mode="structured_explanation",
+            genre="scientific_popular",
+        )
+
+        self.assertEqual(polished, "### Шаг 1. Как начинается процесс")
+        self.assertNotIn("## ###", polished)
+
+    def test_scientific_popular_post_polish_removes_bold_wrapped_step_heading(self) -> None:
+        polished = post_polish_adaptation_output(
+            adapted_text="**### Шаг 1. Как начинается процесс**",
+            product_mode="structured_explanation",
+            genre="scientific_popular",
+        )
+
+        self.assertEqual(polished, "### Шаг 1. Как начинается процесс")
+        self.assertNotIn("**###", polished)
+
     def test_post_polish_removes_internal_protected_span_labels(self) -> None:
         polished = post_polish_adaptation_output(
             adapted_text=(
@@ -445,6 +478,25 @@ class AdaptationOutputContractsTests(unittest.TestCase):
 
         self.assertEqual(result["contract_status"], "needs_review")
         self.assertTrue(any("heading syntax" in issue.lower() for issue in result["issues"]))
+
+    def test_scientific_popular_structured_validator_flags_nested_heading_markup(self) -> None:
+        contract = get_adaptation_output_contract(
+            product_mode="structured_explanation",
+            strategy_mode="mode_a",
+            genre="scientific_popular",
+            risk_level="medium",
+        )
+        result = validate_adaptation_output_contract(
+            contract=contract,
+            source_text="Текст объясняет процесс и его значение.",
+            adapted_text=(
+                "# Тема\n\n## Короткое объяснение\n\nВводный абзац.\n\n"
+                "## ### Шаг 1. Как начинается процесс\nТекст шага.\n\n## Почему это важно\nИтог."
+            ),
+        )
+
+        self.assertEqual(result["contract_status"], "needs_review")
+        self.assertTrue(any("не должны быть вложенными" in issue.lower() for issue in result["issues"]))
 
     def test_validator_flags_legal_actor_action_shift(self) -> None:
         contract = get_adaptation_output_contract(

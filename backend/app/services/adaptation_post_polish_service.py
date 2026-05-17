@@ -89,13 +89,23 @@ def _remove_duplicated_service_labels(text: str) -> str:
 
 def _normalize_mixed_heading_markup(text: str) -> str:
     normalized = re.sub(
+        r"(?im)^\s*#{1,2}\s+###\s+(шаг\s+\d+\.?\s*.*)$",
+        lambda match: f"### {match.group(1).strip()}",
+        text,
+    )
+    normalized = re.sub(
         r"(?im)^\s*\*+\s*#{1,6}\s*([^*\n]+?)\s*\*+\s*(.*)$",
         lambda match: f"### {match.group(1).strip()} {match.group(2).strip()}".rstrip(),
-        text,
+        normalized,
     )
     normalized = re.sub(
         r"(?im)^\s*#{1,6}\s*\*+\s*([^*\n]+?)\s*\*+\s*(.*)$",
         lambda match: f"### {match.group(1).strip()} {match.group(2).strip()}".rstrip(),
+        normalized,
+    )
+    normalized = re.sub(
+        r"(?im)^\s*\*+\s*(###\s+шаг\s+\d+\.?\s*[^*\n]*)\s*\*+\s*$",
+        lambda match: match.group(1).strip(),
         normalized,
     )
     return normalized
