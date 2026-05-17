@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    APP_ENV: str = "development"
     DATABASE_URL: str = "postgresql+psycopg://dyslexia_user:dyslexia_password@localhost:5433/dyslexia_db"
     SECRET_KEY: str = "change-me"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -19,7 +20,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "gigachat"
     GIGACHAT_AUTH_KEY: str | None = None
     GIGACHAT_SCOPE: str = "GIGACHAT_API_PERS"
-    GIGACHAT_MODEL: str = "GigaChat-2"
+    GIGACHAT_MODEL: str = "GigaChat-2-Pro"
     GIGACHAT_BASE_URL: str = "https://gigachat.devices.sberbank.ru/api/v1"
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str | None = None

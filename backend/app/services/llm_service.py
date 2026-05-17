@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from typing import Protocol
 
 from app.core.config import settings
@@ -9,6 +10,8 @@ from app.services.adaptation_prompt_builder import (
     RetrievedKnowledgeChunkPromptContext,
     build_adaptation_system_prompt,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LlmServiceError(Exception):
@@ -75,6 +78,13 @@ class LlmService:
 
 def get_llm_service() -> LlmService:
     provider_name = settings.LLM_PROVIDER.strip().lower()
+    if settings.APP_ENV.strip().lower() in {"dev", "development", "local"}:
+        logger.info(
+            "LLM service config: provider=%s model=%s scope=%s",
+            provider_name,
+            _get_active_model_name(),
+            settings.GIGACHAT_SCOPE if provider_name == "gigachat" else "",
+        )
 
     if provider_name == "gigachat":
         from app.services.gigachat_provider import GigaChatProvider
