@@ -87,6 +87,7 @@ def build_adaptation_rationale(
         semantic_preservation_notes.extend(
             [
                 "Защищённые элементы были извлечены до генерации.",
+                "Защищённые фрагменты были выделены до генерации.",
                 "Применены жанровые правила сохранения смысла и формулировок.",
                 "Разрешены только контролируемые операции адаптации.",
                 "Добавление внешних фактов, примеров, причин, терминов, объяснений и выводов было запрещено.",
@@ -104,6 +105,19 @@ def build_adaptation_rationale(
             if contract_validation["contract_status"] == "ok"
             else "Формат результата требует дополнительной проверки преподавателем."
         )
+    protected_span_report = (
+        factual_consistency_report.get("protected_span_report")
+        if factual_consistency_report is not None and isinstance(factual_consistency_report, dict)
+        else None
+    )
+    if protected_span_report is not None:
+        semantic_preservation_notes.append("После генерации выполнена проверка защищённых фрагментов.")
+        if protected_span_report.get("status") == "critical":
+            semantic_preservation_notes.append("Обнаружены критические искажения защищённых фрагментов.")
+        elif protected_span_report.get("status") == "warning":
+            semantic_preservation_notes.append("Защищённые фрагменты требуют проверки преподавателем.")
+    if factual_consistency_report is not None and factual_consistency_report.get("repair_attempted"):
+        semantic_preservation_notes.append("После генерации был выполнен автоматический repair-pass.")
     semantic_preservation_notes.append(get_factual_report_summary_message(factual_consistency_report))
 
     warnings: list[str] = []
@@ -111,6 +125,8 @@ def build_adaptation_rationale(
         warnings.append(
             "Для выбранного жанра сильное упрощение может изменить исходный смысл или стиль текста."
         )
+    if protected_span_report is not None and protected_span_report.get("status") == "critical":
+        warnings.append("Даже после автоматической проверки защищённые фрагменты требуют ручной верификации.")
 
     intensity = _calculate_intensity(
         normalized_mode=normalized_mode,

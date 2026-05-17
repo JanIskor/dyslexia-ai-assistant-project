@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 FactualIssueType = Literal[
@@ -50,6 +50,9 @@ class FactualConsistencyReport(TypedDict):
     summary_message: str
     strict_mode: bool
     issues: list[FactualIssue]
+    protected_span_report: NotRequired[dict[str, object] | None]
+    repair_attempted: NotRequired[bool]
+    repair_summary: NotRequired[str | None]
 
 
 UNIT_PATTERN = re.compile(
@@ -182,7 +185,14 @@ def extract_key_facts(text: str) -> ExtractedFacts:
     return extract_protected_elements(text)
 
 
-def build_factual_consistency_report(*, source_text: str, adapted_text: str) -> FactualConsistencyReport:
+def build_factual_consistency_report(
+    *,
+    source_text: str,
+    adapted_text: str,
+    protected_span_report: dict[str, object] | None = None,
+    repair_attempted: bool = False,
+    repair_summary: str | None = None,
+) -> FactualConsistencyReport:
     source_facts = extract_key_facts(source_text)
     adapted_facts = extract_key_facts(adapted_text)
     strict_mode = _is_strict_content(source_facts)
@@ -207,14 +217,27 @@ def build_factual_consistency_report(*, source_text: str, adapted_text: str) -> 
         )
 
     summary_status = _get_summary_status(issues)
+    if protected_span_report is not None:
+        protected_status = protected_span_report.get("status")
+        if protected_status == "critical":
+            summary_status = "critical"
+        elif protected_status == "warning" and summary_status == "ok":
+            summary_status = "warning"
     summary_message = _get_summary_message(summary_status)
 
-    return {
+    report: FactualConsistencyReport = {
         "summary_status": summary_status,
         "summary_message": summary_message,
         "strict_mode": strict_mode,
         "issues": _deduplicate_issues(issues),
     }
+    if protected_span_report is not None:
+        report["protected_span_report"] = protected_span_report
+    if repair_attempted:
+        report["repair_attempted"] = True
+    if repair_summary:
+        report["repair_summary"] = repair_summary
+    return report
 
 
 def get_factual_report_summary_message(report: FactualConsistencyReport | None) -> str:

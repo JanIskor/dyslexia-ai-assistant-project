@@ -251,6 +251,7 @@ def build_adaptation_system_prompt(
     genre: AdaptationGenre = DEFAULT_ADAPTATION_GENRE,
     source_text: str,
     retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None,
+    protected_spans: list[dict[str, str]] | None = None,
 ) -> str:
     normalized_product_mode = mode if is_product_mode(mode) else DEFAULT_PRODUCT_ADAPTATION_MODE
     normalized_mode = normalize_adaptation_mode(mode, genre)
@@ -284,6 +285,7 @@ def build_adaptation_system_prompt(
         _build_genre_specific_guardrails_block(genre=genre),
         _build_visual_markup_guidance_block(genre=genre),
         _build_protected_elements_block(protected_elements),
+        _build_protected_spans_block(protected_spans or []),
         _build_operations_block(
             title="Разрешённые операции",
             operations=policy["allowed_operations"],
@@ -310,6 +312,64 @@ def build_adaptation_system_prompt(
     if knowledge_context_block:
         prompt_parts.append(knowledge_context_block)
 
+    return "\n\n".join(part for part in prompt_parts if part)
+
+
+def build_adaptation_repair_prompt(
+    *,
+    original_text: str,
+    previous_adapted_text: str,
+    protected_spans: list[dict[str, str]],
+    validation_issues: list[dict[str, str | None]],
+    mode: AdaptationMode,
+    genre: AdaptationGenre,
+    retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None,
+) -> str:
+    protected_lines = "\n".join(
+        f"- [{span['severity']}/{span['preservation_mode']}] {span['span_type']}: {span['text']}"
+        for span in protected_spans[:20]
+    ) or "- Явные защищённые фрагменты не найдены, но смысловые ограничения всё равно действуют."
+    issue_lines = "\n".join(
+        f"- {issue['issue_type']}: {issue['message']} | repair: {issue['repair_instruction']}"
+        for issue in validation_issues[:12]
+    ) or "- Явные ошибки не перечислены."
+
+    genre_block = _build_repair_genre_block(genre=genre)
+    knowledge_context_block = _build_knowledge_context_block(retrieved_chunks)
+
+    prompt_parts = [
+        "Ты исправляешь уже созданную адаптацию текста для обучающегося с дислексией.",
+        "Не переписывай текст заново без необходимости.",
+        "Исправь только те места, где были потеряны или искажены защищённые фрагменты.",
+        "Не добавляй новые факты, новые субъекты, новые признаки, новые причины, новые выводы и новые интерпретации.",
+        "Если читаемость конфликтует с сохранением защищённого фрагмента, сохрани защищённый фрагмент.",
+        f"Product mode: {mode}",
+        f"Genre: {genre}",
+        (
+            "Protected spans extracted from source text. Preserve these spans according to preservation mode.\n"
+            f"{protected_lines}"
+        ),
+        f"Validation issues that must be repaired:\n{issue_lines}",
+        (
+            "Исходный текст:\n"
+            f"{original_text}"
+        ),
+        (
+            "Текущая адаптация, которую нужно исправить:\n"
+            f"{previous_adapted_text}"
+        ),
+        genre_block,
+        (
+            "Правила repair-pass:\n"
+            "- Верни защищённые фрагменты.\n"
+            "- Сохрани субъект, действие, срок, условие, исключение и направление действия.\n"
+            "- Не усиливай и не ослабляй утверждения.\n"
+            "- Улучшай читаемость только структурой, абзацами, заголовками и аккуратной сегментацией.\n"
+            "- Верни только исправленный адаптированный текст без пояснений от себя."
+        ),
+    ]
+    if knowledge_context_block:
+        prompt_parts.append(knowledge_context_block)
     return "\n\n".join(part for part in prompt_parts if part)
 
 
@@ -342,6 +402,17 @@ def _build_protected_elements_block(protected_elements: dict[str, list[str]]) ->
         return "Защищённые элементы: явных чувствительных элементов не найдено, но факты всё равно нельзя менять."
 
     return "Защищённые элементы, которые нужно сохранить без изменения:\n- " + "\n- ".join(visible_items)
+
+
+def _build_protected_spans_block(protected_spans: list[dict[str, str]]) -> str:
+    if not protected_spans:
+        return "Protected spans extracted from source text: явных protected spans не найдено, но факты и значимые формулировки всё равно нельзя менять."
+
+    lines = [
+        f"[{span['severity']}/{span['preservation_mode']}] {span['span_type']}: {span['text']}"
+        for span in protected_spans[:20]
+    ]
+    return "Protected spans extracted from source text. Preserve these spans according to preservation mode.\n- " + "\n- ".join(lines)
 
 
 def _build_operations_block(*, title: str, operations: list[str]) -> str:
@@ -505,6 +576,34 @@ def _build_visual_markup_guidance_block(*, genre: AdaptationGenre) -> str:
             "- Не перегружай художественный текст **bold** и не выделяй мораль или символ, если этого нет прямо в исходнике."
         )
     return common_rule
+
+
+def _build_repair_genre_block(*, genre: AdaptationGenre) -> str:
+    if genre == "legal":
+        return (
+            "LEGAL REPAIR RULES:\n"
+            "- Legal wording has priority over simplification.\n"
+            "- Preserve legal actors, legal actions, modality, deadlines, conditions and exceptions.\n"
+            "- Do not narrow subjects and do not change direction of action."
+        )
+    if genre == "fiction":
+        return (
+            "FICTION REPAIR RULES:\n"
+            "- Preserve narrative actions, imagery, emotional tone and ambiguity.\n"
+            "- Do not add new adjectives, details or interpretations.\n"
+            "- Do not turn the scene into summary."
+        )
+    if genre in {"educational", "scientific_popular"}:
+        return (
+            "EDUCATIONAL/SCIENTIFIC REPAIR RULES:\n"
+            "- Preserve scope, terms and causal relations.\n"
+            "- Do not add unsupported generalization, external explanation or new notation."
+        )
+    return (
+        "GENERAL REPAIR RULES:\n"
+        "- Preserve protected spans and avoid semantic drift.\n"
+        "- Improve readability only through safe structure."
+    )
 
 
 def _build_output_contract_block(

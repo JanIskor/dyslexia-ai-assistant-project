@@ -7,6 +7,8 @@ from pydantic import BaseModel, StringConstraints
 from app.services.adaptation_prompt_builder import AdaptationGenre, AdaptationMode
 from app.services.adaptation_rationale_service import AdaptationIntensity
 from app.services.factual_consistency_service import FactualIssueSeverity, FactualIssueType, FactualSummaryStatus
+from app.services.protected_span_extractor import ProtectedSpanPreservationMode, ProtectedSpanSeverity
+from app.services.protected_span_validator import ProtectedSpanValidationStatus
 
 
 AssistantMaterialSourceType = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -49,11 +51,41 @@ class FactualConsistencyIssueResponse(BaseModel):
     message: str
 
 
+class ProtectedSpanResponse(BaseModel):
+    text: str
+    normalized_text: str
+    span_type: str
+    severity: ProtectedSpanSeverity
+    preservation_mode: ProtectedSpanPreservationMode
+    reason: str
+
+
+class ProtectedSpanIssueResponse(BaseModel):
+    issue_type: str
+    severity: Literal["warning", "critical"]
+    original_span: str
+    adapted_evidence: str | None = None
+    message: str
+    repair_instruction: str
+
+
+class ProtectedSpanValidationReportResponse(BaseModel):
+    status: ProtectedSpanValidationStatus
+    issues: list[ProtectedSpanIssueResponse]
+    critical_count: int
+    warning_count: int
+    repair_required: bool
+    summary: str
+
+
 class FactualConsistencyReportResponse(BaseModel):
     summary_status: FactualSummaryStatus
     summary_message: str
     strict_mode: bool
     issues: list[FactualConsistencyIssueResponse]
+    protected_span_report: ProtectedSpanValidationReportResponse | None = None
+    repair_attempted: bool = False
+    repair_summary: str | None = None
 
 
 class LearningMaterialResponse(BaseModel):

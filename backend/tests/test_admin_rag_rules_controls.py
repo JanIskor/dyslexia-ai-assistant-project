@@ -559,8 +559,38 @@ class AdminRagRulesControlsTests(unittest.TestCase):
         self.assertIn("11_protected_span_policy", chunk_titles)
         self.assertIn("12_forced_methodology_retrieval", chunk_titles)
         self.assertIn("06_protected_elements_policy", chunk_titles)
+
+    def test_teacher_assistant_runs_repair_pass_for_critical_protected_span_distortion(self) -> None:
+        token = self._login_teacher()
+        llm_calls: list[str] = []
+
+        def _adapt_plain_text(request):
+            llm_calls.append(request.user_text_override or request.source_text)
+            if request.user_text_override is None:
+                return SimpleNamespace(adapted_text="Родитель может отправить письменный отказ в школу.")
+            return SimpleNamespace(adapted_text="Законный представитель вправе направить письменный отзыв в образовательную организацию.")
+
+        with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
+            with patch(
+                "app.services.teacher_ai_assistant_service.get_llm_service",
+                return_value=SimpleNamespace(adapt_plain_text=_adapt_plain_text),
+            ):
+                response = self.client.post(
+                    "/api/v1/teacher/ai-assistant/messages",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={
+                        "message": "Законный представитель вправе направить письменный отзыв в образовательную организацию.",
+                        "mode": "basic_simplify",
+                        "genre": "legal",
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200, response.text)
         payload = response.json()
-        self.assertEqual(payload["reply"], "ok:basic_simplify")
+        self.assertEqual(payload["reply"], "Законный представитель вправе направить письменный отзыв в образовательную организацию.")
+        self.assertTrue(payload["factual_consistency_report"]["repair_attempted"])
+        self.assertIn("protected_span_report", payload["factual_consistency_report"])
+        self.assertEqual(len(llm_calls), 2)
         self.assertIn(
             "Юридическая бережная адаптация",
             [item["document_title"] for item in payload["used_knowledge_chunks"]],

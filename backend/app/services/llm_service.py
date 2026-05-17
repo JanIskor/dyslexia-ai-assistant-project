@@ -36,6 +36,9 @@ class PlainTextAdaptationRequest:
     mode: AdaptationMode
     genre: AdaptationGenre = DEFAULT_ADAPTATION_GENRE
     retrieved_chunks: list[RetrievedKnowledgeChunkPromptContext] | None = None
+    protected_spans: list[dict[str, str]] | None = None
+    system_prompt_override: str | None = None
+    user_text_override: str | None = None
 
 
 @dataclass
@@ -50,14 +53,17 @@ class LlmService:
         self._provider = provider
 
     def adapt_plain_text(self, request: PlainTextAdaptationRequest) -> PlainTextAdaptationResult:
-        adapted_text = self._provider.adapt_plain_text(
+        system_prompt = request.system_prompt_override or build_adaptation_system_prompt(
+            request.mode,
+            genre=request.genre,
             source_text=request.source_text,
-            system_prompt=build_adaptation_system_prompt(
-                request.mode,
-                genre=request.genre,
-                source_text=request.source_text,
-                retrieved_chunks=request.retrieved_chunks,
-            ),
+            retrieved_chunks=request.retrieved_chunks,
+            protected_spans=request.protected_spans,
+        )
+        user_text = request.user_text_override or request.source_text
+        adapted_text = self._provider.adapt_plain_text(
+            source_text=user_text,
+            system_prompt=system_prompt,
         )
 
         return PlainTextAdaptationResult(

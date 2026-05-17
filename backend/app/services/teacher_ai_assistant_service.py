@@ -6,6 +6,7 @@ from fastapi import UploadFile
 
 from app.schemas.learning_materials import TeacherLearningMaterialCreateRequest
 from app.services.adaptation_rationale_service import build_adaptation_rationale
+from app.services.adaptation_repair_service import run_adaptation_repair, should_run_adaptation_repair
 from app.services.adaptation_prompt_builder import (
     RetrievedKnowledgeChunkPromptContext,
     is_product_mode,
@@ -16,6 +17,8 @@ from app.services.adaptation_output_contracts import get_adaptation_output_contr
 from app.services.adaptation_post_polish_service import post_polish_adaptation_output
 from app.services.controlled_adaptation_policy_service import build_controlled_adaptation_policy
 from app.services.factual_consistency_service import build_factual_consistency_report, extract_protected_elements
+from app.services.protected_span_extractor import extract_protected_spans
+from app.services.protected_span_validator import validate_protected_spans
 from app.services.llm_service import PlainTextAdaptationRequest, get_llm_service
 from app.schemas.teacher_ai_assistant import (
     TeacherAiAssistantMessageRequest,
@@ -46,17 +49,20 @@ def create_teacher_ai_assistant_reply(
     payload: TeacherAiAssistantMessageRequest,
 ) -> TeacherAiAssistantMessageResponse:
     source_text = payload.message.strip()
+    product_mode = _resolve_product_mode(payload.mode)
+    strategy_mode = resolve_strategy_mode(payload.mode, payload.genre)
     protected_elements = extract_protected_elements(source_text)
+    protected_span_extraction = extract_protected_spans(source_text, genre=payload.genre)
     controlled_adaptation_policy = build_controlled_adaptation_policy(
-        product_mode=_resolve_product_mode(payload.mode),
-        strategy_mode=resolve_strategy_mode(payload.mode, payload.genre),
+        product_mode=product_mode,
+        strategy_mode=strategy_mode,
         genre=payload.genre,
         original_text=source_text,
         protected_elements=protected_elements,
     )
     output_contract = get_adaptation_output_contract(
-        product_mode=_resolve_product_mode(payload.mode),
-        strategy_mode=resolve_strategy_mode(payload.mode, payload.genre),
+        product_mode=product_mode,
+        strategy_mode=strategy_mode,
         genre=payload.genre,
         risk_level=controlled_adaptation_policy["risk_level"],
     )
@@ -71,30 +77,76 @@ def create_teacher_ai_assistant_reply(
         )
     except HTTPException:
         retrieved_chunks = []
+    prompt_chunks = [
+        RetrievedKnowledgeChunkPromptContext(
+            document_title=chunk.document_title,
+            chunk_index=chunk.chunk_index,
+            content=chunk.content,
+        )
+        for chunk in retrieved_chunks
+    ]
 
-    adaptation_result = get_llm_service().adapt_plain_text(
+    llm_service = get_llm_service()
+    adaptation_result = llm_service.adapt_plain_text(
         PlainTextAdaptationRequest(
             source_text=source_text,
             mode=payload.mode,
             genre=payload.genre,
-            retrieved_chunks=[
-                RetrievedKnowledgeChunkPromptContext(
-                    document_title=chunk.document_title,
-                    chunk_index=chunk.chunk_index,
-                    content=chunk.content,
-                )
-                for chunk in retrieved_chunks
-            ],
+            retrieved_chunks=prompt_chunks,
+            protected_spans=protected_span_extraction["spans"],
         )
     )
     polished_adapted_text = post_polish_adaptation_output(
         adapted_text=adaptation_result.adapted_text,
-        product_mode=_resolve_product_mode(payload.mode),
+        product_mode=product_mode,
         genre=payload.genre,
     )
+    protected_span_report = validate_protected_spans(
+        source_text=source_text,
+        adapted_text=polished_adapted_text,
+        genre=payload.genre,
+        protected_spans=protected_span_extraction["spans"],
+    )
+
+    repair_result = run_adaptation_repair(
+        llm_service=llm_service,
+        original_text=source_text,
+        previous_adapted_text=polished_adapted_text,
+        product_mode=product_mode,
+        mode=payload.mode,
+        genre=payload.genre,
+        protected_spans=protected_span_extraction["spans"],
+        validation_report=protected_span_report,
+        retrieved_chunks=prompt_chunks,
+    ) if should_run_adaptation_repair(protected_span_report) else None
+
+    if repair_result is not None and repair_result.repair_applied:
+        repaired_protected_span_report = validate_protected_spans(
+            source_text=source_text,
+            adapted_text=repair_result.repaired_text,
+            genre=payload.genre,
+            protected_spans=protected_span_extraction["spans"],
+        )
+        original_score = (protected_span_report["critical_count"], protected_span_report["warning_count"])
+        repaired_score = (repaired_protected_span_report["critical_count"], repaired_protected_span_report["warning_count"])
+        if repaired_score <= original_score:
+            polished_adapted_text = repair_result.repaired_text
+            protected_span_report = repaired_protected_span_report
+            repair_attempted = True
+            repair_summary = repair_result.repair_summary
+        else:
+            repair_attempted = True
+            repair_summary = "Automatic repair pass was attempted but did not improve protected-span validation."
+    else:
+        repair_attempted = False
+        repair_summary = None
+
     factual_consistency_report = build_factual_consistency_report(
         source_text=source_text,
         adapted_text=polished_adapted_text,
+        protected_span_report=protected_span_report,
+        repair_attempted=repair_attempted,
+        repair_summary=repair_summary,
     )
     contract_validation = validate_adaptation_output_contract(
         contract=output_contract,
