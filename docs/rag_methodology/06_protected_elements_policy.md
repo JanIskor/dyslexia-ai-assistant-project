@@ -106,6 +106,12 @@
 - менять символическую запись;
 - подменять формальное обозначение бытовым описанием.
 
+### Дополнительное правило для educational
+
+Если в source нет сокращения, формулы или символа, адаптация не должна вводить его самостоятельно.
+
+Protected elements policy работает не только на сохранение existing notation, но и на запрет новой notation без опоры на source.
+
 ---
 
 ## Формулы и формальные зависимости
@@ -156,6 +162,23 @@
 - заменять термин бытовым аналогом, если это меняет область знания;
 - удалять термин без сохранения предметного смысла;
 - подменять термин неточным синонимом.
+
+### Genre-specific protection
+
+Для `fiction` дополнительно сохранять:
+
+- names;
+- roles;
+- relationships;
+- imagery cues;
+- emotionally significant wording.
+
+Для `scientific_popular` дополнительно сохранять:
+
+- key concepts;
+- explanatory terms;
+- causal markers;
+- scope of scientific claims.
 
 ---
 
@@ -342,6 +365,57 @@
 Читаемость не должна достигаться ценой разрушения предметного содержания.
 
 ---
+
+# Защищённые художественные элементы
+
+Для fiction текста защищёнными считаются:
+
+- авторский tone;
+- narrative pacing;
+- ключевые метафоры;
+- эмоциональные кульминации;
+- напряжение сцены;
+- интонация персонажей;
+- образные сравнения;
+- атмосферные описания.
+
+### Разрешено
+
+- упрощать синтаксис;
+- сегментировать сцену;
+- визуально разделять блоки;
+- пояснять отдельные слова.
+
+### Запрещено
+
+- убирать эмоциональную нагрузку;
+- делать сцену нейтральной;
+- заменять образ прямым объяснением;
+- разрушать immersion.
+
+# Protected elements for scientific-popular genre
+
+К защищённым элементам относятся:
+
+- scientific terminology;
+- factual statements;
+- causal logic;
+- educational structure;
+- key definitions;
+- explanation sequence;
+- conceptual integrity.
+
+Разрешается:
+- syntactic simplification;
+- visual restructuring;
+- segmentation;
+- clarification.
+
+Запрещается:
+- scientific distortion;
+- misinformation;
+- removal of key concepts;
+- oversimplification.
 
 # Связанные теги применения
 

@@ -89,6 +89,39 @@
 - product mode влияет прежде всего на структуру подачи;
 - но не должен радикально менять исходные формулировки.
 
+## Специальное правило для учебного жанра
+
+Для жанра `educational` product mode должен влиять не только на глубину упрощения, но и на pedagogical structure результата.
+
+Это означает:
+
+- `basic_simplify` должен стремиться к устойчивому объяснительному layout;
+- `structured_explanation` должен строиться как логика процесса или рассуждения;
+- `key_points_focus` должен выделять learning anchors, а не превращаться в обычный summary;
+- новые обозначения и новые факты недопустимы даже при свободном режиме A.
+
+## Специальное правило для fiction
+
+Для жанра `fiction` product mode должен подчиняться narrative-preserving logic.
+
+Это означает:
+
+- readability support не должен разрушать immersion;
+- segmentation важнее retelling;
+- даже при simplification должны сохраняться atmosphere, tone и emotional dynamics;
+- `structured_explanation` для fiction должен опираться на episodes, а не на technical steps.
+
+## Специальное правило для scientific-popular
+
+Для жанра `scientific_popular` product mode должен подчиняться cognitively safe explanatory logic.
+
+Это означает:
+
+- снижение overload допускается, но не ценой scientific distortion;
+- `basic_simplify` должен помогать понять тему, а не огрублять её;
+- `structured_explanation` должен сохранять causal chain;
+- `key_points_focus` должен выделять concept anchors, а не обнулять educational value.
+
 ### Если жанр допускает переписывание
 
 - сначала рассматривать режим A;
@@ -151,6 +184,58 @@
 - синтаксическое упрощение;
 - изменение порядка фрагментов;
 - интерпретационная подсветка, которая навязывает смысл.
+
+---
+
+# Дополнение в `05_genre_modes_a_b.md`
+
+```md
+## Специальное правило для fiction genre
+
+Для fiction adaptation:
+- режим A допускает controlled rewriting;
+- но rewriting должен сохранять narrative immersion.
+
+Visual support должен помогать чтению,
+а не разрушать художественный ритм текста.
+
+### Для fiction приоритетны
+
+1. Атмосфера сцены.
+2. Повествовательная логика.
+3. Эмоциональная динамика.
+4. Читаемость.
+5. Визуальная поддержка.
+
+### Для fiction запрещено
+
+- превращать художественный текст в summary;
+- уничтожать авторский тон;
+- заменять образность буквальным объяснением;
+- делать overly-instructional adaptation.
+
+---
+
+# Дополнение в `05_genre_modes_a_b.md`
+
+```md
+## Специальное правило для scientific-popular genre
+
+Scientific-popular adaptation должна:
+- снижать когнитивную нагрузку;
+- сохранять научную достоверность;
+- улучшать comprehension;
+- усиливать структуру объяснения.
+
+Visual adaptation используется:
+- для semantic navigation;
+- для hierarchy enhancement;
+- для выделения ключевых концепций.
+
+Система не должна:
+- превращать текст в summary;
+- удалять научную логику;
+- искажать определения.
 
 ## Связанные теги применения
 

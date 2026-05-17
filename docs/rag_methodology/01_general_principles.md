@@ -60,6 +60,17 @@
 - Чем выше риск искажения формулировки, тем осторожнее должна быть адаптация.
 - Для чувствительных жанров сначала выбирать более щадящий формат подачи, а не глубокое переписывание.
 
+## Жанровое поведение методов адаптации
+
+Один и тот же product mode не должен вести себя одинаково во всех жанрах.
+
+- `basic_simplify` в `educational` чаще означает pedagogical rewrite.
+- `basic_simplify` в `legal` означает structured near-source adaptation.
+- `structured_explanation` в `educational` означает process / logic steps.
+- `structured_explanation` в `legal` означает document structure steps.
+- `key_points_focus` в `educational` означает learning anchors.
+- `key_points_focus` в `legal` означает extraction of rights, duties, conditions and restrictions.
+
 ## Приоритет эталонных шаблонов
 
 Если для жанра и типа результата существует утверждённый эталонный шаблон адаптации, система должна использовать его как приоритетную структуру ответа.

@@ -172,6 +172,22 @@
 - удалять промежуточные шаги;
 - превращать сложную зависимость в слишком простую схему, если теряется смысл.
 
+## Genre-aware visual adaptation
+
+### Для fiction
+
+- visual segmentation должна помогать следить за сценой;
+- dialogue separation повышает navigability;
+- структурирование не должно ломать narrative flow;
+- визуальная поддержка не должна превращать fiction в dry outline.
+
+### Для scientific-popular
+
+- visual restructuring должна снижать overload;
+- hierarchy enhancement помогает удерживать explanatory logic;
+- segmentation должна поддерживать comprehension, а не просто дробить текст;
+- blocks должны помогать видеть concept relations и causal chain.
+
 ## Запрещённые операции
 
 ### External fact insertion
@@ -217,6 +233,20 @@
 ## Golden template compliance
 
 Если для жанра и типа результата существует эталонный шаблон адаптации, система обязана следовать его структуре.
+
+Retrieval должен использовать такие template chunks как guidance по форме результата, а не как источник нового содержания.
+
+### Educational template behavior
+
+- поддерживать устойчивую pedagogical structure;
+- помогать `basic_simplify`, `structured_explanation` и `key_points_focus` давать разные типы результата;
+- не допускать новую notation и unsupported expansion.
+
+### Legal template behavior
+
+- усиливать near-source preservation;
+- предпочитать structural segmentation instead of paraphrasing;
+- удерживать права, обязанности, сроки, условия и исключения максимально близко к source.
 
 Это правило применяется:
 - после выбора режима адаптации;
@@ -364,6 +394,41 @@
 
 Читаемость не может быть достигнута за счёт фактической ошибки.
 
+## Fiction golden template compliance
+
+Для fiction genre система должна:
+
+- сохранять narrative flow;
+- избегать excessive fragmentation;
+- сохранять emotional continuity;
+- применять visual adaptation осторожно.
+
+### Priority order for fiction
+
+1. Narrative coherence
+2. Emotional preservation
+3. Atmosphere preservation
+4. Readability improvement
+5. Visual enhancement
+
+
+## Scientific-popular adaptation policy
+
+Для scientific-popular genre система должна:
+
+- prioritise comprehension;
+- reduce cognitive overload;
+- preserve scientific accuracy;
+- maintain causal explanation chains;
+- improve structural readability.
+
+### Priority order
+
+1. Scientific correctness
+2. Conceptual clarity
+3. Cognitive accessibility
+4. Readability
+5. Visual enhancement
 ---
 
 # Связанные теги применения

@@ -67,6 +67,7 @@ def create_teacher_ai_assistant_reply(
             top_k=3,
             selected_mode=payload.mode,
             selected_genre=payload.genre,
+            include_forced_methodology=True,
         )
     except HTTPException:
         retrieved_chunks = []

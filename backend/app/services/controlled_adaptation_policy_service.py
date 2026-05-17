@@ -208,11 +208,25 @@ def _build_policy_summary(
         summary += (
             " Legal near-source rule: preserve legally significant wording as close to the source as possible. "
             "Do not change modality, conditions, exceptions, deadlines, recipients or action order. "
+            "Do not change the acting subject or direction of action. "
             "If a legal phrase is hard to simplify safely, keep the original phrase and improve structure around it."
         )
     if genre == "educational":
         summary += (
             " Educational no-new-notation rule: do not introduce new notation, abbreviations, symbols, formulas "
-            "or broad unsupported generalizations absent from the source."
+            "or broad unsupported generalizations absent from the source. "
+            "Preserve source scope and avoid strengthening claims."
+        )
+    if genre == "fiction":
+        summary += (
+            " Fiction preservation rule: improve readability without narrative destruction. "
+            "Preserve atmosphere, imagery, emotional dynamics, tone and scene order. "
+            "Do not retell the plot instead of adapting the scene."
+        )
+    if genre == "scientific_popular":
+        summary += (
+            " Scientific-popular rule: preserve scientific correctness, key concepts and causal relationships while "
+            "reducing cognitive overload through segmentation, hierarchy and careful term clarification. "
+            "Prefer 3-5 larger meaning blocks over many micro-steps."
         )
     return summary

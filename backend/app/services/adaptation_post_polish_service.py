@@ -28,6 +28,7 @@ def post_polish_adaptation_output(
     polished = re.sub(r"[ \t]{2,}", " ", polished)
     polished = re.sub(r"\n{3,}", "\n\n", polished)
     polished = _remove_duplicated_service_labels(polished)
+    polished = _normalize_mixed_heading_markup(polished)
 
     if product_mode == "structured_explanation":
         polished = _normalize_structured_headings(polished, genre=genre)
@@ -43,12 +44,26 @@ def _remove_duplicated_service_labels(text: str) -> str:
     )
 
 
+def _normalize_mixed_heading_markup(text: str) -> str:
+    normalized = re.sub(
+        r"(?im)^\s*\*+\s*#{1,6}\s*([^*\n]+?)\s*\*+\s*(.*)$",
+        lambda match: f"### {match.group(1).strip()} {match.group(2).strip()}".rstrip(),
+        text,
+    )
+    normalized = re.sub(
+        r"(?im)^\s*#{1,6}\s*\*+\s*([^*\n]+?)\s*\*+\s*(.*)$",
+        lambda match: f"### {match.group(1).strip()} {match.group(2).strip()}".rstrip(),
+        normalized,
+    )
+    return normalized
+
+
 def _normalize_structured_headings(text: str, *, genre: AdaptationGenre) -> str:
     heading_word = "Эпизод" if genre == "fiction" else "Шаг"
     normalized = text
 
     combined_pattern = re.compile(
-        r"(?im)^#{0,3}\s*(?:Шаг|Эпизод)\s*(\d+)\s*/\s*(?:Шаг|Эпизод)\s*(\d+)\s*$"
+        r"(?im)^#{0,3}\s*(?:Шаг|Эпизод)\s*(\d+)\.?\s*/\s*(?:Шаг|Эпизод)\s*(\d+)\.?\s*$"
     )
 
     def _split_combined_heading(match: re.Match[str]) -> str:
@@ -58,18 +73,19 @@ def _normalize_structured_headings(text: str, *, genre: AdaptationGenre) -> str:
 
     normalized = combined_pattern.sub(_split_combined_heading, normalized)
     normalized = re.sub(
-        r"(?im)^#{0,3}\s*шаг\s+(\d+)\b",
-        lambda match: f"### {heading_word} {match.group(1)}",
+        r"(?im)^#{0,3}\s*шаг\s+(\d+)(?:\.\s*)?",
+        lambda match: f"### {heading_word} {match.group(1)}. ",
         normalized,
     )
     normalized = re.sub(
-        r"(?im)^#{0,3}\s*этап\s+(\d+)\b",
-        lambda match: f"### {heading_word} {match.group(1)}",
+        r"(?im)^#{0,3}\s*этап\s+(\d+)(?:\.\s*)?",
+        lambda match: f"### {heading_word} {match.group(1)}. ",
         normalized,
     )
     normalized = re.sub(
-        r"(?im)^#{0,3}\s*эпизод\s+(\d+)\b",
-        lambda match: f"### {heading_word} {match.group(1)}",
+        r"(?im)^#{0,3}\s*эпизод\s+(\d+)(?:\.\s*)?",
+        lambda match: f"### {heading_word} {match.group(1)}. ",
         normalized,
     )
+    normalized = re.sub(r"(?im)^###\s+(Шаг|Эпизод)\s+(\d+)\.\s*$", r"### \1 \2", normalized)
     return normalized

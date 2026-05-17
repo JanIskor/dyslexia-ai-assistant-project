@@ -26,7 +26,7 @@ import {
 import {
   ADAPTATION_GENRE_OPTIONS,
   ADAPTATION_PRODUCT_MODE_OPTIONS,
-  getAdaptationModeLabel,
+  getContextualAdaptationModeLabel,
   getAdaptationGenreLabel,
   getAdaptationStrategyExplanation,
   getStrategyModeLabel,
@@ -1004,8 +1004,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
   };
 
   const selectedModeLabel =
-    ADAPTATION_PRODUCT_MODE_OPTIONS.find((modeOption) => modeOption.value === selectedMode)?.shortLabel ??
-    'Упростить текст';
+    getContextualAdaptationModeLabel(selectedMode, selectedGenre, 'shortLabel');
   const selectedStrategyMode = resolveStrategyMode(selectedMode, selectedGenre);
   const selectedStrategyLabel = getStrategyModeLabel(selectedStrategyMode);
   const selectedGenreLabel = getAdaptationGenreLabel(selectedGenre);
@@ -1128,7 +1127,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                                 className="flex flex-wrap gap-2 text-xs font-medium sm:text-sm"
                               >
                                 <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-orange-700">
-                                  {getAdaptationModeLabel(message.adaptationMode)}
+                                  {getContextualAdaptationModeLabel(message.adaptationMode, message.adaptationGenre)}
                                 </span>
                                 <span className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-stone-600">
                                   {getAdaptationGenreLabel(message.adaptationGenre)}
@@ -1379,7 +1378,7 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                                 : 'text-stone-600 hover:bg-orange-50/70'
                             }`}
                           >
-                            <span>{mode.label}</span>
+                            <span>{getContextualAdaptationModeLabel(mode.value, selectedGenre)}</span>
                             {isSelected ? (
                               <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-orange-600">
                                 Активно

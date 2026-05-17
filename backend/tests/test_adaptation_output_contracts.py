@@ -91,6 +91,30 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertEqual(template["template_id"], "legal_preservation_mode_b")
         self.assertIn("## 1. Кто участвует", template["structure"])
 
+    def test_fiction_basic_template_resolved(self) -> None:
+        template = resolve_golden_template(
+            product_mode="basic_simplify",
+            strategy_mode="mode_a",
+            genre="fiction",
+        )
+
+        self.assertIsNotNone(template)
+        assert template is not None
+        self.assertEqual(template["template_id"], "fiction_basic_simplify")
+        self.assertIn("### Реплика персонажа", template["structure"])
+
+    def test_scientific_popular_basic_template_resolved(self) -> None:
+        template = resolve_golden_template(
+            product_mode="basic_simplify",
+            strategy_mode="mode_a",
+            genre="scientific_popular",
+        )
+
+        self.assertIsNotNone(template)
+        assert template is not None
+        self.assertEqual(template["template_id"], "scientific_popular_basic_simplify")
+        self.assertIn("## Как это работает", template["structure"])
+
     def test_legal_mode_b_override_limits_paraphrasing(self) -> None:
         contract = get_adaptation_output_contract(
             product_mode="basic_simplify",
@@ -132,6 +156,7 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertIn("вправе", prompt)
         self.assertIn("если иное", prompt)
         self.assertIn("в течение", prompt)
+        self.assertIn("Не меняй направление действия", prompt)
 
     def test_key_points_focus_validator_flags_full_retelling(self) -> None:
         contract = get_adaptation_output_contract(
@@ -340,6 +365,31 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertIn("EDUCATIONAL NO-NEW-NOTATION RULES", prompt)
         self.assertIn("Не вводи новые обозначения", prompt)
 
+    def test_fiction_prompt_contains_preservation_rules(self) -> None:
+        prompt = build_adaptation_system_prompt(
+            "basic_simplify",
+            genre="fiction",
+            source_text="Егор молчал, а кораблик качался на воде.",
+            retrieved_chunks=None,
+        )
+
+        self.assertIn("FICTION PRESERVATION RULES", prompt)
+        self.assertIn("narrative structure", prompt)
+        self.assertIn("атмосферу", prompt)
+
+    def test_scientific_popular_prompt_contains_clarity_rules(self) -> None:
+        prompt = build_adaptation_system_prompt(
+            "structured_explanation",
+            genre="scientific_popular",
+            source_text="Текст объясняет, как возникает явление и почему оно важно.",
+            retrieved_chunks=None,
+        )
+
+        self.assertIn("SCIENTIFIC-POPULAR CLARITY RULES", prompt)
+        self.assertIn("scientific correctness", prompt)
+        self.assertIn("cognitive overload", prompt)
+        self.assertIn("3-5 крупных смысловых блоков", prompt)
+
     def test_post_polish_splits_combined_steps_without_semantic_rewrite(self) -> None:
         polished = post_polish_adaptation_output(
             adapted_text="### Шаг 1 / Шаг 2\nСначала откройте окно. Затем заполните форму.",
@@ -350,6 +400,82 @@ class AdaptationOutputContractsTests(unittest.TestCase):
         self.assertIn("### Шаг 1", polished)
         self.assertIn("### Шаг 2", polished)
         self.assertIn("Сначала откройте окно. Затем заполните форму.", polished)
+
+    def test_post_polish_fixes_mixed_markdown_heading_markup(self) -> None:
+        polished = post_polish_adaptation_output(
+            adapted_text="**### Шаг 1.** Подготовьте материал.",
+            product_mode="structured_explanation",
+            genre="educational",
+        )
+
+        self.assertIn("### Шаг 1. Подготовьте материал.", polished)
+        self.assertNotIn("**###", polished)
+
+    def test_validator_flags_mixed_markdown_heading_markup(self) -> None:
+        contract = get_adaptation_output_contract(
+            product_mode="structured_explanation",
+            strategy_mode="mode_a",
+            genre="educational",
+            risk_level="medium",
+        )
+        result = validate_adaptation_output_contract(
+            contract=contract,
+            source_text="Сначала растение получает свет, затем образует вещества.",
+            adapted_text="**### Шаг 1.** Растение получает свет.",
+        )
+
+        self.assertEqual(result["contract_status"], "needs_review")
+        self.assertTrue(any("heading syntax" in issue.lower() for issue in result["issues"]))
+
+    def test_validator_flags_legal_actor_action_shift(self) -> None:
+        contract = get_adaptation_output_contract(
+            product_mode="basic_simplify",
+            strategy_mode="mode_b",
+            genre="legal",
+            risk_level="high",
+        )
+        result = validate_adaptation_output_contract(
+            contract=contract,
+            source_text="Письменный отзыв направляется законным представителем в образовательную организацию. После получения отзыва организация прекращает обработку персональных данных.",
+            adapted_text="Организация направляет письменный отзыв и после этого прекращает обработку данных.",
+        )
+
+        self.assertEqual(result["contract_status"], "needs_review")
+        self.assertTrue(any("субъекта действия" in issue.lower() for issue in result["issues"]))
+
+    def test_validator_flags_fiction_interpretive_additions(self) -> None:
+        contract = get_adaptation_output_contract(
+            product_mode="basic_simplify",
+            strategy_mode="mode_b",
+            genre="fiction",
+            risk_level="high",
+        )
+        result = validate_adaptation_output_contract(
+            contract=contract,
+            source_text="Марина не стала спорить. Рядом плыл кораблик.",
+            adapted_text="Марина молча согласилась. Рядом плыл большой корабль.",
+        )
+
+        self.assertEqual(result["contract_status"], "needs_review")
+        self.assertTrue(any("fiction" in issue.lower() for issue in result["issues"]))
+
+    def test_validator_flags_scientific_popular_micro_fragmentation(self) -> None:
+        contract = get_adaptation_output_contract(
+            product_mode="structured_explanation",
+            strategy_mode="mode_a",
+            genre="scientific_popular",
+            risk_level="medium",
+        )
+        result = validate_adaptation_output_contract(
+            contract=contract,
+            source_text="Текст объясняет явление как последовательный процесс с несколькими крупными этапами.",
+            adapted_text=(
+                "### Шаг 1\nА\n\n### Шаг 2\nБ\n\n### Шаг 3\nВ\n\n### Шаг 4\nГ\n\n### Шаг 5\nД\n\n### Шаг 6\nЕ"
+            ),
+        )
+
+        self.assertEqual(result["contract_status"], "needs_review")
+        self.assertTrue(any("микрошагов" in issue.lower() for issue in result["issues"]))
 
     def test_prompt_includes_output_contract(self) -> None:
         prompt = build_adaptation_system_prompt(

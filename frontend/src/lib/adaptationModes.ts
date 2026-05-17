@@ -71,18 +71,15 @@ export function resolveStrategyMode(
   mode: TeacherAiAssistantMode,
   genre: TeacherAiAssistantGenre,
 ): TeacherAiAssistantStrategyMode {
-  if (mode === 'mode_a' || mode === 'mode_b') {
-    return mode;
-  }
-
   if (genre === 'legal' || genre === 'fiction') {
     return 'mode_b';
   }
-
-  if (mode === 'key_points_focus') {
+  if (mode === 'mode_b') {
     return 'mode_b';
   }
-
+  if (mode === 'mode_a') {
+    return 'mode_a';
+  }
   return 'mode_a';
 }
 
@@ -101,6 +98,19 @@ export function getAdaptationModeLabel(mode: string | null | undefined): string 
     PRODUCT_MODE_LABELS[mode] ??
     mode
   );
+}
+
+export function getContextualAdaptationModeLabel(
+  mode: TeacherAiAssistantMode,
+  genre: TeacherAiAssistantGenre,
+  variant: 'label' | 'shortLabel' = 'label',
+): string {
+  if (mode === 'structured_explanation' && genre === 'fiction') {
+    return variant === 'shortLabel' ? 'По эпизодам' : 'Разделить по эпизодам';
+  }
+
+  const option = ADAPTATION_PRODUCT_MODE_OPTIONS.find((item) => item.value === mode);
+  return variant === 'shortLabel' ? option?.shortLabel ?? getAdaptationModeLabel(mode) : option?.label ?? getAdaptationModeLabel(mode);
 }
 
 export function getAdaptationGenreLabel(genre: string | null | undefined): string {

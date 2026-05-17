@@ -84,8 +84,15 @@ class AdminRagRulesControlsTests(unittest.TestCase):
             )
 
             self.general_document_id = uuid.uuid4()
+            self.educational_golden_document_id = uuid.uuid4()
             self.mode_specific_document_id = uuid.uuid4()
             self.legal_mode_b_document_id = uuid.uuid4()
+            self.general_principles_document_id = uuid.uuid4()
+            self.controlled_ops_document_id = uuid.uuid4()
+            self.protected_span_document_id = uuid.uuid4()
+            self.forced_retrieval_document_id = uuid.uuid4()
+            self.genre_modes_document_id = uuid.uuid4()
+            self.protected_elements_policy_document_id = uuid.uuid4()
             self.disabled_document_id = uuid.uuid4()
             self.deleted_document_id = uuid.uuid4()
 
@@ -103,6 +110,19 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                         use_in_rag=True,
                         adaptation_modes=[],
                         extracted_text="Общий методический документ.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.educational_golden_document_id,
+                        title="08_golden_templates_educational_legal",
+                        original_filename="08_golden_templates_educational_legal.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/golden-educational.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=["basic_simplify", "educational"],
+                        extracted_text="Golden adaptation template for educational basic_simplify.",
                     ),
                     KnowledgeDocument(
                         id=self.mode_specific_document_id,
@@ -129,6 +149,84 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                         use_in_rag=True,
                         adaptation_modes=["mode_b", "legal"],
                         extracted_text="Правила для юридических текстов в строгом режиме.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.general_principles_document_id,
+                        title="01_general_principles",
+                        original_filename="01_general_principles.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/01_general_principles.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=[],
+                        extracted_text="General methodology principles.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.controlled_ops_document_id,
+                        title="07_controlled_adaptation_operations",
+                        original_filename="07_controlled_adaptation_operations.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/07_controlled_adaptation_operations.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=[],
+                        extracted_text="Controlled adaptation operations.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.protected_span_document_id,
+                        title="11_protected_span_policy",
+                        original_filename="11_protected_span_policy.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/11_protected_span_policy.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=[],
+                        extracted_text="Protected span policy.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.forced_retrieval_document_id,
+                        title="12_forced_methodology_retrieval",
+                        original_filename="12_forced_methodology_retrieval.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/12_forced_methodology_retrieval.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=[],
+                        extracted_text="Forced methodology retrieval policy.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.genre_modes_document_id,
+                        title="05_genre_modes_a_b",
+                        original_filename="05_genre_modes_a_b.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/05_genre_modes_a_b.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=["mode_b", "legal"],
+                        extracted_text="Genre modes methodology for legal preservation.",
+                    ),
+                    KnowledgeDocument(
+                        id=self.protected_elements_policy_document_id,
+                        title="06_protected_elements_policy",
+                        original_filename="06_protected_elements_policy.md",
+                        mime_type="text/markdown",
+                        file_size=100,
+                        storage_object_key="knowledge-base/06_protected_elements_policy.md",
+                        uploaded_by_user_id=self.admin_id,
+                        status="embedded",
+                        use_in_rag=True,
+                        adaptation_modes=["mode_b", "legal"],
+                        extracted_text="Protected elements policy for legal texts.",
                     ),
                     KnowledgeDocument(
                         id=self.disabled_document_id,
@@ -172,6 +270,14 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     ),
                     KnowledgeDocumentChunk(
                         id=uuid.uuid4(),
+                        document_id=self.educational_golden_document_id,
+                        chunk_index=0,
+                        content="Golden adaptation template for educational basic_simplify with pedagogical structure.",
+                        char_count=83,
+                        embedding=EMBEDDING_A,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
                         document_id=self.mode_specific_document_id,
                         chunk_index=0,
                         content="Chunk только для mode A.",
@@ -185,6 +291,54 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                         content="Chunk для legal + mode B.",
                         char_count=26,
                         embedding=EMBEDDING_A,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.general_principles_document_id,
+                        chunk_index=0,
+                        content="General principles chunk.",
+                        char_count=25,
+                        embedding=EMBEDDING_B,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.controlled_ops_document_id,
+                        chunk_index=0,
+                        content="Controlled operations chunk.",
+                        char_count=28,
+                        embedding=EMBEDDING_B,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.protected_span_document_id,
+                        chunk_index=0,
+                        content="Protected span policy chunk.",
+                        char_count=28,
+                        embedding=EMBEDDING_B,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.forced_retrieval_document_id,
+                        chunk_index=0,
+                        content="Forced retrieval chunk.",
+                        char_count=24,
+                        embedding=EMBEDDING_B,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.genre_modes_document_id,
+                        chunk_index=0,
+                        content="Genre modes legal chunk.",
+                        char_count=24,
+                        embedding=EMBEDDING_B,
+                    ),
+                    KnowledgeDocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=self.protected_elements_policy_document_id,
+                        chunk_index=0,
+                        content="Protected elements legal chunk.",
+                        char_count=31,
+                        embedding=EMBEDDING_B,
                     ),
                     KnowledgeDocumentChunk(
                         id=uuid.uuid4(),
@@ -269,6 +423,20 @@ class AdminRagRulesControlsTests(unittest.TestCase):
         self.assertIn("Общие рекомендации", [item.document_title for item in basic_items])
         self.assertIn("Общие рекомендации", [item.document_title for item in structured_items])
 
+    def test_golden_template_document_is_prioritized_for_matching_genre_and_product_mode(self) -> None:
+        with self.SessionLocal() as db:
+            with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
+                items = retrieve_relevant_chunks(
+                    db,
+                    query_text="адаптировать учебный текст",
+                    top_k=10,
+                    selected_mode="basic_simplify",
+                    selected_genre="educational",
+                )
+
+        self.assertGreaterEqual(len(items), 1)
+        self.assertEqual(items[0].document_title, "08_golden_templates_educational_legal")
+
     def test_mode_specific_document_participates_for_matching_mode(self) -> None:
         with self.SessionLocal() as db:
             with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
@@ -307,8 +475,8 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                     db,
                     query_text="любой запрос",
                     top_k=10,
-                    selected_mode="mode_a",
-                    selected_genre="legal",
+                    selected_mode="basic_simplify",
+                    selected_genre="educational",
                 )
 
         self.assertIn(
@@ -319,6 +487,27 @@ class AdminRagRulesControlsTests(unittest.TestCase):
             "Юридическая бережная адаптация",
             [item.document_title for item in non_matching_items],
         )
+
+    def test_forced_methodology_retrieval_includes_mandatory_legal_docs_beyond_semantic_top_k(self) -> None:
+        with self.SessionLocal() as db:
+            with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
+                items = retrieve_relevant_chunks(
+                    db,
+                    query_text="адаптируй юридический текст",
+                    top_k=3,
+                    selected_mode="basic_simplify",
+                    selected_genre="legal",
+                    include_forced_methodology=True,
+                )
+
+        titles = [item.document_title for item in items]
+        self.assertIn("01_general_principles", titles)
+        self.assertIn("07_controlled_adaptation_operations", titles)
+        self.assertIn("11_protected_span_policy", titles)
+        self.assertIn("12_forced_methodology_retrieval", titles)
+        self.assertIn("06_protected_elements_policy", titles)
+        self.assertIn("08_golden_templates_educational_legal", titles)
+        self.assertGreater(len(items), 3)
 
     def test_teacher_assistant_endpoint_no_longer_returns_500(self) -> None:
         token = self._login_teacher()
@@ -342,8 +531,36 @@ class AdminRagRulesControlsTests(unittest.TestCase):
                 )
 
         self.assertEqual(response.status_code, 200, response.text)
+
+    def test_teacher_assistant_response_exposes_forced_methodology_chunks(self) -> None:
+        token = self._login_teacher()
+        with patch("app.services.retrieval_service.embed_query", return_value=EMBEDDING_A):
+            with patch(
+                "app.services.teacher_ai_assistant_service.get_llm_service",
+                return_value=SimpleNamespace(
+                    adapt_plain_text=lambda request: SimpleNamespace(
+                        adapted_text=f"ok:{request.mode}"
+                    )
+                ),
+            ):
+                response = self.client.post(
+                    "/api/v1/teacher/ai-assistant/messages",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={
+                        "message": "Проверь адаптацию юридического текста",
+                        "mode": "basic_simplify",
+                        "genre": "legal",
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        chunk_titles = [item["document_title"] for item in response.json()["used_knowledge_chunks"]]
+        self.assertIn("07_controlled_adaptation_operations", chunk_titles)
+        self.assertIn("11_protected_span_policy", chunk_titles)
+        self.assertIn("12_forced_methodology_retrieval", chunk_titles)
+        self.assertIn("06_protected_elements_policy", chunk_titles)
         payload = response.json()
-        self.assertEqual(payload["reply"], "ok:mode_b")
+        self.assertEqual(payload["reply"], "ok:basic_simplify")
         self.assertIn(
             "Юридическая бережная адаптация",
             [item["document_title"] for item in payload["used_knowledge_chunks"]],

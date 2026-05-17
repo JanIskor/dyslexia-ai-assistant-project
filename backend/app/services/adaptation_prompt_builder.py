@@ -74,6 +74,7 @@ BASE_PROMPT: Final[str] = (
     "Не изменяй числа, даты, единицы измерения, формулы, имена, технические обозначения и ключевые термины. "
     "Не добавляй факты, которых нет в исходном тексте. "
     "Не добавляй примеры, причины, термины, объяснения или выводы, которых нет в исходном тексте, даже если они правдоподобны или верны. "
+    "Не добавляй новых субъектов действия, новых признаков, новых цветов, новых оценок, новых причин и новых выводов, которых нет в исходном тексте. "
     "Если в тексте есть сложная формула, сохрани её и при необходимости поясни словами, не меняя саму запись. "
     "Верни только готовый адаптированный текст без вводных комментариев от себя."
 )
@@ -171,18 +172,15 @@ def resolve_strategy_mode(
     mode: AdaptationMode | None,
     genre: AdaptationGenre | None = DEFAULT_ADAPTATION_GENRE,
 ) -> StrategyAdaptationMode:
-    if mode == "mode_b":
-        return "mode_b"
-    if mode == "mode_a":
-        return "mode_a"
-
     effective_mode = mode or DEFAULT_PRODUCT_ADAPTATION_MODE
     effective_genre = genre or DEFAULT_ADAPTATION_GENRE
 
     if effective_genre in {"legal", "fiction"}:
         return "mode_b"
-    if effective_mode == "key_points_focus":
+    if effective_mode == "mode_b":
         return "mode_b"
+    if effective_mode == "mode_a":
+        return "mode_a"
     return "mode_a"
 
 
@@ -232,7 +230,7 @@ def _build_knowledge_context_block(
             f"[Источник: {chunk.document_title}, chunk {chunk.chunk_index}]\n"
             f"{chunk.content.strip()}"
         )
-        for chunk in retrieved_chunks[:5]
+        for chunk in retrieved_chunks[:12]
         if chunk.content.strip()
     )
 
@@ -277,9 +275,14 @@ def build_adaptation_system_prompt(
         PRODUCT_MODE_PROMPT_BLOCKS.get(normalized_product_mode),
         MODE_PROMPT_BLOCKS[normalized_mode],
         GENRE_PROMPT_BLOCKS[genre],
+        _build_genre_aware_method_behavior_block(
+            product_mode=normalized_product_mode,
+            genre=genre,
+        ),
         f"Уровень риска адаптации: {policy['risk_level']}.",
         policy["policy_summary"],
         _build_genre_specific_guardrails_block(genre=genre),
+        _build_visual_markup_guidance_block(genre=genre),
         _build_protected_elements_block(protected_elements),
         _build_operations_block(
             title="Разрешённые операции",
@@ -352,7 +355,9 @@ def _build_genre_specific_guardrails_block(*, genre: AdaptationGenre) -> str:
             "- Сильно предпочитай сохранение исходной формулировки.\n"
             "- Адаптируй через структуру, а не через свободный парафраз.\n"
             "- Не меняй юридический субъект, модальность, условия, исключения, сроки, адресатов и порядок действий.\n"
+            "- Не меняй направление действия: тот, кто выполняет действие в исходнике, должен оставаться тем же субъектом в адаптации.\n"
             "- Бережно сохраняй формулировки и маркеры вроде «вправе», «обязан», «допускается», «не допускается», «если иное», «в течение».\n"
+            "- Не заменяй юридически значимые формулировки бытовыми аналогами вроде «законный представитель» -> «родитель» или «образовательная организация» -> «школа».\n"
             "- Не добавляй примеры, пояснения и выводы, которых нет в исходнике.\n"
             "- Если юридическую фразу трудно упростить безопасно, сохрани её в исходной формулировке и улучши структуру вокруг неё."
         )
@@ -362,9 +367,144 @@ def _build_genre_specific_guardrails_block(*, genre: AdaptationGenre) -> str:
             "- Не вводи новые обозначения, символы, формулы, аббревиатуры и технические ярлыки, если их нет в исходнике.\n"
             "- Не заменяй слова символами или формулами.\n"
             "- Не добавляй внешние примеры, причины и широкие выводы.\n"
-            "- Не расширяй сферу утверждений словами вроде «все», «всегда», «полностью», «главный», «единственный», если этого нет в источнике."
+            "- Не расширяй сферу утверждений словами вроде «все», «всегда», «полностью», «главный», «единственный», если этого нет в источнике.\n"
+            "- Сохраняй ключевые термины и scope исходного объяснения без смыслового усиления."
+        )
+    if genre == "fiction":
+        return (
+            "FICTION PRESERVATION RULES:\n"
+            "- Улучшай читаемость без разрушения narrative structure.\n"
+            "- Сохраняй атмосферу, образность, эмоциональную динамику и tone.\n"
+            "- Не добавляй новые признаки, цвета, оценки, причины, эмоции и интерпретации, которых нет в исходнике.\n"
+            "- Не объясняй символы и подтекст внутри адаптированного текста.\n"
+            "- Не пересказывай сюжет вместо художественной сцены.\n"
+            "- Не уничтожай метафоры и не превращай fiction в informational summary."
+        )
+    if genre == "scientific_popular":
+        return (
+            "SCIENTIFIC-POPULAR CLARITY RULES:\n"
+            "- Сохраняй scientific correctness и educational value.\n"
+            "- Снижая cognitive overload, не удаляй causal relationships и key concepts.\n"
+            "- Поясняй термины бережно и не вводи новые факты.\n"
+            "- Усиливай hierarchy, segmentation и readability без scientific distortion.\n"
+            "- В structured_explanation группируй материал в 3-5 крупных смысловых блоков, а не в множество микрошагов."
         )
     return ""
+
+
+def _build_genre_aware_method_behavior_block(
+    *,
+    product_mode: ProductAdaptationMode,
+    genre: AdaptationGenre,
+) -> str:
+    if product_mode == "basic_simplify" and genre == "educational":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- basic_simplify + educational = pedagogical rewrite.\n"
+            "- Используй стабильную объяснительную учебную структуру.\n"
+            "- Сохраняй термины, причинно-следственные связи и scope исходного утверждения.\n"
+            "- Не добавляй новые факты и новые обозначения."
+        )
+    if product_mode == "basic_simplify" and genre == "legal":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- basic_simplify + legal = structured near-source adaptation.\n"
+            "- Улучшай структуру документа, но минимизируй rewriting.\n"
+            "- Сохраняй юридические конструкции, ограничения, сроки и условия максимально близко к source."
+        )
+    if product_mode == "structured_explanation" and genre == "educational":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- structured_explanation + educational = process/logic steps.\n"
+            "- Шаги должны отражать реальную учебную или причинно-следственную логику текста.\n"
+            "- Не смешивай markdown heading и bold в одной строке. Нельзя писать «**### Шаг 1.**»."
+        )
+    if product_mode == "structured_explanation" and genre == "legal":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- structured_explanation + legal = document structure steps.\n"
+            "- Показывай участников, условия, ограничения, сроки и права как структурные блоки документа, а не как бытовой пересказ."
+        )
+    if product_mode == "key_points_focus" and genre == "educational":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- key_points_focus + educational = learning anchors.\n"
+            "- Выделяй главную мысль, важные условия и опорные термины без полного пересказа."
+        )
+    if product_mode == "key_points_focus" and genre == "legal":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- key_points_focus + legal = obligations/conditions/rights extraction.\n"
+            "- Выделяй права, обязанности, условия, ограничения, сроки и исключения без потери юридической точности."
+        )
+    if product_mode == "basic_simplify" and genre == "fiction":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- basic_simplify + fiction = narrative-preserving simplification.\n"
+            "- Улучшай navigability, но не разрушай immersion и эмоциональный ритм сцены."
+        )
+    if product_mode == "structured_explanation" and genre == "fiction":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- structured_explanation + fiction = episode-aware scene guidance.\n"
+            "- Делай эпизоды и диалоги читаемее, но не превращай сцену в техническую инструкцию.\n"
+            "- Для fiction используй эпизоды, а не шаги."
+        )
+    if product_mode == "key_points_focus" and genre == "fiction":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- key_points_focus + fiction = scene anchors without retelling.\n"
+            "- Выделяй важные моменты, настроение и опорные образы без сухого summary."
+        )
+    if product_mode == "basic_simplify" and genre == "scientific_popular":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- basic_simplify + scientific_popular = scientifically safe pedagogical rewrite.\n"
+            "- Сохраняй causal logic и scientific correctness, уменьшая cognitive overload."
+        )
+    if product_mode == "structured_explanation" and genre == "scientific_popular":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- structured_explanation + scientific_popular = process/logic explanation.\n"
+            "- Разбивай объяснение на понятные causal steps без scientific distortion.\n"
+            "- Группируй материал в 3-5 крупных смысловых блоков, а не в микрошаги."
+        )
+    if product_mode == "key_points_focus" and genre == "scientific_popular":
+        return (
+            "GENRE-AWARE METHOD BEHAVIOR:\n"
+            "- key_points_focus + scientific_popular = concept anchors.\n"
+            "- Выделяй ключевые понятия, связи и ограничения без потери образовательной ценности."
+        )
+    return ""
+
+
+def _build_visual_markup_guidance_block(*, genre: AdaptationGenre) -> str:
+    common_rule = (
+        "CLEAN MARKDOWN RULES:\n"
+        "- Используй только чистый Markdown без HTML и технических маркеров.\n"
+        "- Не смешивай heading syntax и bold в одной строке.\n"
+        "- Предпочитай заголовки, короткие абзацы, списки и умеренное **bold** там, где это действительно помогает чтению."
+    )
+
+    if genre in {"educational", "scientific_popular"}:
+        return (
+            f"{common_rule}\n"
+            "- Для учебных и научно-популярных текстов допустимо умеренно выделять **термины**, ключевые сущности и главную мысль блока.\n"
+            "- Логические переходы и причинно-следственные связи делай заметными через структуру фразы, отдельные абзацы и списки, а не через декоративную разметку."
+        )
+    if genre == "legal":
+        return (
+            f"{common_rule}\n"
+            "- Для legal используй сдержанную разметку: нейтральные заголовки, списки и умеренное **bold** только для субъектов, сроков, прав, обязанностей и запретов.\n"
+            "- Не используй агрессивную разметку, которая может визуально исказить юридические акценты."
+        )
+    if genre == "fiction":
+        return (
+            f"{common_rule}\n"
+            "- Для fiction основная помощь — абзацы, реплики и эпизоды.\n"
+            "- Не перегружай художественный текст **bold** и не выделяй мораль или символ, если этого нет прямо в исходнике."
+        )
+    return common_rule
 
 
 def _build_output_contract_block(
