@@ -8,6 +8,7 @@ import {
   type StudentLearningMaterialDetail,
   type StudentLearningMaterialListItem,
 } from '@/lib/studentMaterialsApi';
+import { SafeMarkdown } from '@/components/ui/SafeMarkdown';
 
 type StudentMaterialsViewState =
   | {
@@ -94,8 +95,12 @@ function StudentMaterialDetailCard({
           </span>
         ) : null}
         <h2 className="mt-3 text-2xl font-medium text-stone-700 sm:text-3xl">{material.title}</h2>
-        <div className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-stone-600 sm:text-lg">
-          {material.original_text}
+        <div className="mt-5 text-base leading-relaxed text-stone-600 sm:text-lg">
+          {material.is_adapted ? (
+            <SafeMarkdown content={material.original_text} />
+          ) : (
+            <div className="whitespace-pre-wrap">{material.original_text}</div>
+          )}
         </div>
       </div>
     </section>

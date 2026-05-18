@@ -35,6 +35,7 @@ import {
   shouldShowGenreAwareWarning,
 } from '@/lib/adaptationModes';
 import { getTeacherMaterials, type TeacherLearningMaterial } from '@/lib/teacherMaterialsApi';
+import { SafeMarkdown } from '@/components/ui/SafeMarkdown';
 
 type TeacherAiAssistantMessageRole = 'user' | 'assistant';
 
@@ -1063,7 +1064,11 @@ export function TeacherAiAssistantSection({ accessToken }: TeacherAiAssistantSec
                             : 'border border-orange-100 bg-orange-50/70 text-stone-700'
                         }`}
                       >
-                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        {isUserMessage ? (
+                          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        ) : (
+                          <SafeMarkdown content={message.content} className="break-words" />
+                        )}
                       </article>
 
                       {message.role === 'assistant' ? (

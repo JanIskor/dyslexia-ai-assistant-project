@@ -27,6 +27,7 @@ import {
 import { TeacherMaterialAssignmentModal } from '@/components/teacher/TeacherMaterialAssignmentModal';
 import { getAdaptationModeLabel } from '@/lib/adaptationModes';
 import { getTeacherStudents, type TeacherStudentListItem } from '@/lib/teacherStudentsApi';
+import { SafeMarkdown } from '@/components/ui/SafeMarkdown';
 
 type TeacherMaterialsViewState =
   | {
@@ -637,7 +638,7 @@ function TeacherAdaptedMaterialDetail({
             data-testid="teacher-adapted-material-detail-text"
             className="mt-4 rounded-[18px] border border-orange-100/80 bg-white/90 px-4 py-4 text-base leading-relaxed text-stone-600 sm:text-lg"
           >
-            <p className="whitespace-pre-wrap">{material.adapted_text}</p>
+            <SafeMarkdown content={material.adapted_text ?? ''} />
           </div>
 
           {material.adaptation_rationale ? (
@@ -759,7 +760,7 @@ function TeacherAdaptedMaterialCompare({
             data-testid="teacher-adapted-material-adapted-text"
             className="mt-4 max-h-[30rem] overflow-y-auto rounded-[18px] border border-orange-100/80 bg-white/90 px-4 py-4 text-base leading-relaxed text-stone-600 sm:text-lg"
           >
-            <p className="whitespace-pre-wrap">{material.adapted_text}</p>
+            <SafeMarkdown content={material.adapted_text ?? ''} />
           </div>
         </section>
       </div>
